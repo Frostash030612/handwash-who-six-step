@@ -40,6 +40,7 @@ PAIRS: tuple[tuple[str, str], ...] = (
     ("docs/DATA.md", "docs/zh/DATA.md"),
     ("docs/RULES_CARD.md", "docs/zh/RULES_CARD.md"),
     ("docs/PROJECT_PLAN_4_WEEK.md", "docs/zh/PROJECT_PLAN_4_WEEK.md"),
+    ("docs/PROJECT_PROPOSAL.md", "docs/zh/PROJECT_PROPOSAL.md"),
 )
 
 #: 只检查这些文件（其余是内部中文文档，不参与双语结构）
@@ -54,6 +55,7 @@ CHECKED_FILES: tuple[str, ...] = (
     "docs/PROTOCOL.md",
     "docs/RULES_CARD.md",
     "docs/PROJECT_PLAN_4_WEEK.md",
+    "docs/PROJECT_PROPOSAL.md",
     "docs/EXPERIMENTS.md",
     "docs/SELF_RECORDING.md",
     "docs/zh/ARCHITECTURE.md",
@@ -63,6 +65,7 @@ CHECKED_FILES: tuple[str, ...] = (
     "docs/zh/PROTOCOL.md",
     "docs/zh/RULES_CARD.md",
     "docs/zh/PROJECT_PLAN_4_WEEK.md",
+    "docs/zh/PROJECT_PROPOSAL.md",
     "tests/README.md",
     "data/README.md",
 )

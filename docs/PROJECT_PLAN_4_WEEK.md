@@ -23,20 +23,21 @@ Breakdown of the 50% project work — **this is the plan's backbone**:
 
 | Item | Weight | Delivered in | Covers |
 | --- | --- | --- | --- |
-| First presentation | 5% | Week 1 | goals, data resources, techniques/tools, progress |
+| First presentation | 5% | Week 2 | goals, data resources required/available, techniques/tools used, progress |
 | Final presentation | 10% | Week 4 | 10–15 min recorded video presentation |
-| Final report | 15% | Week 4 | tools/techniques, system design, performance, findings |
-| Final system | 15% | Week 4 | **runnable** pattern recognition system + datasets + code |
+| Final report | 15% | Week 4 | tools/techniques, system design/models, system performance, findings and discussions |
+| Final system | 15% | Week 4 | **runnable** pattern recognition system + datasets + code + model files |
 | Peer review | 5% | Week 4 | submitted through the peer review system |
 
 ### 0.2 Hard requirements from the brief
 
-1. Team of **max 5 members** — you have 4.
+1. Team of **max 5 members**, and **enrol in Canvas project groups** — you have 4; confirm the
+   Canvas group ID (you need it on the proposal cover).
 2. The project must **develop, integrate and demonstrate at least 3 of these 4 aspects**:
 
    | # | Aspect | How this project satisfies it |
    | --- | --- | --- |
-   | A1 | Supervised / unsupervised learning | **Supervised**: frame-level 6-class classification, video-level train/val/test split |
+   | A1 | Supervised / unsupervised learning | **Supervised**: frame-level 6-class classification; video-level train/val/test split |
    | A2 | Machine learning / deep learning | **Deep learning**: YOLO26n-cls + MobileNetV2 (transfer learning) |
    | A3 | Hybrid ML / ensemble approach | **Hybrid + ensemble**: frame model × temporal model (GRU/TCN) fused by probability smoothing and majority voting |
    | A4 | Intelligent sensing / sense making | **Sense making**: video as a sensor stream; temporal segmentation turns per-frame labels into an action sequence and a compliance verdict |
@@ -44,29 +45,40 @@ Breakdown of the 50% project work — **this is the plan's backbone**:
    **Plan for all four, guarantee three.** A4 is the one that most often collapses under deadline
    pressure, so it gets its own dedicated owner (see §2) and its deliverable is the demo — which you
    must have anyway for the final video.
-3. Deliverables: runnable system, datasets, final report, **10–15 min** video presentation,
-   slides for both presentations, code/model files.
-4. **Additional:** 1–2 page individual report **per member** (personal contribution; what you
-   learnt that is most useful; how you will apply it elsewhere) + peer review via the system.
-5. Submission: 31 Oct 2026, via Canvas → Assignments → Practice Module.
-   **One ZIP per team**, except the individual reports.
+3. Deliverables: runnable system, datasets, final report, **10–15 min** video presentation
+   (`.mp4/.mov/.wmv`), slides for **both** presentations, code + model files.
+4. **Additional submissions:** 1–2 page individual report **per member** (personal contribution;
+   what you learnt that is most useful; how you will apply it elsewhere) + peer review via the
+   peer review system.
+5. Submission: **31 Oct 2026**, Canvas → Assignments → Practice Module.
+   **One ZIP per team**, except the individual reports, which are submitted separately.
 
-### 0.3 Calendar anchors
+### 0.3 Calendar anchors — **all dates on the right are Week 2 and later**
 
-| Course date | What |
-| --- | --- |
-| 15 Sep 2026 | Project proposal deadline *(already past — confirm it was submitted)* |
-| **30 Sep 2026, 18:30–22:30** | **First presentation, via Zoom** (5%) |
-| **31 Oct 2026** | All deliverables (10% + 15% + 15% + 5%) + individual reports |
+| Date | What | Owner |
+| --- | --- | --- |
+| **30 Sep 2026** | **Project Proposal submission deadline** (template: `docs/Project_Proposal_Template.docx`) | R4 (lead) + all |
+| **6 Oct 2026, 09:00–18:00** | **First presentation, via Zoom** (5%) | R4 (lead) + all |
+| **31 Oct 2026** | All deliverables (10% + 15% + 15% + 5%) + individual reports + peer review | all |
 
-**This plan runs Weeks 1–4. Pin it to real dates by setting your own Week-1 Monday**, e.g.
-Week 1 = 21–27 Sep, Week 2 = 28 Sep–4 Oct, Week 3 = 5–11 Oct, Week 4 = 12–18 Oct.
-That leaves **~2 buffer weeks before 31 Oct** — use them for the exam, re-shoots, and the
-final polish. Do not let the buffer tempt you into sliding the plan.
+**The four weeks are counted backwards from 31 Oct.** Set your Week-1 Monday so that Week 4 ends
+comfortably before the deadline — the recommended mapping is:
+
+| Week | Dates | Focus | Course event |
+| --- | --- | --- | --- |
+| Week 1 | 22–28 Sep | Proposal + data pipeline + smoke runs | **Proposal due 30 Sep** |
+| Week 2 | 29 Sep–5 Oct | First presentation + real-data baseline | **First presentation 6 Oct** |
+| Week 3 | 6–12 Oct | Primary model, temporal integration, cross-scenario | — |
+| Week 4 | 13–19 Oct | Ablation, error analysis, demo, report skeleton | — |
+| Buffer | 20–31 Oct | Final system freeze, video, report, ZIP, peer review, **exam** | **Deliverables 31 Oct** |
 
 > The brief estimates **10 days of effort** for the module. Across 4 people × 4 weeks that is
-> **~2.5 focused days per person per week**. If a week is running long, cut scope — never cut the
-> final system, the report, or the video.
+> **~2.5 focused days per person per week**. If a week runs long, cut scope — never cut the final
+> system, the report, or the video.
+>
+> **Do not treat the buffer as slack.** Weeks 1–4 produce a submission that is at least 80%
+> complete; the buffer weeks exist for the exam, re-shoots, and the clean-machine rehearsal.
+> If you let the plan slide into the buffer, you lose that safety margin entirely.
 
 ---
 
@@ -86,6 +98,10 @@ These exist so that four people can work in parallel without breaking each other
 checkpoint every Thursday (unblock). Written decision log in `docs/EXPERIMENTS.md` — if it is not
 written down, it did not happen.
 
+> **This week's exception:** with the proposal due 30 Sep, hold a 45-min **kick-off** on day one
+> to agree the project title, the 3-of-4 aspect story, and who writes which proposal section.
+> Everything else in Week 1 is downstream of that 45 minutes.
+
 ---
 
 ## 2. Four roles (one owner per workstream, no shared ownership)
@@ -97,12 +113,12 @@ Shared ownership means nobody owns it. Each workstream has exactly one owner; ot
 | **R1 — Data & Evaluation Lead** | | datasets, splits, metrics, evaluation protocol, statistical claims | `src/handwash/io/`, `src/handwash/data/`, `scripts/prepare_data.py`, `docs/DATA.md`, `docs/EXPERIMENTS.md` | Final system, final report (performance) |
 | **R2 — Model & Training Lead** | | frame classifier, training pipeline, baselines, hyper-parameters | `src/handwash/models/`, `src/handwash/pipelines/train.py`, `configs/models/`, `configs/experiments/` | Final system, final report (design) |
 | **R3 — Temporal & Assessment Lead** | | temporal fusion, completeness rules, cross-scenario robustness | `src/handwash/models/temporal.py`, `src/handwash/core/protocol.py`, `configs/config.yaml` (`assess`) | Final system (the differentiator) |
-| **R4 — Product, Demo & Delivery Lead** | | runnable demo, video, slides, report integration, ZIP, peer review logistics | `scripts/run_assess.py`, `docs/REPORT_OUTLINE.md`, `deliverables/` | First presentation, final presentation, final report, peer review |
+| **R4 — Product, Demo & Delivery Lead** | | proposal, runnable demo, video, slides, report integration, ZIP, peer review logistics | `docs/PROJECT_PROPOSAL.md`, `scripts/run_assess.py`, `deliverables/` | **Proposal, first presentation**, final presentation, final report, peer review |
 
 **Why this split:** R1 and R2 unblock each other on day one (splits → first baseline).
 R3 depends on R2's checkpoint but can build and unit-test the temporal head against synthetic
-data in Week 1. R4 has the earliest deadline (30 Sep presentation) and the latest (31 Oct ZIP),
-which is exactly why the demo owner must also own delivery — one throat to choke.
+data in Week 1. R4 owns the two submission gates (30 Sep proposal, 6 Oct presentation) and the
+two final ones (video, ZIP) — one throat to choke.
 
 **Load balance check:** each role is ~2.5 days/week. If any role exceeds 4 days in a week,
 that is a planning bug — raise it in the Monday sync.
@@ -113,55 +129,64 @@ that is a planning bug — raise it in the Monday sync.
 
 Legend: **[R1]**…**[R4]** = the role that owns the task. Tasks without a bracket are whole-team.
 
-### Week 1 — Foundations: data flows, first baseline runs, first presentation
+### Week 1 (22–28 Sep) — Proposal + foundations + first runs
 
-**Goal:** by Sunday, a real dataset trains end to end on one GPU box, and everyone can run
-`make check` green. First presentation is delivered on 30 Sep, so Week 1 must also produce slides.
+**Goal:** the proposal is submitted, a real dataset trains end to end on one GPU box, and
+everyone can run `make check` green.
 
 | # | Task | Owner | Deliverable (evidence) |
 | --- | --- | --- | --- |
-| 1.1 | Download the small Kaggle dataset; run `prepare_data.py --inspect`; verify label mapping | [R1] | `data/processed/kaggle/split_report.json` |
-| 1.2 | Start the PSKUS subset download (300–500 clips) in the background — **do not wait for it** | [R1] | download log |
-| 1.3 | Environment check: `python scripts/doctor.py` green on every member's machine | all | 4 screenshots in the team channel |
-| 1.4 | Run the smoke test, then the first real baseline (`exp01`) | [R2] | `outputs/e1_*/eval/eval_val.json` |
-| 1.5 | Build and unit-test the temporal head on synthetic data (no checkpoint needed yet) | [R3] | `pytest tests/unit -k temporal` green |
-| 1.6 | Draft the first-presentation deck: goals, data resources, techniques/tools, progress | [R4] | `deliverables/slides_first_presentation.pdf` |
-| 1.7 | Freeze the label space and the assessment criteria; write them down | [R3] | `docs/PROTOCOL.md` reviewed & merged |
-| 1.8 | Weekly sync + fill `docs/EXPERIMENTS.md` with the baseline row (incl. `config_hash`) | all | experiment log entry |
+| 1.1 | **Kick-off (45 min): title, the 3-of-4 aspect story, proposal section owners** | all | this doc's §2 table filled in with real names |
+| 1.2 | Confirm the Canvas group ID and that all 4 members are enrolled | [R4] | Canvas group screenshot |
+| 1.3 | **Draft the proposal into `docs/Project_Proposal_Template.docx`** — see `docs/PROJECT_PROPOSAL.md` for ready-to-paste content | [R4] + all | `deliverables/project_proposal.pdf` |
+| 1.4 | **Submit the proposal to Canvas — deadline 30 Sep. Do not leave this to the 30th** | [R4] | submission receipt |
+| 1.5 | Download the small Kaggle dataset; run `prepare_data.py --inspect`; verify label mapping | [R1] | `data/processed/kaggle/split_report.json` |
+| 1.6 | Start the PSKUS subset download (300–500 clips) in the background — **do not wait for it** | [R1] | download log |
+| 1.7 | Environment check: `python scripts/doctor.py` green on every member's machine | all | 4 screenshots in the team channel |
+| 1.8 | Run the smoke test, then the first real baseline (`exp01`) | [R2] | `outputs/e1_*/eval/eval_val.json` |
+| 1.9 | Build and unit-test the temporal head on synthetic data (no checkpoint needed yet) | [R3] | `pytest tests/unit -k temporal` green |
+| 1.10 | **Draft the first-presentation deck** (goals, data required/available, techniques/tools, progress) — the proposal content is 70% of it | [R4] | `deliverables/slides_first_presentation.pdf` |
+| 1.11 | Freeze the label space and the assessment criteria; write them down | [R3] | `docs/PROTOCOL.md` reviewed & merged |
+| 1.12 | Weekly sync + fill `docs/EXPERIMENTS.md` with the baseline row (incl. `config_hash`) | all | experiment log entry |
 
 **Week-1 exit criteria**
+- [ ] Proposal **submitted** (not merely drafted) — this is the date that cannot slip
+- [ ] Canvas group ID recorded and all 4 members enrolled
 - [ ] `make check` green on all four machines
 - [ ] One baseline row in `docs/EXPERIMENTS.md` with a real Accuracy **and** Macro-F1
 - [ ] The six classes are confirmed identical across datasets (no label misalignment)
-- [ ] First-presentation slides ready **3 days before** 30 Sep (so there is time to rehearse)
+- [ ] First-presentation slides at draft-2 stage (only polish left for Week 2)
 
 > **Risk to watch:** PSKUS is 18.4 GB. If the download is not done by Week 1 end, do not block —
-> proceed on Kaggle and swap the dataset in Week 2. Say so explicitly in the experiment log.
+> proceed on Kaggle and swap the dataset in Week 3. Say so explicitly in the experiment log.
 
-### Week 2 — Real data at scale: full training, temporal integration, cross-scenario setup
+### Week 2 (29 Sep–5 Oct) — First presentation + real-data baseline
 
-**Goal:** the primary model (YOLO26n-cls + temporal) trains on real hospital data, and the
-evaluation harness produces every number the report needs.
+**Goal:** deliver the first presentation on 6 Oct and start training the primary model on real
+hospital data.
 
 | # | Task | Owner | Deliverable (evidence) |
 | --- | --- | --- | --- |
-| 2.1 | Prepare the PSKUS subset: split by source video, extract frames, rebuild manifest | [R1] | `split_report.json` showing train/val/test clip counts |
-| 2.2 | Leakage audit: run the guard checks, confirm no source video crosses splits | [R1] | audit note in `docs/EXPERIMENTS.md` |
-| 2.3 | Train the primary model (`exp02`: YOLO26n-cls + GRU); log all curves | [R2] | `outputs/e2_*/models/best.pt` + `history.json` |
-| 2.4 | Baseline matrix: MobileNetV2 (frame) and YOLOv8n-cls (frame) on the same split | [R2] | 3 comparable rows in the experiment log |
-| 2.5 | Integrate the temporal head with the trained checkpoint (freeze backbone → train head) | [R3] | `outputs/e2_temporal/` |
-| 2.6 | Wire `assess` end-to-end on a real clip: report JSON + Markdown | [R3] | `outputs/*/assess/<clip>.md` |
-| 2.7 | Evaluate on METC as the cross-scenario split | [R1] | `eval/eval_external.json` |
-| 2.8 | Record a first rough demo capture (phone, one correct + one deliberate mistake) | [R4] | raw `.mp4` files in `data/external/self_recorded/` |
-| 2.9 | Draft the report skeleton: tools/techniques, system design, performance, findings | [R4] | `deliverables/report_draft_v1.pdf` |
+| 2.1 | Rehearse the presentation twice; time it; agree who speaks to which slide | all | rehearsal notes |
+| 2.2 | **Deliver the first presentation — 6 Oct, 09:00–18:00, Zoom** (5%) | [R4] lead | slides + attendance |
+| 2.3 | Capture supervisor feedback verbatim and turn it into tasks | [R4] | feedback note in `docs/EXPERIMENTS.md` |
+| 2.4 | Prepare the PSKUS subset: split by source video, extract frames, rebuild manifest | [R1] | `split_report.json` showing train/val/test clip counts |
+| 2.5 | Leakage audit: run the guard checks, confirm no source video crosses splits | [R1] | audit note in `docs/EXPERIMENTS.md` |
+| 2.6 | Train the primary model (`exp02`: YOLO26n-cls + GRU); log all curves | [R2] | `outputs/e2_*/models/best.pt` + `history.json` |
+| 2.7 | Baseline matrix: MobileNetV2 (frame) and YOLOv8n-cls (frame) on the same split | [R2] | 3 comparable rows in the experiment log |
+| 2.8 | Integrate the temporal head with the trained checkpoint (freeze backbone → train head) | [R3] | `outputs/e2_temporal/` |
+| 2.9 | Wire `assess` end-to-end on a real clip: report JSON + Markdown | [R3] | `outputs/*/assess/<clip>.md` |
+| 2.10 | Evaluate on METC as the cross-scenario split | [R1] | `eval/eval_external.json` |
+| 2.11 | Record a first rough demo capture (phone, one correct + one deliberate mistake) | [R4] | raw `.mp4` files in `data/external/self_recorded/` |
 
 **Week-2 exit criteria**
+- [ ] First presentation delivered; feedback captured as tasks
 - [ ] Same-split comparison table exists: ≥ 3 models, Accuracy + Macro-F1 + confusion matrix
 - [ ] The temporal-vs-frame ablation is running (not necessarily finished)
 - [ ] `assess` produces a human-readable report for at least one real video
 - [ ] Cross-scenario number exists (even if poor — a poor number is a *finding*, not a failure)
 
-### Week 3 — The differentiator: temporal ablation, completeness evaluation, robustness
+### Week 3 (6–12 Oct) — The differentiator: temporal ablation, completeness evaluation, robustness
 
 **Goal:** produce the evidence that answers the research questions. This is the week that turns
 "we trained a classifier" into "we built a pattern recognition **system**".
@@ -177,6 +202,7 @@ evaluation harness produces every number the report needs.
 | 3.7 | Self-recorded validation set: 4–6 clips per member covering correct / missing / swapped / too-short | all | clips + `docs/SELF_RECORDING.md` table |
 | 3.8 | Ground-truth comparison: model verdict vs human verdict, completeness + order accuracy | [R4] | `assess_vs_ground_truth.csv` |
 | 3.9 | Assemble the demo so a stranger can run it from the README in under 5 minutes | [R4] | demo run script + `docs/DEMO.md` |
+| 3.10 | Draft the report: tools/techniques, system design, performance, findings | [R4] + all | `deliverables/report_draft_v1.pdf` |
 
 **Week-3 exit criteria**
 - [ ] The report's central table (the ablation) is complete and reproducible
@@ -188,39 +214,50 @@ evaluation harness produces every number the report needs.
 > A 0.84 Macro-F1 with a clean ablation, an honest error analysis and a cross-scenario study
 > scores better than 0.91 with no analysis — and the second is also more likely to be leakage.
 
-### Week 4 — Consolidate: final system, video, report, submissions
+### Week 4 (13–19 Oct) — Consolidate: final system, video, report, submissions
 
-**Goal:** ship. No new experiments this week — **freeze features at the start of Week 4.**
+**Goal:** reach a submission-ready state. No new experiments this week — **freeze features at the
+start of Week 4.**
 
 | # | Task | Owner | Deliverable (evidence) |
 | --- | --- | --- | --- |
 | 4.1 | **Feature freeze** at Monday sync; only bug fixes afterwards | all | decision recorded in experiment log |
 | 4.2 | Freeze the runnable system: one command installs, one command runs the demo | [R4] | verified on a **clean machine / fresh env** |
 | 4.3 | Package datasets + code + model files into `deliverables/` | [R1] | dataset README + download instructions |
-| 4.4 | Final report: all sections written, figures finalised, references complete | [R4] + all | `deliverables/final_report.pdf` |
-| 4.5 | Each member writes their **1–2 page individual report** | all | 4 separate PDFs |
+| 4.4 | Final report: all sections written, figures finalised, references complete | [R4] + all | `deliverables/final_report.pdf` (draft-final) |
+| 4.5 | Each member drafts their **1–2 page individual report** | all | 4 drafts |
 | 4.6 | Record the **10–15 min** video presentation; check the timer | [R4] | `deliverables/final_presentation.mp4` |
 | 4.7 | Final slides | [R4] | `deliverables/slides_final_presentation.pdf` |
-| 4.8 | Peer review submitted by every member | all | submission receipts |
-| 4.9 | Build the single team ZIP; verify it opens and the demo runs from it | [R4] | `deliverables/PRS_GroupX_submission.zip` |
-| 4.10 | Dry-run the whole submission on a second machine, 3 days before the deadline | all | checklist signed off |
+| 4.8 | Build the single team ZIP; verify it opens and the demo runs from it | [R4] | `deliverables/PRS_GroupX_submission.zip` |
 
 **Week-4 exit criteria**
-- [ ] ZIP submitted to Canvas (**one per team**) — before 31 Oct
-- [ ] 4 individual reports submitted separately
-- [ ] 4 peer reviews submitted
-- [ ] Video is 10–15 min and plays from the ZIP
-- [ ] The system runs from the ZIP on a machine that has never seen the repo
+- [ ] End-to-end submission exists and runs from the ZIP
+- [ ] Report is draft-final, video is recorded, slides are final
+- [ ] Everything is reproducible from `docs/EXPERIMENTS.md` + `config_hash`
+
+### Buffer weeks (20–31 Oct) — Submission, exam, and the clean-machine rehearsal
+
+Not new work — verification, polish and the exam.
+
+| # | Task | Owner | Deliverable |
+| --- | --- | --- | --- |
+| B.1 | Dry-run the whole submission on **a second machine that has never seen the repo** | all | signed checklist |
+| B.2 | Finalise the 4 individual reports | all | 4 PDFs |
+| B.3 | Submit peer review (every member) | all | receipts |
+| B.4 | **Submit the ZIP to Canvas (one per team) + individual reports — before 31 Oct** | [R4] | submission receipt |
+| B.5 | Sit the written examination (3 h, open book) | all | — |
 
 ---
 
 ## 4. Requirement traceability matrix
 
-Fill this table in Week 4 and paste it into the report's appendix. It is the fastest way for a
+Fill this table during Week 4 and paste it into the report's appendix. It is the fastest way for a
 grader to confirm you met every requirement.
 
 | Requirement (from the brief) | Evidence artefact | Owner | Status |
 | --- | --- | --- | --- |
+| Project proposal (deadline 30 Sep) | `deliverables/project_proposal.pdf` (from `docs/Project_Proposal_Template.docx`) | R4 | |
+| Enrolled in Canvas project groups | Canvas group screenshot | R4 | |
 | Runnable pattern recognition system | `deliverables/…zip` → one-command demo | R4 | |
 | Datasets | `docs/DATA.md` + dataset README in ZIP | R1 | |
 | Final report: tools/techniques | report §Method | R4 | |
@@ -246,14 +283,15 @@ at risk. Fix it that week or cut scope elsewhere — do not leave it to the last
 
 | Risk | Likelihood | Impact | Mitigation (owner) |
 | --- | --- | --- | --- |
+| **Proposal (30 Sep) missed while everyone focuses on modelling** | Medium | **Fatal** | It is task 1.3/1.4 in Week 1 and it is R4's only Week-1 priority; the technical work runs in parallel (R4) |
 | PSKUS (18.4 GB) download/prep not finished | High | High | Start in Week 1; proceed on Kaggle; treat "small-data results" as a legitimate first milestone (R1) |
 | yolo26 weights unavailable | High | Medium | Adapter already supports any YOLO classification weight; switch by config and **state the actual weights used** in the report (R2) |
 | Two members edit the same module | Medium | High | PR-only + CODEOWNERS; Monday sync assigns files before work starts (all) |
-| Results not reproducible on another machine | Medium | High | `config_hash` + fixed seed + `environment.yml`; clean-machine dry run in Week 4 (R4) |
+| Results not reproducible on another machine | Medium | High | `config_hash` + fixed seed + `environment.yml`; clean-machine dry run in the buffer weeks (R4) |
 | Accuracy looks great but is leakage | Medium | Fatal | Three guard checks; report the split design explicitly (R1) |
-| Video/report left to the last days | High | High | Draft skeleton in Week 2, feature freeze Week 4, dry run 3 days early (R4) |
+| Video/report left to the last days | High | High | Report skeleton in Week 3, feature freeze Week 4, buffer weeks for polish (R4) |
+| Exam collides with deliverable week | High | Medium | Buffer weeks 20–31 Oct exist for exactly this; do not spend them early (all) |
 | One member overloaded / unavailable | Medium | Medium | Roles are documented, so a task can be reassigned in one sync; each artefact has a written spec (all) |
-| Exam collides with the final week | High | Medium | This is exactly what the 2 buffer weeks before 31 Oct are for — do not spend them early |
 
 ---
 
@@ -261,7 +299,8 @@ at risk. Fix it that week or cut scope elsewhere — do not leave it to the last
 
 | Graded item | Weight | Where it lives in this repo |
 | --- | --- | --- |
-| First presentation | 5% | `deliverables/slides_first_presentation.pdf`; content sourced from `README.md` + `docs/DATA.md` |
+| Project proposal | gate | `deliverables/project_proposal.pdf`; content staged in `docs/PROJECT_PROPOSAL.md` |
+| First presentation | 5% | `deliverables/slides_first_presentation.pdf`; content sourced from the proposal + `docs/DATA.md` |
 | Final presentation | 10% | `deliverables/final_presentation.mp4` (10–15 min) |
 | Final report | 15% | `deliverables/final_report.pdf`; every number traced to `docs/EXPERIMENTS.md` |
 | Final system | 15% | the repo itself; `docs/DEMO.md` is the runnable proof |
@@ -269,7 +308,7 @@ at risk. Fix it that week or cut scope elsewhere — do not leave it to the last
 
 ---
 
-## 7. Definition of done (per person, Week 4)
+## 7. Definition of done (per person, by 31 Oct)
 
 - [ ] I have at least one **merged PR** for every week of the project
 - [ ] Every artefact I own appears in the traceability matrix with a real path

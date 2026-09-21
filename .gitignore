@@ -20,6 +20,12 @@ models/
 *.mlpackage
 !**/configs/models/*.yaml
 
+# --- 提交件（含个人姓名/学号，不进 Git）-------------------------------------
+# 提案、报告、视频、PPT、最终 ZIP 都由脚本生成或人工产出，
+# 统一放 deliverables/ 并在本地/共享盘流转；不要提交到公开可查的地方。
+deliverables/
+!deliverables/README.md
+
 # --- 实验输出（保留结构，不保留内容）---------------------------------------
 outputs/*
 !outputs/**/.gitkeep

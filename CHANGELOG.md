@@ -10,8 +10,15 @@
 ## [未发布]
 
 ### 新增
+- `docs/PROJECT_PROPOSAL.md`（英文主）+ `docs/zh/PROJECT_PROPOSAL.md`（中文）：
+  官方提案模板每一栏的可粘贴内容包（背景/目标/可度量目标表、四项能力说明、
+  系统架构、数据、方法、评估、计划、风险）。
+- `src/handwash/proposal_content.py`：提案文案的单一来源（纯数据，便于反复改措辞）。
+- `scripts/make_proposal.py`：按官方模板的真实表格结构生成填好的提案 DOCX
+  （`deliverables/project_proposal.docx`），支持 `--dry-run` 预览。
+- `deliverables/README.md`：提交件清单 + 最终报告建议大纲（对齐官方四项报告要求）。
 - `docs/PROJECT_PLAN_4_WEEK.md`（英文主）+ `docs/zh/PROJECT_PLAN_4_WEEK.md`（中文）：
-  依据官方文件 `PRS-PatternRecognitionSystems-Practice-Module 7.0 - Stackable.pdf` 制定的
+  依据官方文件 `PRS-PatternRecognitionSystems-Practice-Module 7.0 - FT.pdf` 制定的
   四周四人分工计划 —— 计分项拆解、四个角色、逐周任务与验收标准、要求追溯矩阵、风险清单、
   完成定义。英文版与中文版同时维护。
 - **双语文档结构**：英文成为主版本，中文保留为镜像，每个页面顶部都有语言切换行。
