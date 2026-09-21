@@ -101,12 +101,22 @@
 
 共同负责 = 没人负责。每条工作线只有一个 owner，其他人只做 review。
 
-| 角色 | 成员（填名字） | 负责 | 主要模块 / 文件 | 服务于哪个计分项 |
+| 角色 | 成员 | 负责 | 主要模块 / 文件 | 服务于哪个计分项 |
 | --- | --- | --- | --- | --- |
-| **R1 — 数据与评估负责人** | | 数据集、划分、指标、评估协议、统计结论 | `src/handwash/io/`、`src/handwash/data/`、`scripts/prepare_data.py`、`docs/DATA.md`、`docs/EXPERIMENTS.md` | 最终系统、最终报告（性能） |
-| **R2 — 模型与训练负责人** | | 帧级分类器、训练流程、基线、超参 | `src/handwash/models/`、`src/handwash/pipelines/train.py`、`configs/models/`、`configs/experiments/` | 最终系统、最终报告（设计） |
-| **R3 — 时序与判定负责人** | | 时序融合、完整性规则、跨场景鲁棒性 | `src/handwash/models/temporal.py`、`src/handwash/core/protocol.py`、`configs/config.yaml` 的 `assess` 段 | 最终系统（本项目的差异点） |
-| **R4 — 产品、演示与交付负责人** | | 提案、可运行 demo、视频、PPT、报告整合、ZIP、互评事务 | `docs/PROJECT_PROPOSAL.md`、`scripts/run_assess.py`、`deliverables/` | **提案、首次展示**、最终展示、最终报告、同伴互评 |
+| **R1 — 数据与评估负责人** | **Shen Ziyi**（A0350940J） | 数据集、划分、指标、评估协议、统计结论 | `src/handwash/io/`、`src/handwash/data/`、`scripts/prepare_data.py`、`docs/DATA.md`、`docs/EXPERIMENTS.md` | 最终系统、最终报告（性能） |
+| **R2 — 模型与训练负责人** | **Wang Lepeng**（A0357864L） | 帧级分类器、训练流程、基线、超参 | `src/handwash/models/`、`src/handwash/pipelines/train.py`、`configs/models/`、`configs/experiments/` | 最终系统、最终报告（设计） |
+| **R3 — 时序与判定负责人** | **Zhu Jianyu**（A0353769L） | 时序融合、完整性规则、跨场景鲁棒性 | `src/handwash/models/temporal.py`、`src/handwash/core/protocol.py`、`configs/config.yaml` 的 `assess` 段 | 最终系统（本项目的差异点） |
+| **R4 — 产品、演示与交付负责人** | **Xu Wenzhe**（A0328771W） | 提案、可运行 demo、视频、PPT、报告整合、ZIP、互评事务 | `docs/PROJECT_PROPOSAL.md`、`scripts/run_assess.py`、`deliverables/` | **提案、首次展示**、最终展示、最终报告、同伴互评 |
+
+Canvas 分组编号：**43**。注意提案截止 **2026-09-30**，内容见
+[`PROJECT_PROPOSAL.md`](/docs/zh/PROJECT_PROPOSAL.md)（已写好可直接粘贴）。
+
+> **这份分工是建议值，请在启动会上确认或互换。** 它按"每个人本来就会碰的东西"来分，
+> 并且把关键路径前置：R1 拿下所有结果都依赖的基础（划分不对，任何准确率都没有意义），
+> R2 管模型，R3 管差异点，R4 管两个提交关卡（9/30 提案、10/6 展示）与最终交付。
+> **如果要换，请整条工作线一起换**，包括上表列出的文件。
+>
+> **R4 是唯一在第 1 周就有硬截止的角色**，承担它的人在 9/30 之前的几天必须能找到。
 
 **为什么这样分**：R1 与 R2 第一天就能互相解锁（划分 → 第一条基线）。
 R3 依赖 R2 的 checkpoint，但第 1 周就可以用合成数据把时序头写完并单测。
@@ -128,8 +138,8 @@ R4 负责两个提交关卡（9/30 提案、10/6 展示）和两个最终关卡�
 
 | # | 任务 | 负责人 | 交付物（证据） |
 | --- | --- | --- | --- |
-| 1.1 | **启动会（45 分钟）：定标题、"四项选三项"的说法、提案各节的分工** | 全组 | 本文第 2 节表格填上真实姓名 |
-| 1.2 | 确认 Canvas 分组编号，确认 4 人都已入组 | [R4] | Canvas 分组截图 |
+| 1.1 | **启动会（45 分钟）：确认或互换第 2 节的分工，定下「四项选三项」的说法** | 全组 | 第 2 节分工表已确认 |
+| 1.2 | 确认 Canvas 分组编号（**43**），确认 4 人都已入组 | [R4] | Canvas 分组截图 |
 | 1.3 | **把提案写进 `docs/Project_Proposal_Template.docx`** —— 内容见 `docs/PROJECT_PROPOSAL.md`（可直接粘贴） | [R4] + 全组 | `deliverables/project_proposal.pdf` |
 | 1.4 | **把提案提交到 Canvas —— 截止 9/30。不要拖到 30 号当天** | [R4] | 提交回执 |
 | 1.5 | 下载 Kaggle 小数据集；跑 `prepare_data.py --inspect` 核对标签映射 | [R1] | `data/processed/kaggle/split_report.json` |

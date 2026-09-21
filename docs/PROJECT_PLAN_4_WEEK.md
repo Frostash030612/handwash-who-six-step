@@ -108,12 +108,25 @@ written down, it did not happen.
 
 Shared ownership means nobody owns it. Each workstream has exactly one owner; others review.
 
-| Role | Owner (fill in) | Owns | Primary modules / files | Graded item it feeds |
+| Role | Owner | Owns | Primary modules / files | Graded item it feeds |
 | --- | --- | --- | --- | --- |
-| **R1 — Data & Evaluation Lead** | | datasets, splits, metrics, evaluation protocol, statistical claims | `src/handwash/io/`, `src/handwash/data/`, `scripts/prepare_data.py`, `docs/DATA.md`, `docs/EXPERIMENTS.md` | Final system, final report (performance) |
-| **R2 — Model & Training Lead** | | frame classifier, training pipeline, baselines, hyper-parameters | `src/handwash/models/`, `src/handwash/pipelines/train.py`, `configs/models/`, `configs/experiments/` | Final system, final report (design) |
-| **R3 — Temporal & Assessment Lead** | | temporal fusion, completeness rules, cross-scenario robustness | `src/handwash/models/temporal.py`, `src/handwash/core/protocol.py`, `configs/config.yaml` (`assess`) | Final system (the differentiator) |
-| **R4 — Product, Demo & Delivery Lead** | | proposal, runnable demo, video, slides, report integration, ZIP, peer review logistics | `docs/PROJECT_PROPOSAL.md`, `scripts/run_assess.py`, `deliverables/` | **Proposal, first presentation**, final presentation, final report, peer review |
+| **R1 — Data & Evaluation Lead** | **Shen Ziyi** (A0350940J) | datasets, splits, metrics, evaluation protocol, statistical claims | `src/handwash/io/`, `src/handwash/data/`, `scripts/prepare_data.py`, `docs/DATA.md`, `docs/EXPERIMENTS.md` | Final system, final report (performance) |
+| **R2 — Model & Training Lead** | **Wang Lepeng** (A0357864L) | frame classifier, training pipeline, baselines, hyper-parameters | `src/handwash/models/`, `src/handwash/pipelines/train.py`, `configs/models/`, `configs/experiments/` | Final system, final report (design) |
+| **R3 — Temporal & Assessment Lead** | **Zhu Jianyu** (A0353769L) | temporal fusion, completeness rules, cross-scenario robustness | `src/handwash/models/temporal.py`, `src/handwash/core/protocol.py`, `configs/config.yaml` (`assess`) | Final system (the differentiator) |
+| **R4 — Product, Demo & Delivery Lead** | **Xu Wenzhe** (A0328771W) | proposal, runnable demo, video, slides, report integration, ZIP, peer review logistics | `docs/PROJECT_PROPOSAL.md`, `scripts/run_assess.py`, `deliverables/` | **Proposal, first presentation**, final presentation, final report, peer review |
+
+Group ID (Canvas): **43**. Watch the proposal deadline: **30 Sep 2026** — see
+[`PROJECT_PROPOSAL.md`](PROJECT_PROPOSAL.md), which already contains the filled proposal content.
+
+> **Suggested assignment — confirm or swap it at the kick-off meeting.** It is aligned with what
+> each person would touch anyway, and it front-loads the critical path: R1 owns the foundations
+> every other result depends on (the split must be correct before any accuracy number means
+> anything), R2 owns the model, R3 owns the differentiator, R4 owns the two submission gates
+> (30 Sep proposal, 6 Oct presentation) plus the final delivery.
+> **If you swap, swap the whole workstream**, including the files listed above.
+>
+> **R4 is the only role with a hard deadline inside Week 1.** Whoever holds it must be reachable
+> in the days before 30 Sep.
 
 **Why this split:** R1 and R2 unblock each other on day one (splits → first baseline).
 R3 depends on R2's checkpoint but can build and unit-test the temporal head against synthetic
@@ -136,8 +149,8 @@ everyone can run `make check` green.
 
 | # | Task | Owner | Deliverable (evidence) |
 | --- | --- | --- | --- |
-| 1.1 | **Kick-off (45 min): title, the 3-of-4 aspect story, proposal section owners** | all | this doc's §2 table filled in with real names |
-| 1.2 | Confirm the Canvas group ID and that all 4 members are enrolled | [R4] | Canvas group screenshot |
+| 1.1 | **Kick-off (45 min): confirm or swap the §2 role assignment, agree the 3-of-4 aspect story** | all | §2 table confirmed |
+| 1.2 | Confirm the Canvas group ID (**43**) and that all 4 members are enrolled | [R4] | Canvas group screenshot |
 | 1.3 | **Draft the proposal into `docs/Project_Proposal_Template.docx`** — see `docs/PROJECT_PROPOSAL.md` for ready-to-paste content | [R4] + all | `deliverables/project_proposal.pdf` |
 | 1.4 | **Submit the proposal to Canvas — deadline 30 Sep. Do not leave this to the 30th** | [R4] | submission receipt |
 | 1.5 | Download the small Kaggle dataset; run `prepare_data.py --inspect`; verify label mapping | [R1] | `data/processed/kaggle/split_report.json` |

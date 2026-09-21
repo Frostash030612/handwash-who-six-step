@@ -9,75 +9,103 @@
 #   L2 受限区：需要至少 1 名框架负责人 review
 #   L3 自由区：任何人可自由修改，只需通过 CI
 #
-# 【请把下面的占位用户名替换成真实 GitHub 用户名】
-#   负责人（2 人）: @leader-a @leader-b
-#   数据负责人    : @data-owner
-#   模型负责人    : @model-owner
+# ---------------------------------------------------------------------------
+# 【必须完成的一件事】
+# CODEOWNERS 里的用户名必须是**真实存在的 GitHub 账号**。写错时 GitHub 会静默
+# 忽略失效条目（不报错），于是"冻结区自动指定审阅人"这道防线就变成了空的。
+#
+# 本组（Canvas 分组 43）与工作线的对应关系，见 docs/PROJECT_PLAN_4_WEEK.md 第 2 节：
+#
+#   | 工作线                | 成员        | 学号      | GitHub 用户名            |
+#   |-----------------------|-------------|-----------|--------------------------|
+#   | R4 产品、演示与交付   | Xu Wenzhe   | A0328771W | @Frostash030612（已知）  |
+#   | R1 数据与评估         | Shen Ziyi   | A0350940J | 待填                     |
+#   | R2 模型与训练         | Wang Lepeng | A0357864L | 待填                     |
+#   | R3 时序与判定         | Zhu Jianyu  | A0353769L | 待填                     |
+#
+# 拿到组员用户名后，把本文里的 `_TODO-R1` / `_TODO-R2` / `_TODO-R3` 全局替换掉再提交。
+# 这里故意用 `_TODO-R1` 而不是编造一个用户名：它会被 GitHub 解析失败并忽略，
+# 使"未填写"这件事在工具里可见，而不是悄悄指向某个真人。
+#
+# 另外：**先邀请组员加入私有仓库**，否则他们即使被写成 owner 也看不到仓库：
+#   gh api repos/<owner>/<repo>/collaborators/<用户名> -X PUT -f permission=push
 # ============================================================================
 
 # --- 默认：任何人改动都需要一名负责人 review -------------------------------
-*                                   @leader-a @leader-b
+*                                   @Frostash030612 _TODO-R1
 
 # --- L1 冻结区：契约与规则 ---------------------------------------------------
 # 改这里 = 可能让所有人已跑出的结果失效，必须走 RFC 并在 CHANGELOG.md 记录
-/src/handwash/core/labels.py        @leader-a @leader-b
-/src/handwash/core/schema.py        @leader-a @leader-b
-/src/handwash/core/config.py        @leader-a @leader-b
-/src/handwash/core/protocol.py      @leader-a @leader-b
-/src/handwash/core/registry.py      @leader-a @leader-b
-/src/handwash/errors.py             @leader-a @leader-b
-/src/handwash/paths.py              @leader-a @leader-b
-/src/handwash/logging.py            @leader-a @leader-b
+/src/handwash/core/labels.py        @Frostash030612 _TODO-R1
+/src/handwash/core/schema.py        @Frostash030612 _TODO-R1
+/src/handwash/core/config.py        @Frostash030612 _TODO-R1
+/src/handwash/core/protocol.py      @Frostash030612 _TODO-R1
+/src/handwash/core/registry.py      @Frostash030612 _TODO-R1
+/src/handwash/errors.py             @Frostash030612 _TODO-R1
+/src/handwash/paths.py              @Frostash030612 _TODO-R1
+/src/handwash/logging.py            @Frostash030612 _TODO-R1
 
 # 配置 schema 与数据划分规则：改动会影响所有人的可比性
-/configs/config.yaml                @leader-a @leader-b
-/src/handwash/io/split.py           @leader-a @leader-b
+/configs/config.yaml                @Frostash030612 _TODO-R1
+/src/handwash/io/split.py           @Frostash030612 _TODO-R1
 
 # --- L2 受限区：公共基础设施 -------------------------------------------------
-/pyproject.toml                     @leader-a @leader-b
-/environment.yml                    @leader-a @leader-b
-/Makefile                           @leader-a @leader-b
-/.pre-commit-config.yaml            @leader-a @leader-b
-/.gitignore                         @leader-a @leader-b
-/.gitattributes                     @leader-a @leader-b
-/scripts/check_structure.py         @leader-a @leader-b
-/scripts/check_config.py            @leader-a @leader-b
-/scripts/check_docs.py              @leader-a @leader-b
-/scripts/sync_doc_locales.py        @leader-a @leader-b
-/.github/workflows/                 @leader-a @leader-b
-/CODEOWNERS                         @leader-a @leader-b
-/CONTRIBUTING.md                    @leader-a @leader-b
-/docs/ARCHITECTURE.md               @leader-a @leader-b
-/docs/PROTOCOL.md                   @leader-a @leader-b
+/pyproject.toml                     @Frostash030612 _TODO-R1
+/environment.yml                    @Frostash030612 _TODO-R1
+/Makefile                           @Frostash030612 _TODO-R1
+/.pre-commit-config.yaml            @Frostash030612 _TODO-R1
+/.gitignore                         @Frostash030612 _TODO-R1
+/.gitattributes                     @Frostash030612 _TODO-R1
+/scripts/check_structure.py         @Frostash030612 _TODO-R1
+/scripts/check_config.py            @Frostash030612 _TODO-R1
+/scripts/check_docs.py              @Frostash030612 _TODO-R1
+/scripts/sync_doc_locales.py        @Frostash030612 _TODO-R1
+/.github/workflows/                 @Frostash030612 _TODO-R1
+/CODEOWNERS                         @Frostash030612 _TODO-R1
+
+# --- 规则与架构文档（英文主版本；中文镜像同属冻结范围）--------------------
+/CONTRIBUTING.md                    @Frostash030612 _TODO-R1
+/docs/ARCHITECTURE.md               @Frostash030612 _TODO-R1
+/docs/PROTOCOL.md                   @Frostash030612 _TODO-R1
+/docs/PROJECT_PLAN_4_WEEK.md        @Frostash030612 _TODO-R1
+/docs/zh/                           @Frostash030612 _TODO-R1
 
 # --- 双语文档结构 -----------------------------------------------------------
 # 语言切换行与配对关系由 scripts/check_docs.py 强制校验；
 # 新增双语文档时必须同步更新 sync_doc_locales.py 与 check_docs.py 的 PAIRS 表。
-/README.md                          @leader-a @leader-b
-/README.zh-CN.md                    @leader-a @leader-b
-/docs/zh/                           @leader-a @leader-b
-/docs/RULES_CARD.md                 @leader-a @leader-b
-/docs/zh/RULES_CARD.md              @leader-a @leader-b
+/README.md                          @Frostash030612 _TODO-R1
+/README.zh-CN.md                    @Frostash030612 _TODO-R1
+/docs/RULES_CARD.md                 @Frostash030612 _TODO-R1
+/docs/zh/RULES_CARD.md              @Frostash030612 _TODO-R1
 
-# --- L2：数据层（数据负责人把关）-------------------------------------------
-/src/handwash/io/                   @data-owner @leader-a
-/src/handwash/data/                 @data-owner @leader-a
-/src/handwash/pipelines/prepare.py  @data-owner @leader-a
-/docs/DATA.md                       @data-owner
-/configs/data/                      @data-owner
+# --- L2：数据层（R1 数据与评估负责人把关）-----------------------------------
+/src/handwash/io/                   @Frostash030612 _TODO-R1
+/src/handwash/data/                 @Frostash030612 _TODO-R1
+/src/handwash/pipelines/prepare.py  @Frostash030612 _TODO-R1
+/docs/DATA.md                       @Frostash030612 _TODO-R1
+/docs/EXPERIMENTS.md                @Frostash030612 _TODO-R1
+/configs/data/                      @Frostash030612 _TODO-R1
 
-# --- L2：模型与训练（模型负责人把关）---------------------------------------
-/src/handwash/models/               @model-owner @leader-a
-/src/handwash/pipelines/train.py    @model-owner @leader-a
-/src/handwash/pipelines/evaluate.py @model-owner @leader-a
-/configs/models/                    @model-owner
+# --- L2：模型与训练（R2 模型与训练负责人把关）-------------------------------
+/src/handwash/models/               @Frostash030612 _TODO-R2
+/src/handwash/pipelines/train.py    @Frostash030612 _TODO-R2
+/src/handwash/pipelines/evaluate.py @Frostash030612 _TODO-R2
+/configs/models/                    @Frostash030612 _TODO-R2
+
+# --- L2：时序与完整性判定（R3 时序与判定负责人把关）------------------------
+# 这一块是项目的差异点，也是"四项能力"里 A3/A4 的落点，改动要给个理由。
+/src/handwash/models/temporal.py    @Frostash030612 _TODO-R3
+/src/handwash/models/voting.py      @Frostash030612 _TODO-R3
+/src/handwash/pipelines/infer.py    @Frostash030612 _TODO-R3
+/src/handwash/pipelines/assess.py   @Frostash030612 _TODO-R3
 
 # --- L3 自由区：各组员自己的实验与他人无关 ----------------------------------
 # 实验配置：谁做实验谁负责，不需要额外审批（但仍需 CI 通过）
-/configs/experiments/               @leader-a
+/configs/experiments/               @Frostash030612
 # 测试：新增模块时必须同步新增测试（见 tests/README.md）
-/tests/                             @leader-a
-# 个人产物目录：不提交进仓库（.gitignore 已忽略）
+/tests/                             @Frostash030612
+# 提交件与个人产物目录：不进仓库（.gitignore 已忽略）
+/deliverables/
 /outputs/
 /models/
 /data/
