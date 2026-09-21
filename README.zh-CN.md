@@ -165,6 +165,7 @@ python -m pre_commit run --all-files
 
 | 文档 | 内容 |
 | --- | --- |
+| [`docs/PROJECT_PLAN_4_WEEK.md`](docs/zh/PROJECT_PLAN_4_WEEK.md) | **四周团队计划（4 人）**：角色分工、逐周任务、计分追溯、风险清单 |
 | [`docs/RULES_CARD.md`](docs/RULES_CARD.md) | **一页速查卡**：改代码前先看这一页 |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | **修改规则（必读）**：铁律、分级、提交与 PR 流程 |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | 分层图、五个契约、RFC 流程、扩展指南 |

@@ -40,6 +40,7 @@ PAIRS: tuple[tuple[str, str], ...] = (
     ("docs/CONFIG.md", "docs/zh/CONFIG.md"),
     ("docs/DATA.md", "docs/zh/DATA.md"),
     ("docs/RULES_CARD.md", "docs/zh/RULES_CARD.md"),
+    ("docs/PROJECT_PLAN_4_WEEK.md", "docs/zh/PROJECT_PLAN_4_WEEK.md"),
 )
 
 #: 切换行模板：英文版指向中文镜像，中文版指向英文主版本

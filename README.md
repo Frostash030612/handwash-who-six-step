@@ -179,6 +179,7 @@ See `docs/DATA.md` for how to obtain the datasets; checkpoints are shared throug
 
 | Document | Contents |
 | --- | --- |
+| [`docs/PROJECT_PLAN_4_WEEK.md`](docs/PROJECT_PLAN_4_WEEK.md) | **Four-week team plan (4 members)**: roles, week-by-week tasks, grading traceability, risks |
 | [`docs/RULES_CARD.md`](docs/RULES_CARD.md) | **One-page cheat sheet** — read this before changing code |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | **Modification rules (required reading)**: Iron Rules, change levels, commit and PR flow |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Layer diagram, the five contracts, RFC process, extension guides |

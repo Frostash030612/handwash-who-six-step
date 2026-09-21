@@ -10,6 +10,10 @@
 ## [未发布]
 
 ### 新增
+- `docs/PROJECT_PLAN_4_WEEK.md`（英文主）+ `docs/zh/PROJECT_PLAN_4_WEEK.md`（中文）：
+  依据官方文件 `PRS-PatternRecognitionSystems-Practice-Module 7.0 - Stackable.pdf` 制定的
+  四周四人分工计划 —— 计分项拆解、四个角色、逐周任务与验收标准、要求追溯矩阵、风险清单、
+  完成定义。英文版与中文版同时维护。
 - **双语文档结构**：英文成为主版本，中文保留为镜像，每个页面顶部都有语言切换行。
   - `README.md`（英文主） ↔ `README.zh-CN.md`
   - `CONTRIBUTING.md`（英文主，位于仓库根） ↔ `docs/zh/CONTRIBUTING.md`
