@@ -1,177 +1,203 @@
-# 数据说明（DATA）
+> **English** | [中文](/docs/zh/DATA.md)
 
-本文件是数据部分的**唯一权威说明**：数据集从哪来、目录要怎么摆、标签怎么映射、
-怎么划分、以及最容易踩的三个坑。
+# Data card (DATA)
 
-> 报告中"数据集"一节可以直接引用本文件的结构说明，但**必须自己跑一遍
-> `handwash prepare` 并把实际数字（段数 / 帧数 / 划分）填进去**，
-> 不要照抄本文件的估计值。
+This file is the **single authoritative statement** about the data side of the project:
+where the datasets come from, how the directory layout has to look, how labels are mapped,
+how the split is done, and the three pitfalls that are easiest to fall into.
+
+> The "Datasets" section of the report may cite the structural description in this file
+> directly, but you **must run `handwash prepare` yourself and fill in the actual numbers
+> (clip count / frame count / split)** — do not copy the estimates given here.
 
 ---
 
-## 0. 三条硬规则（违反则结论作废）
+## 0. Three hard rules (violate one and your conclusions are void)
 
-1. **先划分、后抽帧。** 划分单位必须是**原始视频**。把同一段视频的相邻帧
-   同时放进训练集和测试集，准确率会虚高到 0.95+，而且没有任何报错。
-   框架里的三道防线：
-   - `io/manifest.py`：同一 `clip_id` 跨 split → 抛 `DataLeakageError`；
-   - `io/split.py`：按 `split.group_key` 分组划分 + 划分后复核；
-   - `configs/config.yaml`：`split.guard_leakage: true`。
+1. **Split first, extract frames second.** The unit of splitting must be the **source video**.
+   Put adjacent frames of the same video into both the training set and the test set, and
+   accuracy is inflated to 0.95+ without a single error being raised.
+   The framework has three lines of defense:
+   - `io/manifest.py`: the same `clip_id` across splits → raises `DataLeakageError`;
+   - `io/split.py`: grouped split by `split.group_key` + a re-check after splitting;
+   - `configs/config.yaml`: `split.guard_leakage: true`.
 
-2. **数据不进 Git。** `data/`、`models/`、`outputs/` 都已在 `.gitignore`。
-   数据放在本地或共享盘，用 `HANDWASH_DATA_ROOT` 环境变量指向外部位置：
+2. **Data does not go into Git.** `data/`, `models/`, and `outputs/` are all already in
+   `.gitignore`. Keep the data on a local or shared drive and point the
+   `HANDWASH_DATA_ROOT` environment variable at the external location:
    ```bash
    set HANDWASH_DATA_ROOT=E:\datasets\handwash     # Windows
    export HANDWASH_DATA_ROOT=/mnt/data/handwash    # Linux/macOS
    ```
 
-3. **标签映射只改一处。** 数据集原始标签名 → 规范 `Step` 的映射**只允许**
-   写在 `src/handwash/core/labels.py` 的 `_DATASET_ALIASES`。
-   在别处写 `if label == "Step1_water"` 会导致训练标签与评估标签悄悄错位。
+3. **The label mapping is changed in exactly one place.** The mapping from a dataset's raw
+   label names to the canonical `Step` **may only** be written in `_DATASET_ALIASES` in
+   `src/handwash/core/labels.py`. Writing `if label == "Step1_water"` anywhere else causes a
+   silent label misalignment between the training labels and the evaluation labels.
 
 ---
 
-## 1. 数据集总览
+## 1. Dataset overview
 
-| 数据集 | 规模 | 环境 | 用途 | 优先级 |
+| Dataset | Scale | Environment | Purpose | Priority |
 | --- | --- | --- | --- | --- |
-| **PSKUS** | 3185 段 / ~18.4 GB | 真实医院 | 主训练数据 | 必须（可先取子集） |
-| **METC** | 212 段 / ~2.1 GB / 72 人 | 实验室 | 跨场景测试 | 必须 |
-| **Kaggle** | 小（数百 MB） | 混合 | 快速原型 | 建议先跑 |
-| **Jurmala** | 2427 段 / ~17 GB | 真实环境 | 扩展训练 | 可选 |
-| **合成数据** | 自带生成 | 3D 渲染 | 冒烟测试/预训练 | 可选 |
-| **自采视频** | 每人 4—6 段 | 普通洗手池 | 最终验证 | 必须 |
+| **PSKUS** | 3185 clips / ~18.4 GB | Real hospital | Primary training data | Required (a subset is fine to start) |
+| **METC** | 212 clips / ~2.1 GB / 72 people | Laboratory | Cross-scenario testing | Required |
+| **Kaggle** | Small (a few hundred MB) | Mixed | Rapid prototype | Recommended first |
+| **Jurmala** | 2427 clips / ~17 GB | Real-world setting | Extended training | Optional |
+| **synthetic** | Comes with its own generator | 3D rendering | Smoke test / pretraining | Optional |
+| **Self-recorded video** | 4—6 clips per person | Ordinary washbasin | Final validation | Required |
 
 ---
 
-## 2. PSKUS（主数据集）
+## 2. PSKUS (primary dataset)
 
-- 链接：<https://zenodo.org/records/4537209>
-- 论文：<https://doi.org/10.3390/data6040038>
-- 内容：真实医院环境，WHO 六步动作 + 开关水龙头 + 其他动作，**逐帧标注**。
+- Link: <https://zenodo.org/records/4537209>
+- Paper: <https://doi.org/10.3390/data6040038>
+- Contents: a real hospital environment; the WHO six-step actions plus turning the faucet
+  on/off and other actions, with **per-frame annotation**.
 
-**目录结构（框架期望）**
+**Directory layout (what the framework expects)**
 
 ```
 data/raw/pskuss/
-  ├── step_1_palm_to_palm/        # 目录名 = 标签（可用别名，见 core/labels.py）
+  ├── step_1_palm_to_palm/        # directory name = label (aliases allowed, see core/labels.py)
   │   ├── clip_0001.mp4
   │   └── clip_0002.mp4
   ├── faucet_on/
   └── ...
 ```
 
-或者"每段视频一个逐帧标注 CSV"的形式：
+Or as "one per-frame annotation CSV per clip":
 
 ```
-data/raw/pskuss/<clip_id>.csv      # 列：frame, label[, timestamp]
+data/raw/pskuss/<clip_id>.csv      # columns: frame, label[, timestamp]
 ```
 
-**建议**：不要一次下全量。先取 300—500 段跑通，确认抽帧参数与标签映射正确，
-再补全 —— 18.4 GB 抽帧后会占用数十 GB 磁盘。
+**Recommendation**: do not download the full 18.4 GB up front. Start with 300—500 clips and
+get the pipeline working end to end, confirm that the frame-extraction parameters and the
+label mapping are correct, and only then fill in the rest — after frame extraction, 18.4 GB
+will occupy tens of GB of disk.
 
-**配置**：`configs/data/pskuss.yaml`（标签空间 10 类，`include_non_wash: true`）
+**Config**: `configs/data/pskuss.yaml` (a 10-class label space, `label_space: pskuss`,
+`include_non_wash: true`)
 
 ---
 
-## 3. METC（跨场景测试集）
+## 3. METC (cross-scenario test set)
 
-- 链接：<https://zenodo.org/records/5808789>
-- 内容：212 段、72 名参与者的实验室环境数据，帧级标签。
+- Link: <https://zenodo.org/records/5808789>
+- Contents: laboratory-environment data, 212 clips from 72 participants, with frame-level labels.
 
-**正确用法（很重要）**
+**Correct usage (this part matters)**
 
 ```
-① 用 PSKUS 训练 → outputs/e4_pskuss_train/models/best.pt
-② 准备 METC 的帧（configs/data/metc.yaml）
-③ 用**同一个** checkpoint 在 METC 上评估：
-     python -m handwash.cli evaluate --checkpoint <上面的 best.pt> --splits external
+① Train on PSKUS → outputs/e4_pskuss_train/models/best.pt
+② Prepare the METC frames (configs/data/metc.yaml)
+③ Evaluate on METC with the **same** checkpoint:
+     python -m handwash.cli evaluate --checkpoint <the best.pt from above> --splits external
 ```
 
-**不要**用 METC 训练再在 METC 上测试 —— 那就不是跨场景实验了。
-报告里应给出三组数字：PSKUS test（同场景）、METC（跨场景）、自采视频（真实使用）。
+**Do not** train on METC and then test on METC — that is no longer a cross-scenario experiment.
+The report should give three sets of numbers: PSKUS test (same scenario), METC
+(cross-scenario), and self-recorded video (real use).
 
-**配置**：`configs/data/metc.yaml`
+**Config**: `configs/data/metc.yaml`
 
 ---
 
-## 4. Kaggle 洗手数据集（快速原型）
+## 4. Kaggle hand-washing dataset (rapid prototype)
 
-- 链接：<https://www.kaggle.com/datasets/realtimear/hand-wash-dataset>
-- 七分类整理版：<https://github.com/atiselsts/data/raw/master/kaggle-dataset-6classes.tar>
+- Link: <https://www.kaggle.com/datasets/realtimear/hand-wash-dataset>
+- Seven-class curated version: <https://github.com/atiselsts/data/raw/master/kaggle-dataset-6classes.tar>
 
-**目录结构**
+**Directory layout**
 
 ```
 data/raw/kaggle/
-  ├── Step1_water/<clip>/*.jpg      # 或直接 Step1_water/*.jpg
+  ├── Step1_water/<clip>/*.jpg      # or directly Step1_water/*.jpg
   ├── Step2_water/
   └── ...
 ```
 
-**说明**：`Step7_water` / `not_washing` 在框架里归入 `other`，而 `kaggle`
-标签空间只有六步，因此这些样本不会被计入六分类训练（见 `core/labels.py`）。
+**Note**: `Step7_water` / `not_washing` are folded into `other` in the framework, while the
+`kaggle` label space contains only the six steps, so those samples are not counted in
+six-class training (see `core/labels.py`).
 
-**配置**：`configs/data/kaggle.yaml`（默认 `dataset.name`，用于一键冒烟）
-
----
-
-## 5. Jurmala（可选扩展）
-
-- 链接：<https://zenodo.org/records/5808764>
-- 规模：2427 段 / ~17 GB。采集规范与 PSKUS 同源。
-- 用法：与 PSKUS 同为六步 6 类标签空间，可在时间与算力充足时加入训练，
-  **不是完成作业的必要条件**。
+**Config**: `configs/data/kaggle.yaml` (the default `dataset.name`, used for the one-command
+smoke test)
 
 ---
 
-## 6. 合成洗手数据集（可选）
+## 5. Jurmala (optional extension)
 
-- 数据与代码：<https://github.com/r-ozakar/synthetic-hand-washing>
-- 论文：<https://doi.org/10.3390/jimaging11070208>
-- 特点：3D 场景生成，含 RGB、深度与手部掩膜，可研究合成数据预训练。
-- 建议：**只作为扩展实验**。若做，报告中必须说明"合成预训练 + 真实微调"
-  与"纯真实训练"的对比，否则无法体现价值。
-
----
-
-## 7. 组员自采视频（最终验证）
-
-拍摄与标注规范见 [`SELF_RECORDING.md`](SELF_RECORDING.md)。三条要点：
-
-1. 每位组员 4—6 段，必须覆盖：**完整正确 / 漏一步 / 换序 / 某步过短**；
-2. 机位参考公开数据：双手全程清晰可见（俯拍或侧前方 45°）；
-3. **必须记录人工答案**（真实步骤序列），否则无法与模型结果对比。
-
-自采视频的评估用 `handwash assess`（完整性），而不是 `handwash evaluate`（帧级分类）——
-因为自采视频的价值在于**完整流程**，人工也标不出逐帧标签。
+- Link: <https://zenodo.org/records/5808764>
+- Scale: 2427 clips / ~17 GB. The collection protocol comes from the same source as PSKUS.
+- Usage: like PSKUS it uses a 6-class label space covering the six steps, so it can be added
+  to training when time and compute allow. It is **not required to complete the assignment**.
 
 ---
 
-## 8. 常见问题（按报错查）
+## 6. Synthetic hand-washing dataset (optional)
 
-| 报错 | 原因 | 处理 |
+- Data and code: <https://github.com/r-ozakar/synthetic-hand-washing>
+- Paper: <https://doi.org/10.3390/jimaging11070208>
+- Characteristics: 3D scene generation, including RGB, depth, and hand masks; usable for
+  research on synthetic-data pretraining.
+- Recommendation: **treat it as an extension experiment only**. If you do run it, the report
+  must compare "synthetic pretraining + real-data fine-tuning" against "real-data-only
+  training", otherwise its value cannot be demonstrated.
+
+---
+
+## 7. Team-member self-recorded video (final validation)
+
+Filming and annotation rules are in [`SELF_RECORDING.md`](SELF_RECORDING.md) (in Chinese).
+Three key points:
+
+1. 4—6 clips per team member, which must cover: **fully correct / one step missing /
+   steps swapped / one step too short**;
+2. The camera position/angle should follow the public datasets: both hands clearly visible
+   throughout (overhead, or 45° from the side-front);
+3. **The human ground truth must be recorded** (the real step sequence), otherwise there is
+   nothing to compare the model's output against.
+
+Self-recorded video is assessed with `handwash assess` (completeness), not with
+`handwash evaluate` (frame-level classification) — because the value of self-recorded video
+lies in the **complete procedure**, and a human cannot produce frame-level labels for it
+either.
+
+---
+
+## 8. Common problems (look up by the error you see)
+
+| Error | Cause | Fix |
 | --- | --- | --- |
-| `DatasetNotFoundError` | `dataset.root` 路径不对 | 核对 `configs/config.yaml` 的 `datasets` 段；或用 `HANDWASH_DATA_ROOT` |
-| `标签空间 X 无法识别标签：'yyy'` | 数据集的标签名没登记 | 在 `core/labels.py` 的 `_DATASET_ALIASES` 补映射（L1，改动要 review） |
-| `DataLeakageError` | 同一原始视频跨 split | 确认 `split.group_key=original_video`；确认先划分后抽帧 |
-| `manifest 缺少必需列` | 用了旧版 manifest | 删除 `data/processed/*/manifest.csv` 后重跑 `handwash prepare` |
-| 抽帧阶段"视频过短，已跳过" | 视频短于 `min_frames_per_clip` | 调小该值，或检查视频是否损坏 |
-| 准确率 > 0.98 | 极可能数据泄漏 | 见上；另外检查是否把 test 放进了 train |
+| `DatasetNotFoundError` | wrong `dataset.root` path | check the `datasets` section of `configs/config.yaml`; or use `HANDWASH_DATA_ROOT` |
+| `标签空间 X 无法识别标签：'yyy'` (label space X cannot recognize label 'yyy') | the dataset's label names were never registered | add the mapping to `_DATASET_ALIASES` in `core/labels.py` (L1, the change needs review) |
+| `DataLeakageError` | the same source video across splits | make sure `split.group_key=original_video`; make sure you split before extracting frames |
+| `manifest 缺少必需列` (manifest is missing a required column) | an old-format manifest is in use | delete `data/processed/*/manifest.csv` and re-run `handwash prepare` |
+| "视频过短，已跳过" (video too short, skipped) during frame extraction | the video is shorter than `min_frames_per_clip` | lower that value, or check whether the video is corrupt |
+| accuracy > 0.98 | almost certainly data leakage | see above; also check whether test data ended up in train |
 
-**抽帧参数建议**：`fps: 5.0` 对动作级任务足够（30fps 的视频每 6 帧取 1 帧），
-存储可降到约 1/6；`resize_hw: [256, 256]` 落盘、模型再裁到 224。
+**Frame-extraction parameter recommendations**: an extraction rate of 5 fps (`fps: 5.0`) is
+enough for action-level tasks (on a 30fps video that means 1 frame in every 6), and storage
+drops to roughly 1/6; write `resize_hw: [256, 256]` to disk and let the model crop to 224.
 
 ---
 
-## 9. 划分与统计（自检清单）
+## 9. Split and statistics (self-check list)
 
-跑完 `handwash prepare` 后，检查 `data/processed/<dataset>/split_report.json`：
+Once `handwash prepare` has finished, check `data/processed/<dataset>/split_report.json`:
 
-- [ ] 三个 split 的段数比例接近 0.7 / 0.15 / 0.15（小数据集会有偏差，属正常）；
-- [ ] 任一原始视频**没有**同时出现在两个 split（框架已强制）；
-- [ ] 每个 split 里六步都有样本（`label_frames` 不应有 0）；
-- [ ] `val` 不为空（否则无法早停选模）；
-- [ ] 每段视频的帧数与时长合理（异常值通常意味着解码失败或标注错位）。
+- [ ] The clip-count ratio across the three splits is close to 0.7/0.15/0.15 (small datasets
+      will deviate, which is normal);
+- [ ] **No** source video appears in two splits at the same time (already enforced by the
+      framework);
+- [ ] Every split contains samples of all six steps (`label_frames` should contain no 0);
+- [ ] `val` is not empty (otherwise you cannot select a model by early stopping);
+- [ ] Each video's frame count and duration are plausible (outliers usually mean a decode
+      failure or label misalignment).
 
-把这份检查结果写进报告的数据部分，比任何形容词都有说服力。
+Writing these check results into the data section of the report is more persuasive than any
+adjective.

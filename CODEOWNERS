@@ -39,12 +39,25 @@
 /Makefile                           @leader-a @leader-b
 /.pre-commit-config.yaml            @leader-a @leader-b
 /.gitignore                         @leader-a @leader-b
+/.gitattributes                     @leader-a @leader-b
 /scripts/check_structure.py         @leader-a @leader-b
+/scripts/check_config.py            @leader-a @leader-b
+/scripts/check_docs.py              @leader-a @leader-b
+/scripts/sync_doc_locales.py        @leader-a @leader-b
 /.github/workflows/                 @leader-a @leader-b
 /CODEOWNERS                         @leader-a @leader-b
 /CONTRIBUTING.md                    @leader-a @leader-b
 /docs/ARCHITECTURE.md               @leader-a @leader-b
 /docs/PROTOCOL.md                   @leader-a @leader-b
+
+# --- 双语文档结构 -----------------------------------------------------------
+# 语言切换行与配对关系由 scripts/check_docs.py 强制校验；
+# 新增双语文档时必须同步更新 sync_doc_locales.py 与 check_docs.py 的 PAIRS 表。
+/README.md                          @leader-a @leader-b
+/README.zh-CN.md                    @leader-a @leader-b
+/docs/zh/                           @leader-a @leader-b
+/docs/RULES_CARD.md                 @leader-a @leader-b
+/docs/zh/RULES_CARD.md              @leader-a @leader-b
 
 # --- L2：数据层（数据负责人把关）-------------------------------------------
 /src/handwash/io/                   @data-owner @leader-a

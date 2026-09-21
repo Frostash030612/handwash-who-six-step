@@ -71,6 +71,14 @@ archcheck:  ## 分层依赖体检：禁止越层 import、禁止散落魔数
 configcheck:  ## 配置契约检查：所有 configs/*.yaml 必须能严格加载
 	$(PY) scripts/check_config.py
 
+.PHONY: doccheck
+doccheck:  ## 文档体检：双语配对 + 链接不断链
+	$(PY) scripts/check_docs.py
+
+.PHONY: docs-sync
+docs-sync:  ## 补齐/更新双语文档的语言切换行（幂等）
+	$(PY) scripts/sync_doc_locales.py
+
 .PHONY: test
 test:  ## 跑单元测试（秒级，不需要数据、不需要 GPU）
 	$(PYTEST) $(PYTEST_FAST)
@@ -84,7 +92,7 @@ test-cov:  ## 带覆盖率报告
 	$(PYTEST) $(PYTEST_FAST) --cov --cov-report=term-missing
 
 .PHONY: check
-check: lint archcheck configcheck typecheck test  ## 提交前本地必跑（与 CI 完全一致）
+check: lint archcheck configcheck doccheck typecheck test  ## 提交前本地必跑（与 CI 完全一致）
 
 .PHONY: hooks
 hooks:  ## 安装 pre-commit 钩子

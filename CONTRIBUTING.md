@@ -1,290 +1,304 @@
-# 修改规则（CONTRIBUTING）
+> **English** | [中文](/docs/zh/CONTRIBUTING.md)
 
-> **一句话规则：改代码前先看这张表 —— 你要动的是 L1 / L2 / L3 哪一级？**
+# Modification Rules (CONTRIBUTING)
 
-本文件是这个仓库的"法律"。它解决小组项目最常见的失败模式：**五个人各自改一点，
-两周后没人能跑通全流程，也没人说得清哪个结果是哪份代码跑出来的。**
+> **The one-line rule: before you touch code, check this table. Which tier are you changing,
+> L1, L2, or L3?**
 
-- 规则的目标不是限制你，而是保证：**任何人 clone 下来都能复现任何人的结果。**
-- 违反规则的代价不是"被批评"，而是**全组的实验结论作废**。
-- 这份规则由 `scripts/check_structure.py`、pre-commit、CI 三道机器检查强制执行，
-  不依赖任何人自觉。
+This file is the "law" of this repository. It solves the most common failure mode in a group
+project: **five people each change a little something, and two weeks later nobody can run the
+full pipeline, and nobody can say which result came from which code.**
+
+- The point of these rules is not to constrain you. It is to guarantee that **anyone who clones
+  the repo can reproduce anyone else's results.**
+- The cost of breaking a rule is not "getting told off". It is that **the whole team's experimental
+  conclusions are void.**
+- These rules are enforced by three machine checks: `scripts/check_structure.py`, pre-commit, and
+  CI. They do not depend on anyone's good intentions.
 
 ---
 
-## 0. 五分钟上手（新组员第一天的全部动作）
+## 0. Five-minute onboarding (everything a new team member does on day one)
 
 ```bash
-git clone <repo>                       # 1) 拿代码
-conda env create -f environment.yml    # 2) 建环境（Python 3.12 + torch + 依赖）
+git clone <repo>                       # 1) get the code
+conda env create -f environment.yml    # 2) create the environment (Python 3.12 + torch + deps)
 conda activate handwash
-pip install -e ".[all]"                # 3) 把本仓库装进环境
-python -m pre_commit install           # 4) 装提交前钩子（= make hooks）
-python -m handwash.cli doctor          # 5) 自检：缺什么、配好了没
-make train-smoke                       # 6) 30 秒跑通"数据→模型→指标"链路
+pip install -e ".[all]"                # 3) install this repository into the environment
+python -m pre_commit install           # 4) install the pre-commit hook (= make hooks)
+python -m handwash.cli doctor          # 5) self-check: what is missing, what is misconfigured
+make train-smoke                       # 6) run the data -> model -> metrics path in 30 seconds
 ```
 
-六步全部成功，才算"环境就绪"。任何一步失败，
-**先看 `handwash doctor` 的输出**，不要自己猜着改代码。
+Only when all six steps succeed is your environment "ready". If any step fails, **read the output
+of `handwash doctor` first**; do not guess and start editing code.
 
 ---
 
-## 1. 十条铁律（记不住全部，至少记住这十条）
+## 1. The ten Iron Rules (if you remember nothing else, remember these ten)
 
-| # | 规则 | 为什么 | 谁在检查 |
+| # | Rule | Why | Enforced by |
 | --- | --- | --- | --- |
-| **R1** | 只改自己负责的模块；跨模块改动先开 issue 说一声 | 避免两人同时重构同一处 | CODEOWNERS review |
-| **R2** | 文件编码 UTF-8、换行 LF、缩进 4 空格（YAML/JSON 2 空格） | 否则每次 diff 都是整文件重写，无法 review | `.editorconfig` + pre-commit |
-| **R3** | 一切可调参数写进 `configs/`，代码里不允许出现魔数 | 结果要能复现、要能对比 | CI 的 archcheck + review |
-| **R4** | 新增依赖必须同时改 `pyproject.toml` 和 `environment.yml` | 否则别人装不上、跑出不同结果 | review |
-| **R5** | 遵守分层依赖：`core` 不许 import `torch`，`io` 不许 import `models` | 契约层可单测、可复用；改了模型不影响数据 | `scripts/check_structure.py` |
-| **R6** | 数据、权重、输出一律不进 Git（`data/` `models/` `outputs/` 已忽略） | 仓库会被 20GB 数据撑爆 | `.gitignore` + pre-commit 大文件检查 |
-| **R7** | 新工作流必须同时加到 `Makefile` 和 CLI，命名一致 | 组员不用记两套命令 | review |
-| **R8** | 不用 `print` 输出运行信息，不用 `sys.exit` 抛错 | 日志要能统一收集、错误要能统一处理 | archcheck |
-| **R9** | 抛 `HandwashError` 子类，消息里说清"哪个文件/字段/期望/实际" | 报错信息就是最好的文档 | review |
-| **R10** | 洗手步骤的字符串只在 `core/labels.py` 出现一次 | 否则标签错位，指标全废且极难查 | review + 单测 |
+| **R1** | Change only the modules you own; open an issue before any cross-module change | Stops two people refactoring the same code at once | CODEOWNERS review |
+| **R2** | File encoding UTF-8, line endings LF, indent 4 spaces (2 spaces for YAML/JSON) | Otherwise every diff rewrites the whole file and cannot be reviewed | `.editorconfig` + pre-commit |
+| **R3** | Every tunable parameter goes into `configs/`; no magic numbers in code | Results must be reproducible and comparable | CI archcheck + review |
+| **R4** | A new dependency must be added to `pyproject.toml` and `environment.yml` together | Otherwise others cannot install it, or get different results | review |
+| **R5** | Respect layered dependencies: `core` must not import `torch`, `io` must not import `models` | The contract layer stays unit-testable and reusable; a model change does not disturb the data | `scripts/check_structure.py` |
+| **R6** | Data, weights, and outputs never enter Git (`data/` `models/` `outputs/` are ignored) | A 20GB dataset would blow up the repository | `.gitignore` + pre-commit large-file check |
+| **R7** | A new workflow must be added to both the `Makefile` and the CLI, with matching names | Team members should not have to remember two sets of commands | review |
+| **R8** | Do not print runtime information with `print`; do not raise errors with `sys.exit` | Logs must be collectable in one place, errors must be handled in one place | archcheck |
+| **R9** | Raise a `HandwashError` subclass, and state in the message which file/field/expected/actual | A good error message is the best documentation | review |
+| **R10** | Washing-step strings appear exactly once, in `core/labels.py` | Otherwise labels shift, every metric is ruined, and the cause is very hard to find | review + unit tests |
 
 ---
 
-## 2. 改动分级：先判断你动的是哪一级
+## 2. Change tiers: first decide which tier you are touching
 
-### L1 冻结区 —— 改动需要 RFC（先写文档，再改代码）
+### L1 Frozen zone (L1) - changes require an RFC (write the document first, then change code)
 
 ```
-src/handwash/core/labels.py      标签空间（类别顺序一旦冻结，旧权重才有意义）
-src/handwash/core/schema.py      跨层数据契约（字段/含义/单位）
-src/handwash/core/config.py      配置结构（键名就是全组的"接口"）
-src/handwash/core/protocol.py    完整性判定规则（结论口径）
-src/handwash/core/registry.py    注册机制
+src/handwash/core/labels.py      label space (once the class order is frozen, old weights stay meaningful)
+src/handwash/core/schema.py      cross-layer data contract (fields / meaning / units)
+src/handwash/core/config.py      configuration structure (key names are the team-wide "interface")
+src/handwash/core/protocol.py    completeness decision rules (the definition behind every verdict)
+src/handwash/core/registry.py    registration mechanism
 src/handwash/errors.py  paths.py  logging.py
-configs/config.yaml              公共默认配置
-src/handwash/io/split.py         数据划分规则（划分一变，历史指标全部不可比）
+configs/config.yaml              shared default configuration
+src/handwash/io/split.py         data split rules (change the split and all historical metrics become incomparable)
 ```
 
-**L1 改动的标准流程：**
+**The standard process for an L1 change:**
 
-1. 在 `docs/ARCHITECTURE.md` 第 5 节追加一条 RFC 记录（模板已给），写清：
-   现状 → 为什么要改 → 影响谁 → 迁移办法 → 谁同意。
-2. 至少 1 名负责人 review 通过，并在 PR 描述里粘贴 RFC 链接。
-3. 同步更新 `CHANGELOG.md`（破坏性改动要标注 **BREAKING**）。
-4. 如果改动影响已产出的结果，**在 PR 里明确写出"哪些历史实验需要重跑"。**
+1. Append an RFC entry to section 5 of `docs/ARCHITECTURE.md` (a template is provided) and state
+   clearly: current state -> why it must change -> who is affected -> migration plan -> who approves.
+2. Get approval from at least one maintainer, and paste the RFC link into the PR description.
+3. Update `CHANGELOG.md` at the same time (mark breaking changes as **BREAKING**).
+4. If the change affects results that already exist, **state explicitly in the PR which historical
+   experiments must be re-run.**
 
-### L2 受限区 —— 需要 1 名负责人 review
+### L2 Restricted zone (L2) - requires review by 1 maintainer
 
 ```
 src/handwash/io/**             src/handwash/data/**
 src/handwash/models/**         src/handwash/pipelines/**
 scripts/**                     tests/**
 pyproject.toml  environment.yml  Makefile
-.pre-commit-config.yaml  .github/**  docs/**（除 ARCHITECTURE/PROTOCOL）
+.pre-commit-config.yaml  .github/**  docs/** (except ARCHITECTURE/PROTOCOL)
 ```
 
-可以自由实现，但**不得改变对外契约**：
-函数签名、返回结构、配置键名、日志语义都不能变。
-需要变 → 按 L1 走。
+You may implement freely, but you **must not change the external contract**:
+function signatures, return structures, config key names, and log semantics all stay as they are.
+If they need to change, follow the L1 process.
 
-### L3 自由区 —— 随便改，只要 CI 通过
+### L3 Free zone (L3) - change anything you like, as long as CI passes
 
 ```
-configs/experiments/**.yaml    你自己的实验配置
-configs/models/**.yaml         新模型的配置
-configs/data/**.yaml           新数据集的配置
-docs/EXPERIMENTS.md            实验结果记录
-outputs/  data/  models/       本地产物（不进 Git）
-notebooks/**.ipynb             个人探索（提交前请清空输出）
+configs/experiments/**.yaml    your own experiment configs
+configs/models/**.yaml         configs for new models
+configs/data/**.yaml           configs for new datasets
+docs/EXPERIMENTS.md            experiment result records (in Chinese)
+outputs/  data/  models/       local artifacts (never in Git)
+notebooks/**.ipynb             personal exploration (clear outputs before committing)
 ```
 
-**这是你 90% 的工作所在。** 想试新想法 → 新建一个
-`configs/experiments/expNN_描述.yaml`，跑，把结果写进 `docs/EXPERIMENTS.md`，
-不需要任何人批准。
+**This is where 90% of your work happens.** Want to try a new idea? Create a new
+`configs/experiments/expNN_description.yaml`, run it, write the result into `docs/EXPERIMENTS.md`
+(in Chinese). No one's approval needed.
 
-> 判断口诀：**加文件是 L3，改接口是 L1，改实现是 L2。**
+> The rule of thumb: **adding a file is L3, changing an interface is L1, changing an implementation
+> is L2.**
 
 ---
 
-## 3. 加新东西的正确姿势（照抄即可）
+## 3. How to add something new (just copy these patterns)
 
-### 3.1 加一个新模型
+### 3.1 Add a new model
 
 ```python
 # src/handwash/models/my_model.py
 from handwash.core.registry import register_model
 from handwash.models.base import BaseClassifier
 
-@register_model("my-model")            # ① 必须注册，名字就是配置里的 model.arch
+@register_model("my-model")            # (1) registration is required; the name is model.arch in the config
 class MyModel(BaseClassifier):
     arch_name = "my-model"
 
     def __init__(self, num_classes: int, *, pretrained=True, dropout: float = 0.2, **kwargs):
         super().__init__(num_classes, dropout=dropout)
-        ...                            # ② 自己搭网络
+        ...                            # (2) build the network yourself
 
     @property
-    def feature_dim(self) -> int: ...  # ③ 时序头需要它
+    def feature_dim(self) -> int: ...  # (3) the temporal head needs this
 
-    def _forward_logits(self, x):      # ④ 必须返回 (B, T, C)
-        ...                            #    单帧模型也要补一个时间维
+    def _forward_logits(self, x):      # (4) must return (B, T, C)
+        ...                            #     a single-frame model still needs a time dimension
 
-    def embed(self, x):                # ⑤ 想用于 GRU/TCN 两级训练才需要
+    def embed(self, x):                # (5) only needed if you want two-stage GRU/TCN training
         ...
 ```
 
-然后在 `src/handwash/models/factory.py` 的 `register_all()` 里 import 你的模块，
-在 `configs/models/` 加一份配置，在 `tests/unit/models/` 加一个"能前向、形状对"的测试。
-**不要改 `BaseClassifier` 的接口**（那是 L1）。
+Then import your module inside `register_all()` in `src/handwash/models/factory.py`, add a config
+under `configs/models/`, and add a test under `tests/unit/models/` that checks "it runs a forward
+pass and the shapes are right". **Do not change the `BaseClassifier` interface** (that is L1).
 
-### 3.2 加一个新数据集
+### 3.2 Add a new dataset
 
-1. **只改 `core/labels.py` 的 `_DATASET_ALIASES`**：把该数据集的原始标签名映射到规范 `Step`。
-   这一步最容易出错也最重要 —— 映射错了，模型学到的东西就是错位的。
-   若该数据集有新类别（不是六步之一），再在 `LABEL_SPACES` 里加一个命名空间，
-   **并且只能追加在末尾**（顺序即通道号，插入会让旧权重失效 → 属于 L1 改动）。
-2. 在 `configs/data/<name>.yaml` 写数据路径与 `assess` 阈值。
-3. 在 `configs/config.yaml` 的 `datasets:` 段登记路径。
-4. 若目录结构与已有适配器不同，改 `pipelines/prepare.py` 的适配器函数（L2）。
-5. 在 `docs/DATA.md` 补：来源链接、规模、目录结构、下载命令。
+1. **Change only `_DATASET_ALIASES` in `core/labels.py`**: map the dataset's raw label names onto
+   the canonical `Step`. This step is the easiest to get wrong and the most important. Map it wrong
+   and whatever the model learns is misaligned. If the dataset has new classes (not one of the six
+   steps), add another namespace in `LABEL_SPACES`, and **append it at the end only** (order is the
+   channel index; inserting invalidates old weights, which makes it an L1 change).
+2. Write the data paths and the `assess` thresholds in `configs/data/<name>.yaml`.
+3. Register the path under the `datasets:` section of `configs/config.yaml`.
+4. If the directory structure differs from existing adapters, change the adapter function in
+   `pipelines/prepare.py` (L2).
+5. Add to `docs/DATA.md` (in Chinese): source link, scale, directory structure, download command.
 
-### 3.3 加一个新实验
+### 3.3 Add a new experiment
 
 ```bash
 cp configs/config.yaml configs/experiments/exp05_my_idea.yaml
-# 只写与默认不同的键（叠加语义，不要复制整份配置）
+# write only the keys that differ from the defaults (overlay semantics, do not copy the whole config)
 python -m handwash.cli train config=configs/experiments/exp05_my_idea.yaml
 ```
 
-跑完把结果记进 `docs/EXPERIMENTS.md` 的那张表（**必须填 config_hash**）。
+When it finishes, record the result in the table in `docs/EXPERIMENTS.md` (in Chinese)
+(**config_hash is mandatory**).
 
-### 3.4 加一个新评估指标
+### 3.4 Add a new evaluation metric
 
-1. 纯计算放 `core/metrics.py`（L1，但只**追加**函数、不改已有函数的语义）。
-2. 加入 `EvalConfig.metrics` 的合法取值，并在 `pipelines/evaluate.py` 里接上。
-3. 加单测：给一个能手算的例子，断言具体数值。
+1. Put pure computation in `core/metrics.py` (L1, but **append** functions only; do not change the
+   semantics of existing ones).
+2. Add it to the legal values of `EvalConfig.metrics`, and wire it up in `pipelines/evaluate.py`.
+3. Add a unit test: give an example you can compute by hand and assert the exact number.
 
 ---
 
-## 4. 目录与命名约定
+## 4. Directory and naming conventions
 
 ```
 src/handwash/
-  paths.py logging.py errors.py     L0 基础设施（只依赖标准库）
-  core/                             L1 契约：schema / labels / config / metrics / protocol
-  io/                               L2 落盘与解码：manifest / split / video / utils
-  data/                             L2 数据集与预处理
-  models/                           L3 模型（唯一允许 import torch/ultralytics 的地方）
-  pipelines/                        L4 流程编排：prepare / train / evaluate / infer / assess
-  cli.py cli_doctor.py              L4 命令行入口
-scripts/                            薄封装脚本（多步组合、演示用）
+  paths.py logging.py errors.py     L0 infrastructure (standard library only)
+  core/                             L1 contract: schema / labels / config / metrics / protocol
+  io/                               L2 persistence and decoding: manifest / split / video / utils
+  data/                             L2 datasets and preprocessing
+  models/                           L3 models (the only place allowed to import torch/ultralytics)
+  pipelines/                        L4 orchestration: prepare / train / evaluate / infer / assess
+  cli.py cli_doctor.py              L4 command-line entry points
+scripts/                            thin wrapper scripts (multi-step combinations, demos)
 configs/                            config.yaml + data/ + models/ + experiments/
-docs/                               文档
-tests/                              与 src/ 分层对应的测试
-data/ models/ outputs/              产物（不进 Git）
+docs/                               documentation
+tests/                              tests mirroring the src/ layering
+data/ models/ outputs/              artifacts (never in Git)
 ```
 
-命名约定（机器检查 + review 同时把关）：
+Naming conventions (enforced both by machine checks and by review):
 
-| 对象 | 约定 | 例子 |
+| Object | Convention | Example |
 | --- | --- | --- |
-| 模块/函数/变量 | `snake_case` | `build_dataset`、`macro_f1` |
-| 类 | `PascalCase` | `TemporalClassifier` |
-| 常量 | `UPPER_SNAKE` | `CANONICAL_STEPS` |
-| 私有 | 前缀 `_` | `_forward_logits` |
-| 配置键 | `snake_case`，与 dataclass 字段**逐字一致** | `train.epochs` |
-| 类别名 | 只出现在 `core/labels.py` | `step_1_palm_to_palm` |
-| 测试文件 | `test_<被测模块>.py` | `test_protocol.py` |
-| 实验配置 | `expNN_描述.yaml` | `exp02_yolo26n_gru.yaml` |
+| module / function / variable | `snake_case` | `build_dataset`, `macro_f1` |
+| class | `PascalCase` | `TemporalClassifier` |
+| constant | `UPPER_SNAKE` | `CANONICAL_STEPS` |
+| private | prefix `_` | `_forward_logits` |
+| config key | `snake_case`, **character-for-character identical** to the dataclass field | `train.epochs` |
+| class name | appears only in `core/labels.py` | `step_1_palm_to_palm` |
+| test file | `test_<module under test>.py` | `test_protocol.py` |
+| experiment config | `expNN_description.yaml` | `exp02_yolo26n_gru.yaml` |
 
 ---
 
-## 5. 提交与分支（每天都会用）
+## 5. Commits and branches (used every day)
 
-### 分支
-
-```
-main            永远可运行、永远通过 CI。禁止直接 push（pre-commit 会拦）
-feat/<模块>/<简述>    新功能，如 feat/models/tcn-head
-fix/<模块>/<简述>     修 bug，如 fix/io/manifest-dup-frame
-exp/<你的名字>/<编号>  跑实验（通常只改 configs/experiments/）
-docs/<简述>          只改文档
-```
-
-### 提交信息（Conventional Commits，中文描述）
+### Branches
 
 ```
-<类型>(<范围>): <一句话说明>
-
-范围取值：core / io / data / models / pipelines / configs / docs / tests / scripts
-类型取值：feat / fix / refactor / docs / test / chore / perf / BREAKING
-
-例：
-feat(models): 加入 TCN 时序头并注册 tcn 架构
-fix(core): 修正时长判定在 total_wash_s=0 时的除零
-docs(configs): 说明 YOLO 适配器必须用 zero_one 归一化
-BREAKING(core): 标签空间 pskuss 新增 other 类别（旧权重需重训）
+main                  always runnable, always green in CI. Direct pushes are forbidden (pre-commit blocks them)
+feat/<module>/<short> new feature, e.g. feat/models/tcn-head
+fix/<module>/<short>  bug fix, e.g. fix/io/manifest-dup-frame
+exp/<your-name>/<id>  running experiments (usually only touches configs/experiments/)
+docs/<short>          documentation only
 ```
 
-### 提交前必跑（三选一，推荐第一个）
+### Commit messages (Conventional Commits, description in English)
+
+```
+<type>(<scope>): <one-line description>
+
+scope values: core / io / data / models / pipelines / configs / docs / tests / scripts
+type values: feat / fix / refactor / docs / test / chore / perf / BREAKING
+
+Examples:
+feat(models): add a TCN temporal head and register the tcn architecture
+fix(core): fix division by zero in the duration check when total_wash_s=0
+docs(configs): note that the YOLO adapter must use zero_one normalization
+BREAKING(core): add an other class to the pskuss label space (old weights need retraining)
+```
+
+### Run before every commit (pick one of three; the first is recommended)
 
 ```bash
-python -m pre_commit run --all-files    # 快：格式 + 结构检查 + 快速单测
-make check                              # 全：lint + archcheck + typecheck + test
+python -m pre_commit run --all-files    # fast: formatting + structure checks + quick unit tests
+make check                              # full: lint + archcheck + typecheck + test
 python -m pytest -m "not integration and not slow and not gpu"
 ```
 
-### PR 检查清单（复制到 PR 描述里逐条打勾）
+### PR checklist (copy into the PR description and tick every line)
 
 ```markdown
-- [ ] 我改动的文件属于我负责的模块，或已获得负责人同意
-- [ ] 我没有修改任何 L1 冻结文件（若有，已附 RFC 链接：____）
-- [ ] 所有新增参数都进了 configs/，代码里没有新增魔数
-- [ ] 新增/修改的模块都有对应测试（tests/ 下同名文件）
-- [ ] `python -m pre_commit run --all-files` 通过
-- [ ] 我在本机跑过受影响的最小流程（贴命令与结果：____）
-- [ ] 若改了模型/数据，已记录实验到 docs/EXPERIMENTS.md（含 config_hash）
-- [ ] 若影响历史结果，已在 PR 里列出"需要重跑的实验"
-- [ ] 没有提交数据/权重/输出（`git status` 干净）
+- [ ] The files I changed belong to the modules I own, or I have the maintainer's approval
+- [ ] I did not modify any L1 frozen file (if I did, the RFC link is attached: ____)
+- [ ] Every new parameter went into configs/; no new magic numbers in code
+- [ ] Every new or changed module has a matching test (same-named file under tests/)
+- [ ] `python -m pre_commit run --all-files` passes
+- [ ] I ran the smallest affected workflow locally (paste commands and results: ____)
+- [ ] If I changed a model or data, I recorded the experiment in docs/EXPERIMENTS.md (in Chinese, with config_hash)
+- [ ] If historical results are affected, I listed the "experiments that need re-running" in the PR
+- [ ] I did not commit data/weights/outputs (the `git status` is clean)
 ```
 
 ---
 
-## 6. 常见错误与正确处理（看到报错先查这里）
+## 6. Common errors and the correct handling (check here first when you see an error)
 
-| 现象 | 真正原因 | 正确处理 |
+| Symptom | Real cause | Correct handling |
 | --- | --- | --- |
-| `ConfigError: 出现未知配置键` | 配置键拼错，或把新参数写进了 YAML 但没加到 dataclass | 核对 `core/config.py` 的字段名；新参数走 RFC |
-| `DataLeakageError` | 同一段原始视频落进了两个 split | 检查 `split.group_key=original_video`；**必须先划分再抽帧** |
-| `ManifestError: 缺少必需列` | 用了旧版 manifest | 删掉旧的 `data/processed/*/manifest.csv` 重跑 `prepare` |
-| 准确率异常高（>0.98） | 极可能数据泄漏，或测试集进了训练 | 检查划分；参考 `docs/DATA.md` 的"自检清单" |
-| 准确率异常低 | 归一化用错（YOLO 用 imagenet）、标签映射错位 | 跑 `handwash doctor`；核对 `core/labels.py` |
-| 找不到 `handwash` 模块 | 没 `pip install -e .`，或脚本缺 `from _bootstrap import ...` | 二选一修好 |
-| 别人跑不出我的结果 | 没固定 seed / 没记录 config_hash | 用 `runtime.seed`，实验记录里填 `config_hash` |
-| 显存不足 | clip 模式 batch 含义不同（窗口数 × 窗口长度） | 调小 `train.batch_size` 或 `model.temporal.window` |
-| Windows DataLoader 报错 | 多进程 + 中文路径 | `runtime.num_workers: 0` |
+| `ConfigError: unknown config key` | A config key is misspelled, or you added a new parameter to the YAML without adding it to the dataclass | Check the field names in `core/config.py`; new parameters go through an RFC |
+| `DataLeakageError` | The same raw video landed in two splits | Check `split.group_key=original_video`; **you must split before frame extraction** |
+| `ManifestError: missing required column` | You are using an old manifest | Delete the old `data/processed/*/manifest.csv` and re-run `prepare` |
+| Accuracy suspiciously high (>0.98) | Very likely data leakage, or the test set leaked into training | Check the split; see the "self-check list" in `docs/DATA.md` (in Chinese) |
+| Accuracy suspiciously low | Wrong normalization (imagenet for YOLO), or misaligned label mapping | Run `handwash doctor`; check `core/labels.py` |
+| `handwash` module not found | You did not run `pip install -e .`, or the script is missing `from _bootstrap import ...` | Fix either one |
+| Others cannot reproduce my results | No fixed seed / no recorded config_hash | Use `runtime.seed`, and fill in `config_hash` in the experiment record |
+| Out of GPU memory | In clip mode the batch means something different (number of windows x window length) | Lower `train.batch_size` or `model.temporal.window` |
+| Windows DataLoader error | Multiprocessing plus non-ASCII paths | `runtime.num_workers: 0` |
 
 ---
 
-## 7. 文档与记录的义务
+## 7. Your documentation obligations
 
-**改了东西不写文档 = 没改。**
+**Changing something without documenting it = you did not change it.**
 
-| 你改了什么 | 必须更新 |
+| What you changed | What you must update |
 | --- | --- |
-| 新增/修改配置键 | `docs/CONFIG.md`（逐键说明） |
-| 新增数据集或标注结构 | `docs/DATA.md` |
-| 修改判定阈值或口径 | `docs/PROTOCOL.md` |
-| 跑了实验（无论成功失败） | `docs/EXPERIMENTS.md`（含 `config_hash`） |
-| 破坏性改动 | `CHANGELOG.md`（标 `BREAKING`）+ RFC |
-| 新的分层/架构决定 | `docs/ARCHITECTURE.md` 第 5 节 RFC |
+| Added or changed a config key | `docs/CONFIG.md` (key-by-key description) (in Chinese) |
+| Added a dataset or a label structure | `docs/DATA.md` (in Chinese) |
+| Changed a decision threshold or criterion | `docs/PROTOCOL.md` (in Chinese) |
+| Ran an experiment (success or failure) | `docs/EXPERIMENTS.md` (in Chinese) (including `config_hash`) |
+| A breaking change | `CHANGELOG.md` (marked `BREAKING`) + RFC |
+| A new layering or architecture decision | RFC in section 5 of `docs/ARCHITECTURE.md` |
 
 ---
 
-## 8. 遇到规则妨碍你的时候
+## 8. When a rule gets in your way
 
-规则是为人服务的。如果你觉得某条规则挡住了正确的事：
+Rules serve people. If you think a rule is blocking the right thing:
 
-1. **不要偷偷绕过**（例如把 magic number 藏进函数默认值、把测试改成 skip）。
-2. 在 PR 里写明"我认为 R× 在这里不适用，因为……"。
-3. 由负责人决定是**豁免一次**（在 `scripts/check_structure.py` 的
-   `ALLOWED_EXCEPTIONS` 里逐文件登记理由）还是**改规则**（走 L1 RFC）。
+1. **Do not quietly work around it** (for example hiding a magic number in a function default, or
+   turning a test into a skip).
+2. State in the PR: "I believe R× does not apply here, because ...".
+3. The maintainer decides whether to grant a **one-off exemption** (registered file by file with a
+   reason in `ALLOWED_EXCEPTIONS` in `scripts/check_structure.py`) or to **change the rule** (via an
+   L1 RFC).
 
-**唯一不可协商的两条：数据泄漏（R6 相关的划分规则）与标签空间唯一性（R10）。**
-这两条一旦破，全组的时间都白花。
+**Only two things are non-negotiable: data leakage (the split rules behind R6) and the uniqueness of
+the label space (R10).** Break either one and the whole team's time is wasted.

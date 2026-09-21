@@ -54,6 +54,9 @@ jobs:
       - name: 配置契约检查（所有 configs/*.yaml 必须能严格加载）
         run: python scripts/check_config.py
 
+      - name: 文档体检（双语配对 + 链接不断链）
+        run: python scripts/check_docs.py
+
       - name: 确认没有把数据/权重/输出提交进来
         run: |
           set -e

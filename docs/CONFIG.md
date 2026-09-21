@@ -1,228 +1,236 @@
-# 配置参考（CONFIG）
+> **English** | [中文](/docs/zh/CONFIG.md)
 
-配置文件的键名与 `src/handwash/core/config.py` 的 dataclass 字段**逐字对应**，
-拼错的键会**直接报错**（不会静默忽略）。本文件是每个键的说明。
+# Configuration Reference (CONFIG)
 
-用法回顾：
+Config keys correspond **word for word** to the dataclass fields in
+`../src/handwash/core/config.py`, and a misspelled key **raises an error outright**
+(it is never silently ignored). This document explains every key.
+
+Recap of usage:
 
 ```bash
-# 默认加载 configs/config.yaml
+# configs/config.yaml is loaded by default
 python -m handwash.cli train
 
-# 叠加一个覆盖文件（推荐：只写与默认不同的部分）
+# layer one override file on top (recommended: write only what differs from the default)
 python -m handwash.cli train config=configs/experiments/smoke.yaml
 
-# 临时改单个参数（key.sub=value，值按 YAML 标量解析）
+# change a single parameter for one run (key.sub=value, value parsed as a YAML scalar)
 python -m handwash.cli train train.epochs=5 runtime.device=cpu
 
-# 替换基础配置（文件必须自洽）
+# replace the base configuration (the file must be self-contained)
 python -m handwash.cli train --config configs/experiments/smoke.yaml
 ```
 
-> `config=`（位置参数）是**叠加**，`--config` 是**替换**。这是刻意的区分：
-> 叠加用于实验覆盖，替换用于完全独立的一套配置。
+> `config=` (a positional argument) **layers on top**, whereas `--config` **replaces**.
+> That distinction is deliberate: layering is for experiment overrides, replacement is
+> for a completely independent set of configuration.
 
 ---
 
 ## schema_version
 
-配置结构版本，当前为 `1`。破坏性改动时递增，并同步 `docs/CHANGELOG` 与迁移说明。
-**不要为了"让它跑起来"而手工改这个数字。**
+Configuration-schema version, currently `1`. Increment it on breaking changes, and update
+`docs/CHANGELOG` and the migration notes together with it.
+**Do not change this number by hand just to "make it run".**
 
 ## project
 
-| 键 | 类型 | 说明 |
+| Key | Type | Description |
 | --- | --- | --- |
-| `name` | str | 项目名，写入产物元数据 |
-| `task` | str | 任务标识，默认 `who_six_step_recognition` |
-| `language` | str | 报告语言，默认 `zh` |
+| `name` | str | Project name, written into artefact metadata |
+| `task` | str | Task identifier, default `who_six_step_recognition` |
+| `language` | str | Report language, default `zh` |
 
 ## runtime
 
-| 键 | 类型 | 默认 | 说明 |
+| Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `seed` | int | 42 | 全局随机种子。**固定种子是结果可复现的前提** |
-| `deterministic` | bool | true | 让 cuDNN 走确定性算法（略慢但可复现） |
+| `seed` | int | 42 | Global random seed. **A fixed seed is the precondition for reproducible results** |
+| `deterministic` | bool | true | Makes cuDNN use deterministic algorithms (slightly slower but reproducible) |
 | `device` | str | auto | `auto` / `cpu` / `cuda` / `cuda:0` |
-| `num_workers` | int | 4 | DataLoader 进程数。**Windows 报错时改成 0** |
-| `pin_memory` | bool | true | 有 GPU 时通常更快 |
+| `num_workers` | int | 4 | Number of DataLoader processes. **Set it to 0 when Windows errors out** |
+| `pin_memory` | bool | true | Usually faster when a GPU is present |
 | `log_level` | str | INFO | DEBUG / INFO / WARNING / ERROR |
 | `tracking` | str | csv | `none` / `csv` / `tensorboard` / `wandb` |
-| `tracking_project` | str | handwash | 追踪平台的项目名 |
-| `run_name` | str\|null | null | 输出目录名。null 时用时间戳；**对比实验建议写死** |
+| `tracking_project` | str | handwash | Project name on the tracking platform |
+| `run_name` | str\|null | null | Output directory name. When null a timestamp is used; **pin it for comparison experiments** |
 
 ## paths
 
-| 键 | 默认 | 说明 |
+| Key | Default | Description |
 | --- | --- | --- |
-| `out_dir` | `outputs` | 实验产物根目录 |
-| `models_dir` | `models` | 外部权重存放处（不进 Git） |
-| `cache_dir` | `.cache/handwash` | 缓存目录 |
+| `out_dir` | `outputs` | Root directory for experiment artefacts |
+| `models_dir` | `models` | Where external weights are kept (not committed to Git) |
+| `cache_dir` | `.cache/handwash` | Cache directory |
 
-相对路径一律相对**仓库根目录**解析（不是当前工作目录）。
+Relative paths are always resolved against the **repository root** (not the current
+working directory).
 
 ## dataset
 
-| 键 | 类型 | 默认 | 说明 |
+| Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `name` | str | kaggle | 当前使用的数据集，必须出现在 `datasets` 段中 |
-| `root` | str | `data/raw/kaggle` | 数据集原始目录 |
-| `variants` | list[str] | `[]` | 数据集变体标记（预留） |
-| `label_space` | str\|null | null | 标签空间名；null 表示与 `name` 相同 |
-| `include_non_wash` | bool | false | 是否把开关水龙头等辅助动作当类别 |
-| `prep.fps` | float | 5.0 | **抽帧率**。动作级任务 5 fps 足够 |
-| `prep.frame_step` | int | 1 | 固定步长降采样（与 fps 二选一，fps 优先） |
-| `prep.resize_hw` | [int,int] | [256,256] | 落盘尺寸（比模型输入略大，留增强空间） |
+| `name` | str | kaggle | Dataset currently in use; it must appear in the `datasets` section |
+| `root` | str | `data/raw/kaggle` | Raw dataset directory |
+| `variants` | list[str] | `[]` | Dataset variant tags (reserved) |
+| `label_space` | str\|null | null | Label-space name; null means the same as `name` |
+| `include_non_wash` | bool | false | Whether auxiliary actions such as turning the tap on/off count as classes |
+| `prep.fps` | float | 5.0 | **Frame extraction rate**. 5 fps is enough for action-level tasks |
+| `prep.frame_step` | int | 1 | Fixed-stride downsampling (alternative to fps; fps wins if both are set) |
+| `prep.resize_hw` | [int,int] | [256,256] | Size written to disk (slightly larger than the model input, leaving room for augmentation) |
 | `prep.image_ext` | str | jpg | jpg / jpeg / png |
 | `prep.jpeg_quality` | int | 92 | 1—100 |
-| `prep.min_frames_per_clip` | int | 10 | 短于此值的视频会被跳过 |
+| `prep.min_frames_per_clip` | int | 10 | Videos shorter than this are skipped |
 
 ## datasets
 
-数据集档案字典：`datasets.<name>.root / processed_dir / frames_dir / manifest`。
-训练脚本只读 `dataset.name` 对应的那一份；其余档案不影响运行。
+Dictionary of dataset profiles: `datasets.<name>.root / processed_dir / frames_dir / manifest`.
+The training script reads only the one profile matching `dataset.name`; the other profiles
+do not affect the run.
 
-**manifest 里的 `image_path` 是相对 `<root>` 的路径** —— 因此整个数据目录
-可以搬走或挂载到别的盘，manifest 不需要改。
+**`image_path` inside the manifest is a path relative to `<root>`** — so the whole data
+directory can be moved away or mounted on another drive without changing the manifest.
 
 ## split
 
-| 键 | 类型 | 默认 | 说明 |
+| Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `group_key` | str | original_video | 划分分组键：`original_video` / `clip_id` / `participant` |
-| `train` / `val` / `test` | float | 0.70/0.15/0.15 | 三者之和必须为 1.0 |
-| `stratify_by` | str\|null | label_sequence | 分层依据；null 表示不分层 |
-| `seed` | int | 42 | 划分随机种子 |
-| `max_frames_per_clip_train` | int\|null | 200 | 长视频**等间隔**截断（不是取前 N 帧） |
-| `max_frames_per_clip_eval` | int\|null | 100 | 同上，评估集 |
-| `guard_leakage` | bool | true | 发现跨 split 的原始视频直接报错 |
+| `group_key` | str | original_video | Split grouping key: `original_video` / `clip_id` / `participant` |
+| `train` / `val` / `test` | float | 0.70/0.15/0.15 | The three must sum to 1.0 |
+| `stratify_by` | str\|null | label_sequence | Stratification basis; null means no stratification |
+| `seed` | int | 42 | Random seed for the split |
+| `max_frames_per_clip_train` | int\|null | 200 | Long videos are truncated at **equal intervals** (not by taking the first N frames) |
+| `max_frames_per_clip_eval` | int\|null | 100 | Same as above, for evaluation sets |
+| `guard_leakage` | bool | true | Raise an error as soon as an original video crosses splits |
 
-> `group_key` 是防数据泄漏的关键。**改成 `clip_id` 就失去了防泄漏能力**，
-> 除非你能保证 clip_id 与原始视频一一对应。
+> `group_key` is the key to preventing data leakage. **Switching it to `clip_id` gives up
+> the leakage protection**, unless you can guarantee that clip_id corresponds one-to-one
+> to the original video.
 
 ## model
 
-| 键 | 类型 | 默认 | 说明 |
+| Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `name` | str | yolo26n-cls | 便于阅读的模型名（不影响行为） |
-| `arch` | str | yolo26n-cls | **注册名**，见 `src/handwash/models/` |
-| `pretrained` | str\|bool | auto | `auto` / `true` / `false` / 权重名 / 本地路径 |
-| `num_classes` | int\|null | null | **保持 null**：由标签空间自动推导 |
-| `image_size` | int | 224 | 必须是 64 的倍数（YOLO 对非 32 倍数尺寸不友好） |
+| `name` | str | yolo26n-cls | Human-readable model name (does not affect behaviour) |
+| `arch` | str | yolo26n-cls | **Registered name**, see `../src/handwash/models/` |
+| `pretrained` | str\|bool | auto | `auto` / `true` / `false` / a weight name / a local path |
+| `num_classes` | int\|null | null | **Keep it null**: it is derived automatically from the label space |
+| `image_size` | int | 224 | Must be a multiple of 64 (YOLO is unfriendly to sizes that are not multiples of 32) |
 | `normalize` | str | zero_one | `imagenet` / `zero_one` / `minus_one_one` |
 | `dropout` | float | 0.2 | [0, 1) |
 | `temporal.kind` | str | gru | `gru` / `tcn` / `mean_pool` / `none` |
-| `temporal.hidden_size` | int | 128 | 时序头隐藏维度 |
-| `temporal.num_layers` | int | 1 | GRU 层数 |
-| `temporal.bidirectional` | bool | false | true 会用到未来帧，**不能用于实时演示** |
-| `temporal.window` | int | 16 | 时序窗口长度（帧） |
-| `temporal.stride` | int | 8 | 滑窗步长 |
-| `temporal.kernel_size` | int | 3 | TCN 卷积核 |
-| `temporal.dilations` | list[int] | [1,2,4,8] | TCN 膨胀率 |
-| `temporal.dropout` | float | 0.1 | 时序头 dropout |
+| `temporal.hidden_size` | int | 128 | Hidden dimension of the temporal head |
+| `temporal.num_layers` | int | 1 | Number of GRU layers |
+| `temporal.bidirectional` | bool | false | true uses future frames and **cannot be used for a live demo** |
+| `temporal.window` | int | 16 | Temporal window length (frames) |
+| `temporal.stride` | int | 8 | Sliding-window stride |
+| `temporal.kernel_size` | int | 3 | TCN convolution kernel |
+| `temporal.dilations` | list[int] | [1,2,4,8] | TCN dilation rates |
+| `temporal.dropout` | float | 0.1 | Dropout of the temporal head |
 
-**`normalize` 与 arch 的搭配（最常见的坑）**
+**Combining `normalize` with arch (the most common trap)**
 
-| arch | 必须的 normalize | 原因 |
+| arch | Required normalize | Reason |
 | --- | --- | --- |
-| `yolo26n-cls` / `yolon-cls` | `zero_one` | ultralytics 内部已做归一化，再归一化一次等于吃了两次 |
-| `mobilenet_v2` / `resnet18` / `efficientnet_b0` | `imagenet` | 用 ImageNet 预训练权重，必须匹配其输入分布 |
+| `yolo26n-cls` / `yolon-cls` | `zero_one` | ultralytics already normalises internally, so normalising once more means doing it twice |
+| `mobilenet_v2` / `resnet18` / `efficientnet_b0` | `imagenet` | These use ImageNet pre-trained weights, so their input distribution must be matched |
 
-`handwash doctor` 会检查这个搭配。
+`handwash doctor` checks this combination.
 
 ## train
 
-| 键 | 类型 | 默认 | 说明 |
+| Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `mode` | str | frame | `frame` / `clip` / `hybrid`（决定是否走时序训练路径） |
-| `epochs` | int | 20 | 训练轮数 |
-| `batch_size` | int | 32 | **clip 模式下含义不同**：窗口数 × 窗口长度 |
-| `eval_batch_size` | int | 64 | 评估 batch |
-| `lr` | float | 3e-4 | 学习率 |
-| `weight_decay` | float | 5e-4 | 权重衰减 |
+| `mode` | str | frame | `frame` / `clip` / `hybrid` (decides whether the temporal training path is taken) |
+| `epochs` | int | 20 | Number of training epochs |
+| `batch_size` | int | 32 | **Means something different in clip mode**: number of windows × window length |
+| `eval_batch_size` | int | 64 | Evaluation batch |
+| `lr` | float | 3e-4 | Learning rate |
+| `weight_decay` | float | 5e-4 | Weight decay |
 | `optimizer` | str | adamw | `adamw` / `sgd` |
-| `momentum` | float | 0.9 | 仅 SGD |
+| `momentum` | float | 0.9 | SGD only |
 | `scheduler` | str | cosine | `cosine` / `step` / `none` |
-| `warmup_epochs` | float | 1.0 | 预热轮数 |
+| `warmup_epochs` | float | 1.0 | Number of warm-up epochs |
 | `label_smoothing` | float | 0.05 | [0, 1) |
-| `class_weights` | str | none | `none` / `balanced`（类别不平衡时用） |
-| `early_stopping_patience` | int | 5 | 验证 Macro-F1 连续 N 轮不提升就停 |
-| `grad_clip_norm` | float | 1.0 | 梯度裁剪；0 表示关闭 |
-| `precision` | str | fp32 | `fp32` / `fp16` / `bf16`（fp16 需要 CUDA） |
-| `accumulate_grad_batches` | int | 1 | 梯度累积，显存不足时放大等效 batch |
-| `focal_gamma` | float | 0.0 | >0 时改用焦点损失 |
-| `augment.*` | | | 见下 |
+| `class_weights` | str | none | `none` / `balanced` (use when classes are imbalanced) |
+| `early_stopping_patience` | int | 5 | Stop once validation Macro-F1 fails to improve for N consecutive epochs |
+| `grad_clip_norm` | float | 1.0 | Gradient clipping; 0 disables it |
+| `precision` | str | fp32 | `fp32` / `fp16` / `bf16` (fp16 requires CUDA) |
+| `accumulate_grad_batches` | int | 1 | Gradient accumulation; enlarge the effective batch when memory runs short |
+| `focal_gamma` | float | 0.0 | Switch to focal loss when >0 |
+| `augment.*` | | | see below |
 
-`train.augment`：`random_resized_crop`(true) / `crop_scale`([0.7,1.0]) /
+`train.augment`: `random_resized_crop`(true) / `crop_scale`([0.7,1.0]) /
 `horizontal_flip`(true) / `color_jitter`(0.2) / `rotation_deg`(8.0) /
 `gaussian_blur`(0.1) / `randaugment`(false)
 
-> **选模标准是验证集 Macro-F1**，不是 Accuracy。类别不平衡时 Accuracy 会掩盖
-> 小类别（第 5、6 步）的退化。
+> **The model-selection criterion is validation Macro-F1**, not Accuracy. With imbalanced
+> classes, Accuracy hides the degradation of the small classes (steps 5 and 6).
 
 ## eval
 
-| 键 | 类型 | 默认 | 说明 |
+| Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `splits` | list[str] | [val, test] | 要评估的 split |
-| `metrics` | list[str] | 见文件 | 记录用（实际指标固定在 core/metrics） |
-| `save_confusion_matrix` | bool | true | 输出 PNG |
-| `save_predictions` | bool | true | 输出逐帧 JSONL（复核失败案例用） |
-| `bootstrap_ci` | bool | false | 自助法置信区间（证明提升不是波动） |
-| `bootstrap_samples` | int | 1000 | 自助采样次数 |
-| `extra_datasets` | list[str] | [] | 跨场景数据集名，如 `[metc]` |
+| `splits` | list[str] | [val, test] | Splits to evaluate |
+| `metrics` | list[str] | see the file | For the record (the actual metrics are fixed in core/metrics) |
+| `save_confusion_matrix` | bool | true | Write a PNG |
+| `save_predictions` | bool | true | Write per-frame JSONL (for reviewing failure cases) |
+| `bootstrap_ci` | bool | false | Bootstrap confidence interval (to show that an improvement is not fluctuation) |
+| `bootstrap_samples` | int | 1000 | Number of bootstrap resamples |
+| `extra_datasets` | list[str] | [] | Names of cross-scenario datasets, e.g. `[metc]` |
 
-## assess（完整性判定阈值）
+## assess (completeness judgement thresholds)
 
-| 键 | 默认 | 说明 |
+| Key | Default | Description |
 | --- | --- | --- |
-| `smooth_window` | 9 | 多数投票滑窗（帧） |
-| `min_confidence` | 0.4 | 低于此置信度的帧不参与投票 |
-| `min_segment_frames` | 5 | 有效片段的最少帧数 |
-| `min_segment_s` | 1.0 | 有效片段的最短秒数 |
-| `min_total_duration_s` | 40.0 | 总搓洗时长下限（WHO 建议 40—60 s） |
-| `reference_total_duration_s` | 50.0 | 打分用的参考总时长 |
-| `min_step_duration_s` | 3.0 | 单步时长下限（`duration_check=seconds` 时生效） |
-| `step_duration_ratio` | 0.4 | 单步时长占"平均份额"的最低比例（`ratio` 时生效） |
-| `allow_repeats` | false | 是否允许重复步骤 |
-| `missing_tolerance` | 0 | 允许漏几步仍判"基本完整" |
+| `smooth_window` | 9 | Majority-vote sliding window (frames) |
+| `min_confidence` | 0.4 | Frames below this confidence take no part in the vote |
+| `min_segment_frames` | 5 | Minimum number of frames in a valid segment |
+| `min_segment_s` | 1.0 | Minimum number of seconds in a valid segment |
+| `min_total_duration_s` | 40.0 | Lower bound on the total wash duration (WHO recommends 40—60 s) |
+| `reference_total_duration_s` | 50.0 | Reference total duration used for scoring |
+| `min_step_duration_s` | 3.0 | Lower bound on a single step's duration (applies when `duration_check=seconds`) |
+| `step_duration_ratio` | 0.4 | Minimum fraction of the "fair share" a single step must reach (applies with `ratio`) |
+| `allow_repeats` | false | Whether repeated steps are allowed |
+| `missing_tolerance` | 0 | How many missed steps still count as "essentially complete" |
 | `duration_check` | ratio | `seconds` / `ratio` / `none` |
-| `order_check` | true | 是否检查顺序 |
-| `require_faucet_events` | false | 是否要求检出开关水龙头 |
-| `report_language` | zh | 报告语言 |
+| `order_check` | true | Whether the order is checked |
+| `require_faucet_events` | false | Whether tap on/off events must be detected |
+| `report_language` | zh | Report language |
 
-判定口径详见 [`PROTOCOL.md`](PROTOCOL.md)。
+For the judgement criteria in detail see [`PROTOCOL.md`](PROTOCOL.md).
 
 ## infer
 
-| 键 | 默认 | 说明 |
+| Key | Default | Description |
 | --- | --- | --- |
 | `mode` | clip | `frame` / `clip` / `hybrid` |
-| `temporal_apply` | true | 是否做概率滑动平均 |
-| `smooth_window` | 9 | 滑动平均窗口 |
-| `save_frame_predictions` | true | 输出逐帧 JSONL |
-| `save_overlay_video` | false | 输出叠加预览 |
-| `batch_size` | 64 | 推理 batch |
-| `tta` | false | 测试时增强（更慢） |
+| `temporal_apply` | true | Whether a moving average over probabilities is applied |
+| `smooth_window` | 9 | Moving-average window |
+| `save_frame_predictions` | true | Write per-frame JSONL |
+| `save_overlay_video` | false | Write an overlay preview |
+| `batch_size` | 64 | Inference batch |
+| `tta` | false | Test-time augmentation (slower) |
 
 ---
 
-## 常见改法速查
+## Quick reference for common edits
 
 ```bash
-# 显存不足
+# out of GPU memory
 train.batch_size=8 train.accumulate_grad_batches=4
-# 换成 CPU 快速验证链路
+# switch to CPU for a quick pipeline check
 runtime.device=cpu runtime.num_workers=0
-# Windows DataLoader 报错
+# Windows DataLoader error
 runtime.num_workers=0
-# 试 TCN 替代 GRU
+# try TCN instead of GRU
 model.temporal.kind=tcn train.mode=clip
-# 关闭增强做消融（验证增强到底有没有用）
+# turn augmentation off for an ablation (does augmentation actually help?)
 train.augment.random_resized_crop=false train.augment.horizontal_flip=false \
 train.augment.color_jitter=0.0 train.augment.rotation_deg=0.0
-# 只做漏步/顺序判定，不管时长
+# judge only missed steps / order, ignoring duration
 assess.duration_check=none
-# 允许回头补做
+# allow going back to redo a step
 assess.order_check=false
 ```

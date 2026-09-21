@@ -74,6 +74,14 @@ repos:
         always_run: true
         files: ^configs/.*\.ya?ml$
 
+      - id: handwash-docs-check
+        name: 文档体检 (双语配对 + 链接)
+        entry: python scripts/check_docs.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        files: \.md$
+
       - id: handwash-unit-tests
         name: 单元测试 (快速子集)
         entry: python -m pytest -m "not integration and not slow and not gpu" -q

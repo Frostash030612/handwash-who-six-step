@@ -20,7 +20,7 @@ data/
 | `raw/jurmala/` | Jurmala 扩展数据集 | <https://zenodo.org/records/5808764> |
 | `external/self_recorded/full/` | 组员自采视频 | 见 `docs/SELF_RECORDING.md` |
 
-详细结构、标签映射与常见问题见 [`docs/DATA.md`](../docs/DATA.md)。
+详细结构、标签映射与常见问题见 [`docs/DATA.md`](/docs/DATA.md)（中文版见 [`docs/zh/DATA.md`](/docs/zh/DATA.md)）。
 
 ## 两条硬规则
 

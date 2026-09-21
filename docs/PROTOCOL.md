@@ -1,161 +1,188 @@
-# 完整性判定口径（PROTOCOL）
+> **English** | [中文](/docs/zh/PROTOCOL.md)
 
-本文件定义"漏步 / 顺序异常 / 时长不足"的**精确含义**。
-报告里的每一个数字都必须能在这里找到对应的定义和阈值来源。
+# Completeness Judgement Criteria (PROTOCOL)
 
-实现位置：`src/handwash/core/protocol.py`
-阈值位置：`configs/config.yaml` 的 `assess` 段（**不要在代码里写阈值**）
+This document defines the **precise meaning** of "missed step / out-of-order /
+insufficient duration".
+Every number in the report must be traceable to a definition and a threshold origin found here.
 
----
-
-## 1. 输入与输出
-
-```
-输入：逐帧标签序列 labels[]（Step）、逐帧置信度 confidences[]、有效帧率 fps
-输出：ProtocolReport {
-        is_complete, is_in_order,
-        step_sequence, statistics[], violations[],
-        total_wash_duration_s, total_duration_s, overall_score, notes[]
-      }
-```
-
-处理链：**平滑 → 分段 → 三类判定 → 汇总打分**
+Implementation: `../src/handwash/core/protocol.py`
+Thresholds: the `assess` section of `configs/config.yaml` (**do not write thresholds in code**)
 
 ---
 
-## 2. 平滑（消除单帧跳变）
+## 1. Input and output
 
-`assess.smooth_window`（默认 9 帧，5 fps 时约 1.8 秒）
+```
+Input:  per-frame label sequence labels[] (Step), per-frame confidence confidences[],
+        effective frame rate fps
+Output: ProtocolReport {
+          is_complete, is_in_order,
+          step_sequence, statistics[], violations[],
+          total_wash_duration_s, total_duration_s, overall_score, notes[]
+        }
+```
 
-- 以当前帧为中心的**多数投票**滑窗；窗口在序列两端自动收缩（不做零填充，
-  否则边界会被无根据地"投票"给某个类别）。
-- 平票时优先保持"上一帧结果"（时间连贯性优先于瞬时置信度）。
-- 置信度低于 `assess.min_confidence`（默认 0.4）的帧**不参与投票**；
-  整个窗口都不可信时沿用上一帧标签。
-
-> 为什么不用"简单多数 + 固定窗口"：实测中第 4 步与第 2 步（都涉及手背）
-> 容易互相跳变，时间连贯性约束能显著减少这类抖动。
+Processing chain: **smoothing → segmentation → three classes of judgement → aggregate scoring**
 
 ---
 
-## 3. 分段（把帧序列切成动作片段）
+## 2. Smoothing (eliminating single-frame jumps)
 
-`assess.min_segment_frames`（默认 5 帧）+ `assess.min_segment_s`（默认 1.0 秒）
+`assess.smooth_window` (default 9 frames, about 1.8 seconds at 5 fps)
 
-- 连续同标签的帧构成一个片段。
-- 两个条件**都**要满足才算有效片段。
-- 太短的片段**不丢弃**，而是并入时间上最近的相邻片段（保持时间轴无空洞）。
-  若全部片段都太短，退回"整段一个主标签"，保证后续统计不出现空结果。
+- A **majority-vote** sliding window centred on the current frame; the window shrinks
+  automatically at both ends of the sequence (no zero padding, otherwise the boundary
+  would be "voted" into some class on no grounds at all).
+- On a tie, keep the "previous frame's result" (temporal coherence takes precedence over
+  instantaneous confidence).
+- Frames whose confidence is below `assess.min_confidence` (default 0.4) **do not take
+  part in the vote**; when the whole window is untrustworthy, the previous frame's label
+  is carried over.
 
-> 为什么不直接删掉短片段：删了会让总时长凭空缩短，
-> "时长不足"的结论就会被这个删除动作本身制造出来。
+> Why not "plain majority + fixed window": in our measurements step 4 and step 2 (both
+> involving the back of the hand) tend to jump back and forth into each other, and the
+> temporal-coherence constraint markedly reduces that kind of jitter.
 
 ---
 
-## 4. 三类判定
+## 3. Segmentation (cutting the frame sequence into action segments)
 
-### 4.1 漏步（missing）
+`assess.min_segment_frames` (default 5 frames) + `assess.min_segment_s` (default 1.0 second)
+
+- Consecutive frames with the same label form one segment.
+- **Both** conditions must hold for a segment to count as valid.
+- Segments that are too short are **not discarded**; they are merged into the nearest
+  neighbouring segment in time (keeping the timeline free of holes).
+  If every segment is too short, fall back to "one dominant label for the whole clip",
+  so that later statistics never come out empty.
+
+> Why not simply delete short segments: deleting them would shorten the total duration
+> out of thin air, and the "insufficient duration" conclusion would be manufactured by
+> that very deletion.
+
+---
+
+## 4. Three classes of judgement
+
+### 4.1 Missed step (missing)
 
 ```
-detected(step) := 该步的累计时长 >= assess.min_segment_s
-is_complete    := |{六步中 detected 的}| >= 6 - assess.missing_tolerance
+detected(step) := cumulative duration of that step >= assess.min_segment_s
+is_complete    := |{detected among the six steps}| >= 6 - assess.missing_tolerance
 ```
 
-- 默认 `missing_tolerance: 0` —— 漏一步就算不完整。
-- 每个缺失步骤生成一条 `severity="error"` 的 violation。
+- Default `missing_tolerance: 0` — missing one step already counts as incomplete.
+- Every missing step produces one violation with `severity="error"`.
 
-**注意**：`detected` 用的是**时长阈值**而不是"出现过一帧"。
-理由：一闪而过的误判不应被当成"做了这一步"。
+**Note**: `detected` uses a **duration threshold**, not "appeared in at least one frame".
+Rationale: a momentary misclassification must not be taken as "this step was performed".
 
-### 4.2 顺序异常（out_of_order）
+### 4.2 Out-of-order (out_of_order)
 
 ```
-行动序列 := collapse_repeats(片段标签序列)      # 去掉连续重复
-对六步子序列，统计所有逆序对 (前, 后)：
-    若 order(后) < order(前)  → 一条 out_of_order
+action sequence := collapse_repeats(segment label sequence)   # drop consecutive repeats
+for the six-step subsequence, count all inversion pairs (earlier, later):
+    if order(later) < order(earlier)  → one out_of_order
 ```
 
-- 只看 WHO 六步；`faucet_on/off`、`other`、`unknown` 不参与顺序判定。
-- **1 → 2 → 1**（回头补做）会被判为乱序并单独说明，而不是静默忽略 ——
-  "顺序异常"本身就是本项目要检出的目标之一。
-- `assess.order_check: false` 可关闭顺序判定（用于对比实验）。
+- Only the WHO six steps are considered; `faucet_on/off`, `other` and `unknown` take no
+  part in the order judgement.
+- **1 → 2 → 1** (going back to redo a step) is judged as out-of-order and explained
+  separately rather than silently ignored — out-of-order behaviour is itself one of the
+  targets this project is meant to detect.
+- `assess.order_check: false` turns the order judgement off (for comparison experiments).
 
-### 4.3 时长不足（insufficient_duration）
+### 4.3 Insufficient duration (insufficient_duration)
 
-`assess.duration_check` 三选一：
+`assess.duration_check` takes one of three values:
 
-| 取值 | 判定条件 | 适用场景 |
+| Value | Judgement condition | When it applies |
 | --- | --- | --- |
-| `seconds` | 该步时长 ≥ `min_step_duration_s`（默认 3.0 s） | 已知动作节奏的数据集 |
-| `ratio`（默认） | 该步时长 ≥ `step_duration_ratio` × (总搓洗时间 ÷ 应做步骤数) | **推荐**：WHO 未要求六步均分时间 |
-| `none` | 不判定 | 只关心漏步/顺序时 |
+| `seconds` | Step duration ≥ `min_step_duration_s` (default 3.0 s) | Datasets whose action tempo is known |
+| `ratio` (default) | Step duration ≥ `step_duration_ratio` × (total wash time ÷ number of steps required) | **Recommended**: WHO does not require the six steps to share time equally |
+| `none` | No judgement | When only missed steps / order matter |
 
-外加一条**整体**判定：
+Plus one **whole-procedure** judgement:
 
 ```
-若 total_wash_duration_s < assess.min_total_duration_s  → 一条 error
-（默认 40.0 s，依据 WHO 建议的完整洗手 40—60 秒）
+if total_wash_duration_s < assess.min_total_duration_s  → one error
+(default 40.0 s, based on the WHO recommendation of 40—60 seconds for a complete wash)
 ```
 
-> **为什么默认用 `ratio`**：WHO 指南只要求整个流程 40—60 秒，
-> **没有**规定每步必须平均分配。用绝对秒数会把"某步做得快但流程完整"
-> 误判为不合格。比例口径以"平均应得份额"为基准，更贴近指南原意。
-> 报告中必须写明使用了哪一种口径。
+> **Why `ratio` is the default**: the WHO guideline only requires the whole procedure to
+> last 40—60 seconds; it does **not** require each step to get an equal share. Using
+> absolute seconds would misjudge "a step done quickly while the procedure is complete"
+> as failing. The ratio criterion is anchored on the "fair share" each step is entitled
+> to, which is closer to the intent of the guideline.
+> The report must state which criterion was used.
 
-### 4.4 重复步骤（repeated）
+### 4.4 Repeated step (repeated)
 
-某一步在行动序列中出现多次 → `severity="info"`。
-`assess.allow_repeats: true` 时不再报告。
+A step that occurs more than once in the action sequence → `severity="info"`.
+With `assess.allow_repeats: true` it is no longer reported.
 
 ---
 
-## 5. 综合得分（overall_score，0—1）
+## 5. Overall score (overall_score, 0—1)
 
 ```
-score = 0.5 × 六步覆盖率
-      + 0.3 × (顺序正确 ? 1 : 0)
-      + 0.2 × min(1, 总搓洗时间 / reference_total_duration_s)
+score = 0.5 × six-step coverage
+      + 0.3 × (order correct ? 1 : 0)
+      + 0.2 × min(1, total wash time / reference_total_duration_s)
 ```
 
-- 权重**固定在代码里**（`core/protocol.py::_overall_score`），不放进配置 ——
-  否则各组员用不同权重会得到不可比的分数。
-- 分母 `reference_total_duration_s` 是可配置的（默认 50 s）。
-- 得分只用于"同一套阈值下的横向比较"，**不是临床指标**，报告中必须如此表述。
+- The weights are **fixed in code** (`core/protocol.py::_overall_score`) and are not put
+  into the configuration — otherwise team members using different weights would obtain
+  incomparable scores.
+- The denominator `reference_total_duration_s` is configurable (default 50 s).
+- The score is only for "cross-sectional comparison under one and the same set of
+  thresholds"; it is **not a clinical metric**, and the report must say so.
 
 ---
 
-## 6. 阈值调整的正确方式
+## 6. The correct way to adjust thresholds
 
-**改配置，不改代码。**
+**Change the configuration, not the code.**
 
 ```bash
-# 单次实验
+# a one-off experiment
 python -m handwash.cli assess --video demo.mp4 assess.min_total_duration_s=30
 
-# 某个数据集的长期设定 -> 写进 configs/data/<name>.yaml 的 assess 段
+# a long-term setting for one dataset -> write it into the assess section of configs/data/<name>.yaml
 ```
 
-如果要改的是**判定规则本身**（例如"允许回头补做不算乱序"），
-那属于 L1 改动：先写 RFC（见 `docs/ARCHITECTURE.md` 第 5 节），再改
-`core/protocol.py`，并同步更新本文件与 `CHANGELOG.md`。
+If what you want to change is the **judgement rule itself** (for example "allow going
+back to redo a step without calling it out-of-order"), that is an L1 change: write an RFC
+first (see section 5 of `ARCHITECTURE.md`), then change `core/protocol.py`, and update
+this document and `CHANGELOG.md` along with it.
 
 ---
 
-## 7. 报告里必须交代的四件事
+## 7. Four things the report must disclose
 
-1. **口径**：`duration_check` 用的是 `seconds` 还是 `ratio`，阈值各是多少；
-2. **帧率**：完整性判定基于抽帧后的有效帧率（`data.prep.fps`），不是原始 fps；
-3. **模型**：用哪个 checkpoint（`config_hash` + epoch），是逐帧还是时序推理；
-4. **失败案例**：至少给 2 个模型判错的例子，说明是视觉困难（遮挡/相似动作）
-   还是流程困难（乱序/过快），这一节往往最能体现工作的深度。
+1. **Criteria**: whether `duration_check` uses `seconds` or `ratio`, and what each
+   threshold is;
+2. **Frame rate**: the completeness judgement is based on the effective frame rate after
+   frame extraction (`data.prep.fps`), not on the original fps;
+3. **Model**: which checkpoint was used (`config_hash` + epoch), and whether inference
+   was per-frame or temporal;
+4. **Failure cases**: at least 2 examples where the model judged wrongly, saying whether
+   the difficulty was visual (occlusion / similar actions) or procedural (out-of-order /
+   too fast). This section usually shows the depth of the work better than any other.
 
 ---
 
-## 8. 已知局限（主动写进报告，比被问到更好）
+## 8. Known limitations (writing them into the report proactively beats being asked)
 
-- **只做规范性分析，不做医学判断**：不评价洗手是否达到消毒标准。
-- **依赖机位**：双手不清晰时六步区分度大幅下降（与公开数据集机位差异大时尤其明显）。
-- **顺序判定的歧义**：真实洗手存在"回头补做"，框架默认判为乱序；
-  若认为这不合理，应通过 RFC 修改规则并在报告中说明。
-- **总时长阈值是参考值**：WHO 的 40—60 秒是完整流程建议，不是硬性标准，
-  因此框架把它作为 `error` 级别的提示而非"不合格"判定。
+- **Normative analysis only, no medical judgement**: we do not assess whether the washing
+  meets a disinfection standard.
+- **Camera-position dependent**: when the hands are not clearly visible, the
+  discriminability of the six steps drops sharply (especially when the camera position
+  differs greatly from that of public datasets).
+- **Ambiguity in the order judgement**: real hand-washing includes "going back to redo",
+  which the framework judges as out-of-order by default; if you consider that
+  unreasonable, change the rule through an RFC and explain it in the report.
+- **The total-duration threshold is a reference value**: the WHO figure of 40—60 seconds
+  is a recommendation for a complete procedure, not a hard standard, so the framework
+  treats it as an `error`-level warning rather than a "failing" judgement.

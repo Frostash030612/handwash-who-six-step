@@ -10,6 +10,16 @@
 ## [未发布]
 
 ### 新增
+- **双语文档结构**：英文成为主版本，中文保留为镜像，每个页面顶部都有语言切换行。
+  - `README.md`（英文主） ↔ `README.zh-CN.md`
+  - `CONTRIBUTING.md`（英文主，位于仓库根） ↔ `docs/zh/CONTRIBUTING.md`
+  - `docs/{ARCHITECTURE,PROTOCOL,CONFIG,DATA,RULES_CARD}.md`（英文主）
+    ↔ `docs/zh/{同名}.md`
+  - 内部工作文档只有中文，不予翻译：`docs/EXPERIMENTS.md`、`docs/SELF_RECORDING.md`、
+    `CHANGELOG.md`、`tests/README.md`
+- `scripts/check_docs.py`：文档体检 —— 检查相对链接是否断链、双语配对是否都有语言切换行。
+- `scripts/sync_doc_locales.py`：幂等地为双语文档插入/更新语言切换行（新增双语文档时改表重跑即可）。
+- `.gitattributes`：统一仓库内换行为 LF，避免 Windows/macOS 之间的"整文件 diff"。
 - 初始工程框架：分层架构（L0 基础设施 / L1 契约 / L2 数据与 IO / L3 模型 / L4 编排）。
 - `core/labels.py`：WHO 六步的唯一权威标签空间 + 5 个公开数据集的别名映射。
 - `core/protocol.py`：完整性判定（漏步 / 乱序 / 时长不足 / 重复步骤 + 综合得分）。
@@ -26,6 +36,10 @@
 - CI：格式 → 分层依赖 → 配置契约 → 单元测试 → 冒烟训练 → 依赖一致性。
 
 ### 变更
+- **文档语言策略变更**：英文成为主版本（课程提交与评分使用），中文从"唯一版本"改为"镜像"。
+  原 `CONTRIBUTING.md` 与 `docs/{ARCHITECTURE,PROTOCOL,CONFIG,DATA,RULES_CARD}.md`
+  已移动到 `docs/zh/` 下，英文版本占用原路径。**历史链接需要更新**：
+  `docs/CONFIG.md` 现在指向英文版，中文版在 `docs/zh/CONFIG.md`。
 - `confusion_matrix(normalize=...)` 现在严格校验取值：只接受
   `None` / `True` / `"true"`（按行，召回视角）/ `"pred"`（按列，精确率视角）/ `"all"`。
   **以前任何非 `True` 的取值都会被静默当作按列归一化**，容易让混淆矩阵被误读。

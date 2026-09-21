@@ -1,38 +1,42 @@
-# 快速上手与修改规则速查卡
+> **English** | [中文](/docs/zh/RULES_CARD.md)
 
-> 这一页是 [`CONTRIBUTING.md`](../CONTRIBUTING.md) 的压缩版。
-> **卡片和正文冲突时以正文为准**；卡片忘记更新属于文档缺陷，请提 PR 补上。
-> 建议打印出来贴在桌上。
+# Getting started and change-rule cheat sheet
+
+> This page is the condensed version of [`CONTRIBUTING.md`](../CONTRIBUTING.md).
+> **When the card and the full document disagree, the full document wins**; a card that
+> was not updated is a documentation defect — send a PR to fix it.
+> Print it out and pin it to your desk.
 
 ---
 
-## 一、三条命令起步
+## 1. Three commands to get started
 
 ```bash
 conda env create -f environment.yml && conda activate handwash
 pip install -e ".[all]" && python -m pre_commit install
-python scripts/doctor.py                 # 自检；全绿后再往下
-python scripts/train_model.py --config configs/experiments/smoke.yaml   # 30 秒冒烟
+python scripts/doctor.py                 # self-check; go on only when everything is green
+python scripts/train_model.py --config configs/experiments/smoke.yaml   # 30-second smoke test
 ```
 
-> 没做 `pip install -e .` 也能跑：`scripts/` 下的脚本自带导入路径引导。
+> You can run without `pip install -e .`: the scripts under `scripts/` bootstrap their own
+> import paths.
 
 ---
 
-## 二、我该改哪一级？（第一个问题永远是这个）
+## 2. Which level am I allowed to touch? (always the first question)
 
-| 我要动的 | 级别 | 需要什么 |
+| What I want to touch | Level | What it needs |
 | --- | --- | --- |
-| 新建实验配置、跑实验、记录结果 | **L3 自由** | 只要 CI 通过 |
-| 新建模型文件 / 数据集适配器 / 脚本 | **L3 自由** | 只要 CI 通过 |
-| 修改已有函数的**实现** | **L2 受限** | 1 名负责人 review |
-| 修改 `tests/`、`docs/`、`configs/experiments/` | **L2/L3** | 通常自由 |
-| 改**函数签名 / 返回结构 / 配置键名 / 判定规则** | **L1 冻结** | **先写 RFC**，后改代码 |
-| 改 `core/` 下任何东西的语义、改标签空间顺序、改划分规则 | **L1 冻结** | **先写 RFC**，后改代码 |
+| Create an experiment config, run experiments, record results | **L3 free** | CI green |
+| Add a model file / dataset adapter / script | **L3 free** | CI green |
+| Change the **implementation** of an existing function | **L2 restricted** | 1 maintainer review |
+| Change `tests/`, `docs/`, `configs/experiments/` | **L2/L3** | Usually free |
+| Change a **function signature / return structure / config key name / decision rule** | **L1 frozen** | **Write the RFC first**, then change code |
+| Change the semantics of anything under `core/`, the label space order, or the split rules | **L1 frozen** | **Write the RFC first**, then change code |
 
-**口诀：加文件是 L3，改实现是 L2，改接口是 L1。**
+**Mantra: adding a file is L3, changing an implementation is L2, changing an interface is L1.**
 
-L1 文件清单（动它们之前先停一下）：
+The L1 file list (pause before you touch any of them):
 ```
 src/handwash/core/labels.py  schema.py  config.py  protocol.py  registry.py
 src/handwash/errors.py  paths.py  logging.py
@@ -42,120 +46,124 @@ configs/config.yaml
 
 ---
 
-## 三、十条铁律
+## 3. The ten Iron Rules
 
-| # | 规则 |
+| # | Rule |
 | --- | --- |
-| 1 | 只改自己负责的模块；跨模块先开 issue 说一声 |
-| 2 | UTF-8 + LF + 4 空格（YAML/JSON 2 空格） |
-| 3 | 可调参数写进 `configs/`，代码里不留魔数 |
-| 4 | 新依赖同时改 `pyproject.toml` **和** `environment.yml` |
-| 5 | `core` 不 import torch；`io` 不 import models（分层依赖） |
-| 6 | 数据、权重、输出不进 Git |
-| 7 | 新工作流同时加进 `Makefile` 与 `scripts/` |
-| 8 | 不用 `print`（CLI 除外），不用 `sys.exit`（库代码） |
-| 9 | 抛 `HandwashError` 子类，消息写清"哪个字段/期望/实际" |
-| 10 | 洗手步骤字符串只出现在 `core/labels.py` |
+| 1 | Touch only the modules you own; open an issue before crossing module boundaries |
+| 2 | UTF-8 + LF + 4 spaces (2 spaces for YAML/JSON) |
+| 3 | Tunable parameters go into `configs/`; no magic numbers in code |
+| 4 | Update `pyproject.toml` **and** `environment.yml` for any new dependency |
+| 5 | `core` must not import torch; `io` must not import models (layered dependencies) |
+| 6 | Data, weights, and outputs stay out of Git |
+| 7 | Add a new workflow to both `Makefile` and `scripts/` |
+| 8 | No `print` (except in the CLI), no `sys.exit` (in library code) |
+| 9 | Raise `HandwashError` subclasses with a message stating field / expected / actual |
+| 10 | Hand-washing step strings appear only in `core/labels.py` |
 
 ---
 
-## 四、四个"绝对不能"
+## 4. The four absolutes
 
-1. **不能让同一段原始视频跨 train/test**（数据泄漏 → 所有结论作废）。
-   流程固定为：**扫描 → 按视频划分 → 抽帧**，顺序不可颠倒。
-2. **不能重排标签空间里的类别顺序**（旧 checkpoint 的输出会静默错位）。
-   只能追加到末尾。
-3. **不能在业务代码里写判定规则**（漏步/顺序/时长只在 `core/protocol.py`）。
-4. **不能用 `git push --force` 覆盖别人的提交**（`main` 分支禁止强推）。
+1. **Never let the same original video cross train/test** (data leakage → every conclusion
+   is void). The pipeline is fixed as: **scan → split by video → frame extraction**; the
+   order cannot be reversed.
+2. **Never reorder the classes in the label space** (existing checkpoints would silently
+   shift). Append to the end only.
+3. **Never write decision rules into business code** (missed step / order / duration live
+   only in `core/protocol.py`).
+4. **Never overwrite someone else's commits with `git push --force`** (force-pushing `main`
+   is forbidden).
 
 ---
 
-## 五、提交前跑什么
+## 5. What to run before committing
 
 ```bash
-python -m pre_commit run --all-files     # 快：格式 + 结构 + 快速单测
-make check                               # 全：与 CI 完全一致
+python -m pre_commit run --all-files     # fast: format + structure + quick unit tests
+make check                               # full: exactly the same as CI
 ```
 
-不装 pre-commit 也行，但 PR 里必须贴出 `make check` 的输出。
+Skipping the pre-commit install is fine, but the PR must include the `make check` output.
 
 ---
 
-## 六、PR 检查清单（复制到 PR 描述）
+## 6. PR checklist (copy into the PR description)
 
 ```markdown
-- [ ] 我改的文件属于我负责的模块，或已获得负责人同意
-- [ ] 我没有修改 L1 冻结文件（若有，RFC 链接：____）
-- [ ] 新增参数都进了 configs/，没有新增魔数
-- [ ] 新增/修改的模块都有对应测试
-- [ ] `make check` 通过（贴输出）
-- [ ] 跑过受影响的最小流程（贴命令与结果）
-- [ ] 若改了模型/数据，已把实验记进 docs/EXPERIMENTS.md（含 config_hash）
-- [ ] 若影响历史结果，已列出"需要重跑的实验"
-- [ ] `git status` 干净，没有提交数据/权重/输出
+- [ ] The files I changed belong to my modules, or I have maintainer approval
+- [ ] I did not modify L1 frozen files (if I did, RFC link: ____)
+- [ ] New parameters went into configs/, and I added no new magic numbers
+- [ ] New/changed modules have matching tests
+- [ ] `make check` passes (paste the output)
+- [ ] I ran the smallest affected workflow (paste command and result)
+- [ ] If I changed models/data, the experiment is recorded in docs/EXPERIMENTS.md (with config_hash)
+- [ ] If historical results are affected, I listed the "experiments that must be re-run"
+- [ ] `git status` is clean, and no data/weights/outputs were committed
 ```
 
 ---
 
-## 七、看到报错先查这里
+## 7. Seeing an error? Check here first
 
-| 报错 | 第一反应 |
+| Error | First reflex |
 | --- | --- |
-| `ConfigError: 出现未知配置键` | 键名拼错，或你加了新参数没写进 `core/config.py` |
-| `DataLeakageError` | 同一原始视频跨了 split；检查 `split.group_key` |
-| 准确率 > 0.98 | 几乎一定是泄漏，不是模型好 |
-| 准确率异常低 | `normalize` 与 `arch` 不匹配（YOLO 用 `zero_one`） |
-| `ModuleNotFoundError: handwash` | 没 `pip install -e .`，且没用 `scripts/` 入口 |
-| Windows DataLoader 报错 | `runtime.num_workers: 0`（写在 `configs/local.yaml`） |
-| 太长的 traceback | 先看最后一行，再看 `handwash doctor` 的输出 |
+| `ConfigError: unknown config key` | Typo in the key name, or you added a new parameter without registering it in `core/config.py` |
+| `DataLeakageError` | The same original video crossed splits; check `split.group_key` |
+| Accuracy > 0.98 | Almost certainly leakage, not a good model |
+| Abnormally low accuracy | `normalize` does not match `arch` (YOLO uses `zero_one`) |
+| `ModuleNotFoundError: handwash` | You did not run `pip install -e .`, and you bypassed the `scripts/` entry points |
+| DataLoader error on Windows | `runtime.num_workers: 0` (set in `configs/local.yaml`) |
+| Endless traceback | Read the last line first, then the output of `handwash doctor` |
 
 ---
 
-## 八、每次跑实验都要记的东西
+## 8. What every experiment run must record
 
 ```
 run_name          outputs/<run_name>/
-config_hash       resolved_config.yaml 里的 config_hash
-数据集与划分      split_report.json
-指标              eval/eval_*.json + confusion_matrix_*.png
-一句话结论        写进 docs/EXPERIMENTS.md
+config_hash       the config_hash inside resolved_config.yaml
+dataset & split   split_report.json
+metrics           eval/eval_*.json + confusion_matrix_*.png
+one-line verdict  write it into docs/EXPERIMENTS.md
 ```
 
-**没有 `config_hash` 的结果不允许出现在报告里。**
+**A result without a `config_hash` is not allowed into any report.**
 
 ---
 
-## 九、我要加一个新东西（最短路径）
+## 9. I want to add something new (shortest path)
 
-| 想做 | 步骤 |
+| Want to add | Steps |
 | --- | --- |
-| **新模型** | `models/xxx.py` 用 `@register_model("名")` 注册 → `factory.py` 的 `register_all()` 加 import → `configs/models/xxx.yaml` → 形状测试 |
-| **新数据集** | `core/labels.py` 的 `_DATASET_ALIASES` 补别名（追加）→ `configs/data/xxx.yaml` → `configs/config.yaml` 的 `datasets` 登记 → `docs/DATA.md` |
-| **新实验** | `cp configs/config.yaml configs/experiments/expNN_描述.yaml`，只写与默认不同的键 |
-| **新指标** | `core/metrics.py` **追加**函数 → 接入 `pipelines/evaluate.py` → 手算例子做单测 |
-| **新命令** | `cli.py` 加子命令 → `Makefile` 加 target → `scripts/` 加薄封装（三处同步） |
-| **改阈值** | 只改 `configs/` 的 `assess` 段（**不要改代码**） |
+| **A new model** | Register `models/xxx.py` with `@register_model("name")` → add the import to `register_all()` in `factory.py` → `configs/models/xxx.yaml` → shape test |
+| **A new dataset** | Add the alias to `_DATASET_ALIASES` in `core/labels.py` (append) → `configs/data/xxx.yaml` → register it under `datasets` in `configs/config.yaml` → `docs/DATA.md` |
+| **A new experiment** | `cp configs/config.yaml configs/experiments/expNN_description.yaml`, and write only the keys that differ from the defaults |
+| **A new metric** | **Append** a function in `core/metrics.py` → wire it into `pipelines/evaluate.py` → unit-test it against a hand-computed example |
+| **A new command** | Add the subcommand in `cli.py` → add the target in `Makefile` → add a thin wrapper under `scripts/` (three places in sync) |
+| **A threshold change** | Change only the `assess` section in `configs/` (**do not touch the code**) |
 
 ---
 
-## 十、给自己一个"看得见的验收"
+## 10. Give yourself a visible acceptance test
 
-答辩前必须能现场演示这三件事：
+Before the defense you must be able to demo these three things live:
 
 ```bash
-# 1) 一段完整规范的洗手 -> 判定完整、顺序正确
-python scripts/run_assess.py --video <完整视频>.mp4
+# 1) One complete, correct hand-washing clip -> judged complete, order correct
+python scripts/run_assess.py --video <complete_video>.mp4
 
-# 2) 故意漏一步 -> 明确指出漏了第几步
-python scripts/run_assess.py --video <漏步视频>.mp4
+# 2) One deliberately skipped step -> points out exactly which step is missing
+python scripts/run_assess.py --video <missed_step_video>.mp4
 
-# 3) 故意换序 -> 明确指出顺序异常
-python scripts/run_assess.py --video <换序视频>.mp4
+# 3) One deliberately reordered clip -> points out the order anomaly
+python scripts/run_assess.py --video <reordered_video>.mp4
 ```
 
-三段视频的准备与标注规范见 [`SELF_RECORDING.md`](SELF_RECORDING.md)。
+For how to prepare and annotate these three clips, see [`SELF_RECORDING.md`](SELF_RECORDING.md) (in Chinese).
 
 ---
 
-**最后一句：规则存在的唯一目的是让"任何人 clone 下来都能复现任何人的结果"。**
-如果某条规则妨碍了正确的事，别偷偷绕过 —— 在 PR 里说明理由，让大家一起改规则。
+**Last word: the only purpose of these rules is to make sure "anyone who clones the repo can
+reproduce anyone else's results."** If a rule blocks the right thing, do not bypass it
+quietly — explain why in the PR and let everyone change the rule together.
