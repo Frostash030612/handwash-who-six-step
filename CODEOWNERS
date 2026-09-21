@@ -1,0 +1,70 @@
+# ============================================================================
+# CODEOWNERS —— 谁负责哪些文件（GitHub / GitLab 均支持）
+# ----------------------------------------------------------------------------
+# 作用：给"框架文件"指定守门人。改动这些文件时，PR 会自动请求对应成员审阅，
+#       避免有人为了跑通自己的实验而悄悄改掉公共契约。
+#
+# 规则来源：CONTRIBUTING.md 第 2 节"改动分级（L1 / L2 / L3）"
+#   L1 冻结区：只能由框架负责人修改，且必须走 RFC（docs/ARCHITECTURE.md 第 5 节）
+#   L2 受限区：需要至少 1 名框架负责人 review
+#   L3 自由区：任何人可自由修改，只需通过 CI
+#
+# 【请把下面的占位用户名替换成真实 GitHub 用户名】
+#   负责人（2 人）: @leader-a @leader-b
+#   数据负责人    : @data-owner
+#   模型负责人    : @model-owner
+# ============================================================================
+
+# --- 默认：任何人改动都需要一名负责人 review -------------------------------
+*                                   @leader-a @leader-b
+
+# --- L1 冻结区：契约与规则 ---------------------------------------------------
+# 改这里 = 可能让所有人已跑出的结果失效，必须走 RFC 并在 CHANGELOG.md 记录
+/src/handwash/core/labels.py        @leader-a @leader-b
+/src/handwash/core/schema.py        @leader-a @leader-b
+/src/handwash/core/config.py        @leader-a @leader-b
+/src/handwash/core/protocol.py      @leader-a @leader-b
+/src/handwash/core/registry.py      @leader-a @leader-b
+/src/handwash/errors.py             @leader-a @leader-b
+/src/handwash/paths.py              @leader-a @leader-b
+/src/handwash/logging.py            @leader-a @leader-b
+
+# 配置 schema 与数据划分规则：改动会影响所有人的可比性
+/configs/config.yaml                @leader-a @leader-b
+/src/handwash/io/split.py           @leader-a @leader-b
+
+# --- L2 受限区：公共基础设施 -------------------------------------------------
+/pyproject.toml                     @leader-a @leader-b
+/environment.yml                    @leader-a @leader-b
+/Makefile                           @leader-a @leader-b
+/.pre-commit-config.yaml            @leader-a @leader-b
+/.gitignore                         @leader-a @leader-b
+/scripts/check_structure.py         @leader-a @leader-b
+/.github/workflows/                 @leader-a @leader-b
+/CODEOWNERS                         @leader-a @leader-b
+/CONTRIBUTING.md                    @leader-a @leader-b
+/docs/ARCHITECTURE.md               @leader-a @leader-b
+/docs/PROTOCOL.md                   @leader-a @leader-b
+
+# --- L2：数据层（数据负责人把关）-------------------------------------------
+/src/handwash/io/                   @data-owner @leader-a
+/src/handwash/data/                 @data-owner @leader-a
+/src/handwash/pipelines/prepare.py  @data-owner @leader-a
+/docs/DATA.md                       @data-owner
+/configs/data/                      @data-owner
+
+# --- L2：模型与训练（模型负责人把关）---------------------------------------
+/src/handwash/models/               @model-owner @leader-a
+/src/handwash/pipelines/train.py    @model-owner @leader-a
+/src/handwash/pipelines/evaluate.py @model-owner @leader-a
+/configs/models/                    @model-owner
+
+# --- L3 自由区：各组员自己的实验与他人无关 ----------------------------------
+# 实验配置：谁做实验谁负责，不需要额外审批（但仍需 CI 通过）
+/configs/experiments/               @leader-a
+# 测试：新增模块时必须同步新增测试（见 tests/README.md）
+/tests/                             @leader-a
+# 个人产物目录：不提交进仓库（.gitignore 已忽略）
+/outputs/
+/models/
+/data/

@@ -1,0 +1,26 @@
+# ============================================================================
+# 叠加配置示例：不改基础配置，只声明"本次实验与默认不同"的部分。
+# ----------------------------------------------------------------------------
+# 用法：
+#     python -m handwash.cli train config=configs/config.yaml \
+#         extra=...（当前 CLI 用 `config=` 指定单一基础文件，多个文件请用
+#         load_config([...]) 或在 scripts/ 里组合）
+#
+# 说明：本文件是**给人看的模板**，被 .gitignore 忽略（configs/local*.yaml）。
+#       请复制成 configs/local.yaml 后按需修改，不要提交个人路径。
+# ============================================================================
+
+runtime:
+  device: cuda:0
+  num_workers: 0        # Windows 上偶发 DataLoader 报错时设为 0
+  run_name: my_local_run
+
+dataset:
+  # 数据集放在外置硬盘时，直接指向绝对路径
+  root: E:/datasets/handwash/kaggle
+
+train:
+  batch_size: 16        # 显存不足时调小
+
+paths:
+  out_dir: outputs

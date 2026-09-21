@@ -1,0 +1,48 @@
+# ============================================================================
+# 实验 E3：时序方案对比 —— 有/无时序处理的消融（ablation）
+# ----------------------------------------------------------------------------
+# 目的：直接回答研究问题 3"加入时序信息后，能否减少单帧误判"。
+#
+# 做法：**同一份数据、同一个 seed、同一个骨干**，只改后处理方式，跑四次：
+#     A) model.temporal.kind=none         + infer.temporal_apply=false   （纯帧级）
+#     B) model.temporal.kind=none         + infer.temporal_apply=true    （仅概率平滑）
+#     C) model.temporal.kind=mean_pool    （训练时也不建模时序 -> 下界）
+#     D) model.temporal.kind=gru / tcn    + infer.temporal_apply=true    （本方案）
+#
+# 报告要求（重要）：四个数字必须在**同一划分**上得到，并给出宏平均 F1；
+# 只报 accuracy 会掩盖小类别（第 5、6 步）的退化。
+#
+# 运行示例（逐个跑，run_name 不同以便对比）：
+#     python -m handwash.cli train config=configs/experiments/exp03_ablation_temporal.yaml \
+#         runtime.run_name=e3_A_frame infer.temporal_apply=false
+#     python -m handwash.cli train config=configs/experiments/exp03_ablation_temporal.yaml \
+#         runtime.run_name=e3_B_smooth infer.temporal_apply=true
+# ============================================================================
+
+runtime:
+  run_name: e3_ablation
+
+model:
+  arch: mobilenet_v2
+  pretrained: auto
+  normalize: imagenet
+  image_size: 224
+  temporal:
+    kind: mean_pool      # 由命令行覆盖为 gru / tcn / none
+    hidden_size: 128
+    window: 16
+
+train:
+  mode: frame           # clip 模式下再切到 clip
+  epochs: 20
+  batch_size: 32
+  lr: 0.0003
+  precision: fp16
+
+infer:
+  temporal_apply: true
+  smooth_window: 9
+
+assess:
+  smooth_window: 9
+  min_confidence: 0.4

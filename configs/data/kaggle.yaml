@@ -1,0 +1,33 @@
+# ============================================================================
+# 数据集叠加配置：Kaggle 洗手数据集（快速原型）
+# ----------------------------------------------------------------------------
+# 用途：先在小数据上跑通"抽帧 -> 训练 -> 评估 -> 完整性报告"全链路。
+# 规模：小（数百 MB），下载与训练都很快。
+# 链接：https://www.kaggle.com/datasets/realtimear/hand-wash-dataset
+#       七分类整理版 https://github.com/atiselsts/data/raw/master/kaggle-dataset-6classes.tar
+#
+# 期望目录结构（两种都支持）：
+#     data/raw/kaggle/<label_name>/<clip>/*.jpg     <- 每个子目录是一段视频抽出的帧
+#     data/raw/kaggle/<label_name>/*.jpg
+# 其中 label_name 形如 Step1_water ... Step7_water（映射见 core/labels.py）
+# ============================================================================
+
+dataset:
+  name: kaggle
+  root: data/raw/kaggle
+  label_space: kaggle
+  include_non_wash: false
+  prep:
+    fps: 5.0
+    resize_hw: [256, 256]
+
+# Kaggle 数据只有六步搓洗动作，没有水龙头事件，因此关掉相关要求
+assess:
+  require_faucet_events: false
+  duration_check: ratio     # 小数据集的片段很短，用比例判定比绝对秒数更合理
+  min_total_duration_s: 15.0
+  reference_total_duration_s: 40.0
+
+model:
+  image_size: 224
+  normalize: zero_one

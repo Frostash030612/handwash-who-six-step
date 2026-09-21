@@ -1,0 +1,82 @@
+# ============================================================================
+# .pre-commit-config.yaml —— 提交前的第一道自动防线
+# ----------------------------------------------------------------------------
+# 安装：make hooks   （等价于 python -m pre_commit install）
+# 手动全量跑：python -m pre_commit run --all-files
+#
+# 设计取舍：
+#   * 只放"快"的检查（<10 秒），慢的（mypy / 全量 pytest）留给 CI 与 make check。
+#   * 每个 hook 都必须能在 Windows + macOS + Linux 上跑。
+# ============================================================================
+
+default_language_version:
+  python: python3.10
+
+default_stages: [pre-commit]
+fail_fast: false
+
+repos:
+  # --- 基础卫生：空白、换行、大文件 ----------------------------------------
+  # 依据 CONTRIBUTING.md R2 / R6
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.(md|markdown)$
+      - id: end-of-file-fixer
+        exclude: \.(pt|pth|onnx|png|jpg|jpeg|mp4)$
+      - id: mixed-line-ending
+        args: [--fix=lf]
+        exclude: \.(bat|cmd|ps1)$
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=2048]        # 2 MB：数据/权重请走 data/ 与 models/
+      - id: check-case-conflict     # 防 Windows/macOS 大小写不敏感带来的坑
+      - id: detect-private-key
+      - id: forbid-submodules
+      - id: no-commit-to-branch
+        args: [--branch, main, --branch, master]
+
+  # --- 代码风格与静态检查（唯一裁决者：ruff）-------------------------------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  # --- 防止 Jupyter notebook 输出污染 diff ---------------------------------
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.7.1
+    hooks:
+      - id: nbstripout
+
+  # --- 项目自定义：分层依赖与结构守卫（本仓库脚本）------------------------
+  # 依据 CONTRIBUTING.md R5 / R8，详见 docs/ARCHITECTURE.md
+  - repo: local
+    hooks:
+      - id: handwash-archcheck
+        name: 分层依赖体检 (scripts/check_structure.py)
+        entry: python scripts/check_structure.py
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: handwash-config-contract
+        name: 配置契约检查 (core/config.py 严格模式)
+        entry: python scripts/check_config.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        files: ^configs/.*\.ya?ml$
+
+      - id: handwash-unit-tests
+        name: 单元测试 (快速子集)
+        entry: python -m pytest -m "not integration and not slow and not gpu" -q
+        language: system
+        pass_filenames: false
+        always_run: true

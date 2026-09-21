@@ -1,0 +1,45 @@
+# ============================================================================
+# 数据集叠加配置：METC 洗手数据集（跨场景测试）
+# ----------------------------------------------------------------------------
+# 链接：https://zenodo.org/records/5808789
+# 规模：212 段视频，约 2.1 GB，72 名参与者，实验室环境，帧级标签。
+#
+# 【重要】METC 在这里的角色是"跨场景测试集"，不是训练集。
+#   正确用法：
+#     1) 用 PSKUS 训练模型（configs/data/pskuss.yaml）；
+#     2) 把 METC 的帧准备好后，作为 external split 评估：
+#            python -m handwash.cli evaluate \
+#                --checkpoint outputs/pskuss_run/models/best.pt eval.splits=[external]
+#   不要用 METC 训练再在 METC 上测试 —— 那就不是跨场景实验了。
+#
+# 期望目录结构：
+#     data/raw/metc/<label_name>/<video>.mp4
+#     或 data/raw/metc/<clip_id>.csv（列含 frame / label）
+# ============================================================================
+
+dataset:
+  name: metc
+  root: data/raw/metc
+  label_space: metc         # 9 类：六步 + faucet_on/off + other
+  include_non_wash: true
+  prep:
+    fps: 5.0
+    resize_hw: [256, 256]
+    min_frames_per_clip: 10
+
+split:
+  group_key: original_video
+  # 跨场景评估时，全部数据都进 external；比例仍需合法（校验要求和为 1）
+  train: 0.70
+  val: 0.15
+  test: 0.15
+  max_frames_per_clip_train: 200
+  max_frames_per_clip_eval: 150
+
+eval:
+  splits: [external]
+  extra_datasets: [metc]
+
+assess:
+  min_total_duration_s: 40.0
+  duration_check: ratio

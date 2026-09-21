@@ -1,0 +1,43 @@
+# ============================================================================
+# .gitattributes —— 让换行符在不同操作系统上保持一致
+# 规则依据：CONTRIBUTING.md R2（UTF-8 + LF + 4 空格）
+# 不做这件事的后果：Windows 组员提交一次，GitHub 上显示"整个文件被改写"，
+#                   代码 review 变得不可能。
+# ============================================================================
+
+# 默认：所有文本文件在仓库里存 LF
+* text=auto eol=lf
+
+# 显式声明为文本（参与换行归一化）
+*.py        text diff=python
+*.md        text
+*.txt       text
+*.yaml      text
+*.yml       text
+*.toml      text
+*.json      text
+*.jsonl     text
+*.csv       text
+*.cfg       text
+*.ini       text
+Makefile    text
+*.ps1       text eol=crlf
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+
+# 二进制：不做任何换行或文本 diff 处理
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.webp      binary
+*.mp4       binary
+*.avi       binary
+*.pt        binary
+*.pth       binary
+*.onnx      binary
+*.npz       binary
+*.zip       binary
+
+# 让 GitHub 的语言统计不要把 notebook 算进去（结果主要由 Python 决定）
+*.ipynb     linguist-detectable=false

@@ -1,0 +1,74 @@
+# ============================================================================
+# environment.yml —— 实验可复现的精确环境（conda）
+# ----------------------------------------------------------------------------
+# 规则（详见 CONTRIBUTING.md R4）：
+#   * 任何人新增依赖，必须同时改 pyproject.toml（宽松范围）和本文件（精确版本）。
+#   * 禁止直接 conda install / pip install 后再"忘了记录"。
+#   * 组员拿到代码后的唯一正确起手式：
+#         conda env create -f environment.yml
+#         conda activate handwash
+#         pip install -e ".[all]"       # 把本仓库以可编辑方式装进环境
+#         handwash doctor               # 自检
+#
+# 【README-WRITER 注意】下面带有 "# PIN-CHECK:" 注释的版本号是按当前主流
+#   版本填写的占位。落库前请在本机跑一次 `conda env create -f environment.yml`，
+#   然后把 conda 实际解析出的版本号回填到这里（`conda list --export`）。
+#   这不属于"改框架结构"，不需要额外审批。
+# ============================================================================
+
+name: handwash
+
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+
+dependencies:
+  # --- 语言与解释器 ------------------------------------------------------
+  - python=3.12
+
+  # --- PyTorch（CUDA 12.1 构建；纯 CPU 组员把 pytorch-cuda 整行删掉即可）---
+  # PIN-CHECK: torch 2.2+ 均支持 YOLO26 与 torchvision 主干
+  - pytorch>=2.2
+  - torchvision>=0.17
+  - pytorch-cuda=12.1
+  - cudatoolkit
+
+  # --- 数值与数据分析 ----------------------------------------------------
+  # 注意：numpy<2 与部分老版本 torchvision 冲突；若安装报错，先放开上限。
+  - numpy>=1.26,<2.1
+  - pandas>=2.0
+  - scikit-learn>=1.3
+  - scipy>=1.11
+
+  # --- 图像 / 视频 -------------------------------------------------------
+  - pillow>=10.0
+  - opencv>=4.9          # 视频解码主力；缺失时自动回退 imageio
+  - imageio>=2.34
+  - imageio-ffmpeg>=0.4.9
+  - matplotlib>=3.8
+
+  # --- 工程辅助 ----------------------------------------------------------
+  - pyyaml>=6.0
+  - tqdm>=4.66
+  - rich>=13.0
+
+  # --- pip 侧依赖（conda 没有或版本太旧的）-------------------------------
+  - pip
+  - pip:
+      # 主模型 YOLO26n-cls 由 ultralytics 提供
+      # PIN-CHECK: 以 `pip index versions ultralytics` 的最新稳定版为准
+      - ultralytics>=8.3
+      # 开发门禁
+      - pytest>=8.0
+      - pytest-cov>=5.0
+      - ruff>=0.5
+      - mypy>=1.10
+      - pre-commit>=3.7
+
+# ============================================================================
+# 可选：把环境导出成完全锁定的快照，交给助教/组员复现
+#     conda env export --no-builds > environment.lock.yml
+# 该文件只用于归档，不要手工编辑。
+# ============================================================================

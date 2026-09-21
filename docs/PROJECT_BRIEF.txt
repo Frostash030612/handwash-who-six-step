@@ -1,0 +1,160 @@
+六步洗手动作识别与完整性评估
+——选题、数据集与论文简要分析
+
+一、选题介绍
+
+本项目拟开发一个基于视频的洗手动作识别系统，对照 WHO 六步洗手法，自动判断使用者正在进行哪一步，并检查是否存在漏步、顺序异常或动作时间不足。
+
+项目不诊断疾病，只做动作规范性分析。演示时可用手机拍摄组员洗手视频，模型逐段输出动作类别和完成情况，因此结果容易现场验证。
+
+
+二、研究问题
+
+1. 模型能否识别 WHO 六类洗手动作？
+2. 在医院数据上训练后，换到普通洗手池还能否识别？
+3. 加入时序信息后，能否减少单帧误判？
+4. 系统能否发现漏步、重复步骤和不完整流程？
+
+
+三、模型方案
+
+主模型采用 YOLO26n-cls，对视频帧进行动作分类。YOLO26 是 Ultralytics 在 2026 年发布的新一代 YOLO，官方已经提供分类模型 yolo26n-cls.pt，可直接微调。
+
+官方介绍：
+https://docs.ultralytics.com/models/yolo26
+
+分类任务说明：
+https://docs.ultralytics.com/tasks/classify
+
+选择分类模型而不是普通目标检测模型的原因是：公开洗手数据主要提供每一帧的动作类别，没有手部框或分割掩膜。直接做分类最符合现有标注，也能减少重新标注的工作量。
+
+基本流程：
+
+视频 → 抽帧 → YOLO26n-cls 识别每帧动作 → 时序平滑或 GRU/TCN → 动作分段 → 判断是否漏步并统计时长
+
+YOLO26负责识别画面中的动作；时序模型负责利用前后帧关系，减少瞬间误判。为了比较改进效果，可以将 MobileNetV2 或 YOLOv8n-cls 作为基线模型。
+
+
+四、公开数据集
+
+1. PSKUS 医院洗手数据集（主数据集）
+
+链接：https://zenodo.org/records/4537209
+
+规模：3185 段视频，约 18.4 GB。
+内容：真实医院环境，包含 WHO 六步动作、开关水龙头及其他动作，并提供逐帧标注。
+用途：模型训练和同场景测试。数据较大，可先下载其中一部分完成课程作业。
+
+2. METC 洗手数据集（跨场景测试）
+
+链接：https://zenodo.org/records/5808789
+
+规模：212 段视频，约 2.1 GB，72 名参与者。
+内容：医学生在实验室环境中完成洗手动作，提供帧级标签。
+用途：检验模型从医院环境迁移到新人物、新背景后的表现。
+
+3. Kaggle Hand Wash Dataset（快速原型）
+
+链接：https://www.kaggle.com/datasets/realtimear/hand-wash-dataset
+
+整理后的七分类版本：
+https://github.com/atiselsts/data/raw/master/kaggle-dataset-6classes.tar
+
+特点：规模较小，下载和训练较快，适合先验证代码流程。
+
+4. Jurmala 数据集（可选扩展）
+
+链接：https://zenodo.org/records/5808764
+
+规模：2427 段视频，约 17 GB。
+用途：在时间和算力充足时增加训练数据，不是完成作业的必要条件。
+
+5. 合成洗手数据集（可选）
+
+数据与代码：https://github.com/r-ozakar/synthetic-hand-washing
+论文：https://doi.org/10.3390/jimaging11070208
+
+特点：由 3D 场景生成，包含 RGB、深度和手部掩膜。可研究合成数据预训练，但建议只作为扩展实验。
+
+
+五、推荐的数据组合
+
+训练：PSKUS 的部分视频
+内部测试：PSKUS 中按原始视频划分的测试集
+跨场景测试：METC
+快速调试：Kaggle 七分类版本
+最终验证：组员自行拍摄的视频
+
+必须先按“原始视频”划分训练集和测试集，再进行抽帧。不能随机打乱所有视频帧，否则同一段视频的相邻画面可能同时进入训练集和测试集，造成数据泄漏和虚高的准确率。
+
+
+六、自采验证方案
+
+建议每位组员录制 4—6 段视频，包括：
+
+1. 一套完整、顺序正确的六步洗手；
+2. 故意漏掉一个步骤；
+3. 调换两个步骤的顺序；
+4. 某一步只做很短时间；
+5. 可选：改变衣服、光照、背景或拍摄角度。
+
+拍摄前应参考公开数据的机位，使双手清晰可见。记录每段视频的真实步骤，作为人工答案，与模型结果直接比较。
+
+WHO 资料说明完整洗手过程通常为 40—60 秒，但没有规定每个动作必须平均分配相同时间，因此项目应重点报告总时长、各步骤相对时长和是否明显不足。
+
+WHO 指南：
+https://www.who.int/publications/m/item/how-to-handwash
+
+
+七、实验与评价指标
+
+基础实验：
+
+1. YOLO26n-cls 单帧分类；
+2. 加入多数投票、滑动窗口或 GRU/TCN 后的时序结果；
+3. PSKUS 内部测试与 METC、自采视频的跨场景比较；
+4. 完整流程、漏步流程和乱序流程的识别效果。
+
+主要指标：Accuracy、Macro-F1、各类别 Precision/Recall、混淆矩阵、完整流程判断准确率，以及单段视频推理时间。
+
+报告重点可以讨论：哪些步骤动作相似、背景变化造成多大性能下降、时序处理能否减少跳变，以及模型在真实演示中的失败案例。
+
+
+八、相关论文与代码
+
+1. Hand-Washing Video Dataset Annotated According to the World Health Organization’s Hand-Washing Guidelines（2021）
+https://doi.org/10.3390/data6040038
+
+作用：介绍 PSKUS 数据集、采集方式和标注规范，可作为数据部分的主要引用。
+
+2. Towards Automated Hand Hygiene Assessment in Hospitals Using Video-Based Recognition（2022）
+https://www.edi.lv/wp-content/uploads/2022/12/main.pdf
+
+作用：讨论医院洗手动作识别、时序模型和跨场景问题，可用于设计基线和实验。
+
+3. Learning to Recognize Hand-Washing Activities in Hospital Settings（2020）
+https://arxiv.org/abs/2011.11383
+
+作用：说明真实医院场景中的遮挡、动作相似和背景变化等困难。
+
+4. Hand Washing Gesture Recognition Using a Synthetic Dataset（2025）
+https://doi.org/10.3390/jimaging11070208
+
+作用：使用 YOLOv8 系列研究洗手动作，证明 YOLO 方法与该课题具有相关性。本文可以作为方法依据，而本项目使用更新的 YOLO26n-cls。
+
+5. 开源基线代码
+https://github.com/edi-riga/handwash
+
+代码包含 MobileNetV2、GRU 和 RGB/光流等基线，并提供数据划分文件，可用于复现和比较。
+
+
+九、可行性与风险
+
+优点：公开数据充足、自采验证简单、演示直观，并能同时讨论图像分类、时序分析和跨场景泛化。
+
+主要风险是数据量较大、相邻动作视觉相似，以及家庭环境与医院环境存在差异。解决办法是先用小数据跑通流程，采用轻量级 YOLO26n-cls，并把跨场景性能下降本身作为研究发现。
+
+
+十、Proposal 可用摘要
+
+本项目研究基于视频的 WHO 六步洗手动作识别与完整性评估。系统以公开医院洗手视频为主要训练数据，利用 YOLO26n-cls 识别视频帧中的动作类别，并结合时序平滑或 GRU/TCN 完成动作分段、漏步检测和时长统计。实验将比较模型在 PSKUS、METC 及组员自采视频上的表现，重点分析从医院环境迁移到普通洗手池时的域差异。最终系统可通过手机拍摄的视频进行现场演示，验证结果清晰，且具有实际公共卫生意义。

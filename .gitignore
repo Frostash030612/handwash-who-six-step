@@ -1,0 +1,100 @@
+# ============================================================================
+# .gitignore —— 什么绝对不能进 Git
+# 核心原则：数据、权重、输出、密钥 一律不进仓库（详见 CONTRIBUTING.md R6）
+# ============================================================================
+
+# --- 数据（体积大，用 scripts/download_data.sh 或 docs/DATA.md 的链接获取）--
+data/raw/
+data/interim/
+data/processed/
+data/external/
+!data/**/.gitkeep
+
+# --- 模型权重与导出 ---------------------------------------------------------
+models/
+*.pt
+*.pth
+*.onnx
+*.engine
+*.tflite
+*.mlpackage
+!**/configs/models/*.yaml
+
+# --- 实验输出（保留结构，不保留内容）---------------------------------------
+outputs/*
+!outputs/**/.gitkeep
+!outputs/**/README.md
+
+# --- 实验记录 ---------------------------------------------------------------
+mlruns/
+wandb/
+lightning_logs/
+*.ckpt
+
+# --- Python -----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# --- 虚拟环境 ---------------------------------------------------------------
+.venv/
+venv/
+env/
+.conda/
+
+# --- 测试与类型检查缓存 -----------------------------------------------------
+.pytest_cache/
+# pytest 在无法创建 .pytest_cache 的受限环境里会把临时锁目录留在仓库根，
+# 名字形如 pytest-cache-files-xxxx；这里一并忽略，避免污染 git status。
+pytest-cache-files-*/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+
+# --- Notebook ---------------------------------------------------------------
+.ipynb_checkpoints/
+*.ipynb.tmp
+
+# --- 编辑器 / 系统 ----------------------------------------------------------
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- 密钥与本地覆盖 ---------------------------------------------------------
+.env
+.env.*
+!.env.example
+configs/local*.yaml
+!configs/local.example.yaml
+*.pem
+*.key
+
+# --- 临时文件 ---------------------------------------------------------------
+*.log
+tmp/
+scratch/
+*.tmp
+*.bak
+
+# --- 本项目专用的临时目录 ---------------------------------------------------
+# pytest / 合成数据 / 冒烟产物都放这里，保证"不往仓库外写文件"，
+# 也让沙箱环境（CI、受限的执行环境）能正常跑测试。
+.tmp/

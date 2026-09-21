@@ -1,0 +1,44 @@
+# ============================================================================
+# 实验 E2：主模型 —— YOLO26n-cls（逐帧）+ GRU（时序）
+# ----------------------------------------------------------------------------
+# 目的：本项目主方案。YOLO26n-cls 负责逐帧动作分类，GRU 利用前后帧关系。
+#
+# 运行：
+#     python -m handwash.cli train config=configs/config.yaml model.arch=yolo26n-cls \
+#         train.mode=clip runtime.run_name=e2_yolo26_gru
+#
+# 若 yolo26 权重不可用（先跑 handwash doctor 确认），做两步：
+#     1) 用现成权重跑通：model.pretrained=yolo11n-cls.pt
+#     2) 在报告里说明"因权重可用性问题，改用 X 权重，方法完全一致"
+#        —— 这是诚实且可接受的处理方式，不要悄悄换掉不说。
+# ============================================================================
+
+runtime:
+  run_name: e2_yolo26n_gru
+
+model:
+  arch: yolo26n-cls
+  pretrained: auto
+  image_size: 224
+  normalize: zero_one
+  temporal:
+    kind: gru
+    hidden_size: 128
+    num_layers: 1
+    bidirectional: false
+    window: 16
+    dropout: 0.1
+
+train:
+  mode: clip
+  epochs: 30
+  batch_size: 16
+  eval_batch_size: 16
+  lr: 0.0002
+  precision: fp16
+  class_weights: balanced
+
+infer:
+  mode: clip
+  temporal_apply: true
+  smooth_window: 9

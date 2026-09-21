@@ -1,0 +1,61 @@
+# ============================================================================
+# 数据集叠加配置：PSKUS 医院洗手数据集（主数据集）
+# ----------------------------------------------------------------------------
+# 链接：https://zenodo.org/records/4537209
+# 规模：3185 段视频，约 18.4 GB，逐帧标注，真实医院环境。
+# 论文：https://doi.org/10.3390/data6040038
+#
+# 【建议】不要一次下全量。先下载其中一个子集（例如 300—500 段）跑通，
+#         确认流程无误后再补全 —— 18.4GB 的抽帧会占掉几十 GB 磁盘。
+#
+# 期望目录结构：
+#     data/raw/pskuss/<label_name>/<video>.mp4      目录名即标签
+#     或 data/raw/pskuss/<clip_id>.csv              每段视频一个逐帧标注 csv
+# （若你下载到的结构不同，只需改 src/handwash/pipelines/prepare.py 的适配器，
+#   并同步更新 docs/DATA.md。）
+# ============================================================================
+
+dataset:
+  name: pskuss
+  root: data/raw/pskuss
+  label_space: pskuss        # 10 类：六步 + faucet_on/off + washing_hands + other
+  include_non_wash: true
+  prep:
+    # 医院视频较长；5fps 对动作级任务足够，且能把存储压到 1/6
+    fps: 5.0
+    frame_step: 1
+    resize_hw: [256, 256]
+    jpeg_quality: 90
+    min_frames_per_clip: 15
+
+runtime:
+  num_workers: 6
+
+split:
+  # 医院数据同一名参与者可能录了多段视频，用 video 级别划分；
+  # 若标注里有 participant 字段，改成 participant 更严格（防同一人跨集）
+  group_key: original_video
+  max_frames_per_clip_train: 300
+  max_frames_per_clip_eval: 150
+
+model:
+  arch: yolo26n-cls
+  normalize: zero_one
+  temporal:
+    kind: gru
+    hidden_size: 128
+    window: 16
+
+train:
+  mode: clip                 # 用上时序信息，对应研究问题 3
+  batch_size: 16
+  epochs: 30
+  lr: 0.0002
+  class_weights: balanced    # 医院数据各类别帧数差异大
+  precision: fp16
+
+assess:
+  min_total_duration_s: 40.0
+  reference_total_duration_s: 50.0
+  duration_check: ratio
+  require_faucet_events: true   # 医院数据包含开关水龙头，可要求检出

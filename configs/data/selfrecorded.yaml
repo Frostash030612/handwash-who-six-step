@@ -1,0 +1,52 @@
+# ============================================================================
+# 数据集叠加配置：组员自采视频（最终验证）
+# ----------------------------------------------------------------------------
+# 拍摄要求（选题文档第六节）：
+#   每人 4—6 段，包含：
+#     1) 一套完整、顺序正确的六步洗手
+#     2) 故意漏掉一个步骤
+#     3) 调换两个步骤的顺序
+#     4) 某一步只做很短时间
+#     5) 可选：改变衣服、光照、背景或拍摄角度
+#   机位参考公开数据：双手全程清晰可见（俯拍或侧前方 45°）。
+#
+# 期望目录结构（目录名即真实标签，人工答案为准）：
+#     data/external/self_recorded/<label_name>/<video>.mp4
+#     label_name ∈ {step_1_palm_to_palm, ..., step_6_rotational_fingertips,
+#                   faucet_on, faucet_off, other}
+#   也可以做"整段视频"评估（推荐）：把整段视频放在
+#     data/external/self_recorded/full/<name>.mp4
+#   然后用 `handwash assess --video ...` 直接出完整性报告 ——
+#   自采视频的价值在于**完整流程**，而不是单帧分类。
+#
+# 每位组员必须填写 docs/SELF_RECORDING.md 的表格，记录每段视频的
+# 真实步骤序列，作为人工答案（ground truth）用于与模型结果对比。
+# ============================================================================
+
+dataset:
+  name: selfrecorded
+  root: data/external/self_recorded
+  label_space: selfrecorded
+  include_non_wash: true
+  prep:
+    fps: 5.0
+    resize_hw: [256, 256]
+    min_frames_per_clip: 5
+
+split:
+  group_key: original_video
+  max_frames_per_clip_train: 200
+  max_frames_per_clip_eval: 200
+
+eval:
+  splits: [external]
+
+assess:
+  # 自采视频通常比医院视频短，阈值适当放宽，避免"全是时长不足"的噪声结论
+  min_total_duration_s: 20.0
+  reference_total_duration_s: 40.0
+  min_step_duration_s: 2.0
+  step_duration_ratio: 0.35
+  duration_check: ratio
+  require_faucet_events: false
+  order_check: true

@@ -1,0 +1,215 @@
+# ============================================================================
+# config.yaml —— 基础配置（所有实验的公共部分）
+# ----------------------------------------------------------------------------
+# 用法：
+#     python -m handwash.cli train --config configs/config.yaml
+#     python -m handwash.cli train config=configs/experiments/smoke.yaml
+#     python -m handwash.cli train train.epochs=5 runtime.device=cpu
+#
+# 规则（详见 CONTRIBUTING.md R3 / R14）：
+#   * **键名必须与 src/handwash/core/config.py 的 dataclass 字段完全一致**，
+#     拼错的键会直接报错（不会静默忽略）。
+#   * 不要在这里写"只有我这台机器才成立"的路径；本机差异请用
+#     configs/local.yaml 覆盖（该文件已被 .gitignore 忽略）。
+#   * 任何新增的可调参数都要同时更新 docs/CONFIG.md。
+# ============================================================================
+
+# 配置结构版本：破坏性改动时才 +1（见 CHANGELOG.md）
+schema_version: 1
+
+# ---------------------------------------------------------------------------
+# 项目标识：会出现在日志与产物元数据里
+# ---------------------------------------------------------------------------
+project:
+  name: handwash
+  task: who_six_step_recognition
+  language: zh
+
+# ---------------------------------------------------------------------------
+# 运行时：随机性、设备、日志、实验追踪
+# ---------------------------------------------------------------------------
+runtime:
+  seed: 42                 # 固定种子是"结果可复现"的前提，禁止随手改
+  deterministic: true      # 让 cuDNN 走确定性算法（稍慢但可复现）
+  device: auto             # auto | cpu | cuda | cuda:0
+  num_workers: 4           # Windows 下若报 DataLoader 错误，改成 0
+  pin_memory: true
+  log_level: INFO          # DEBUG / INFO / WARNING / ERROR
+  tracking: csv            # none | csv | tensorboard | wandb
+  tracking_project: handwash
+  run_name: null           # null = 自动用时间戳；写死便于对比实验，如 baseline_v1
+
+# ---------------------------------------------------------------------------
+# 路径：相对路径一律相对仓库根目录
+# ---------------------------------------------------------------------------
+paths:
+  out_dir: outputs
+  models_dir: models
+  cache_dir: .cache/handwash
+
+# ---------------------------------------------------------------------------
+# 当前使用的数据集（换个数据集做实验时改这里，或叠加 configs/data/*.yaml）
+# ---------------------------------------------------------------------------
+dataset:
+  name: kaggle             # 必须同时出现在下面的 datasets 段里
+  root: data/raw/kaggle
+  label_space: kaggle      # null 表示与 name 相同
+  include_non_wash: false  # 是否把开关水龙头等辅助动作也当类别
+  prep:
+    fps: 5.0               # 抽帧率：动作级任务 5fps 足够，且显著省磁盘
+    frame_step: 1
+    resize_hw: [256, 256]  # 落盘尺寸（比模型输入略大，留增强空间）
+    image_ext: jpg
+    jpeg_quality: 92
+    min_frames_per_clip: 10
+
+# ---------------------------------------------------------------------------
+# 数据集档案：所有可能用到的数据集都在这里登记（additive，不影响默认）
+#   训练脚本只读 dataset.name 对应的那一份。
+# ---------------------------------------------------------------------------
+datasets:
+  kaggle:
+    root: data/raw/kaggle
+    processed_dir: data/processed/kaggle
+    frames_dir: data/processed/kaggle/frames
+    manifest: data/processed/kaggle/manifest.csv
+    notes: "Kaggle realtimear/hand-wash-dataset：规模小，用于快速跑通流程"
+  pskuss:
+    root: data/raw/pskuss
+    processed_dir: data/processed/pskuss
+    frames_dir: data/processed/pskuss/frames
+    manifest: data/processed/pskuss/manifest.csv
+    notes: "PSKUS 医院数据集（Zenodo 4537209）：主训练数据，约 18.4GB，可先取部分"
+  metc:
+    root: data/raw/metc
+    processed_dir: data/processed/metc
+    frames_dir: data/processed/metc/frames
+    manifest: data/processed/metc/manifest.csv
+    notes: "METC（Zenodo 5808789）：跨场景测试，72 名参与者"
+  jurmala:
+    root: data/raw/jurmala
+    processed_dir: data/processed/jurmala
+    frames_dir: data/processed/jurmala/frames
+    manifest: data/processed/jurmala/manifest.csv
+    notes: "Jurmala（Zenodo 5808764）：可选扩展训练数据"
+  selfrecorded:
+    root: data/external/self_recorded
+    processed_dir: data/processed/self_recorded
+    frames_dir: data/external/self_recorded
+    manifest: data/processed/self_recorded/manifest.csv
+    notes: "组员自采视频：每人 4—6 段，含漏步/乱序/过短等对照"
+  synthetic:
+    root: data/interim/synthetic
+    processed_dir: data/interim/synthetic
+    frames_dir: data/interim/synthetic/frames
+    manifest: data/interim/synthetic/manifest.csv
+    notes: "合成数据：仅用于冒烟测试与单元测试"
+
+# ---------------------------------------------------------------------------
+# 数据划分：**必须按原始视频划分**，否则会造成数据泄漏（指标虚高）
+# ---------------------------------------------------------------------------
+split:
+  group_key: original_video  # original_video | clip_id | participant
+  train: 0.70
+  val: 0.15
+  test: 0.15
+  stratify_by: label_sequence  # null 表示不分层
+  seed: 42
+  max_frames_per_clip_train: 200   # 长视频等间隔截断（不是取前 N 帧）
+  max_frames_per_clip_eval: 100
+  guard_leakage: true        # 发现跨 split 的原始视频直接报错终止
+
+# ---------------------------------------------------------------------------
+# 模型：主模型 = YOLO26n-cls；基线 = MobileNetV2 / YOLOv8n-cls
+# ---------------------------------------------------------------------------
+model:
+  name: yolo26n-cls
+  arch: yolo26n-cls        # 注册名，见 src/handwash/models/
+  pretrained: auto         # auto | true | false | 本地权重路径 | 权重名
+  num_classes: null        # null = 由标签空间自动推导（**不要手写数字**）
+  image_size: 224
+  normalize: zero_one      # YOLO 适配器必须用 zero_one（ultralytics 内部已归一化）
+  dropout: 0.2
+  temporal:
+    kind: gru              # gru | tcn | mean_pool | none
+    hidden_size: 128
+    num_layers: 1
+    bidirectional: false   # true 会用到未来帧，不能用于实时演示
+    window: 16
+    stride: 8
+    kernel_size: 3
+    dilations: [1, 2, 4, 8]
+    dropout: 0.1
+
+# ---------------------------------------------------------------------------
+# 训练超参（默认值偏"小数据也能跑通"；正式实验请用 configs/experiments/ 覆盖）
+# ---------------------------------------------------------------------------
+train:
+  mode: frame              # frame | clip | hybrid
+  epochs: 20
+  batch_size: 32
+  eval_batch_size: 64
+  lr: 0.0003
+  weight_decay: 0.0005
+  optimizer: adamw         # adamw | sgd
+  momentum: 0.9
+  scheduler: cosine        # cosine | step | none
+  warmup_epochs: 1.0
+  label_smoothing: 0.05
+  class_weights: none      # none | balanced（类别极不平衡时用 balanced）
+  early_stopping_patience: 5
+  grad_clip_norm: 1.0
+  precision: fp32          # fp32 | fp16 | bf16（fp16 需要 CUDA）
+  accumulate_grad_batches: 1
+  focal_gamma: 0.0         # >0 时改用焦点损失
+  augment:
+    random_resized_crop: true
+    crop_scale: [0.7, 1.0]
+    horizontal_flip: true
+    color_jitter: 0.2
+    rotation_deg: 8.0
+    gaussian_blur: 0.1
+    randaugment: false
+
+# ---------------------------------------------------------------------------
+# 评估：内部测试 + 跨场景测试（研究问题 2）
+# ---------------------------------------------------------------------------
+eval:
+  splits: [val, test]
+  metrics: [accuracy, macro_f1, weighted_f1, per_class, confusion_matrix]
+  save_confusion_matrix: true
+  save_predictions: true
+  bootstrap_ci: false
+  bootstrap_samples: 1000
+  extra_datasets: []       # 例如 [metc]：加上跨场景对比
+
+# ---------------------------------------------------------------------------
+# 完整性判定阈值：**所有业务阈值只在这里改**
+# ---------------------------------------------------------------------------
+assess:
+  smooth_window: 9
+  min_confidence: 0.4
+  min_segment_frames: 5
+  min_segment_s: 1.0
+  min_total_duration_s: 40.0        # WHO 建议完整流程 40—60 秒
+  reference_total_duration_s: 50.0  # 打分用的参考总时长
+  min_step_duration_s: 3.0
+  step_duration_ratio: 0.4          # 单步时长不得低于"平均份额"的 40%
+  allow_repeats: false
+  missing_tolerance: 0
+  duration_check: ratio             # seconds | ratio | none
+  order_check: true
+  require_faucet_events: false
+  report_language: zh
+
+# ---------------------------------------------------------------------------
+# 推理
+# ---------------------------------------------------------------------------
+infer:
+  mode: clip               # frame | clip | hybrid
+  temporal_apply: true
+  smooth_window: 9
+  save_frame_predictions: true
+  save_overlay_video: false
+  batch_size: 64
+  tta: false

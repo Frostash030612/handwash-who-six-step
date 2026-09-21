@@ -1,0 +1,37 @@
+# ============================================================================
+# .editorconfig —— 让所有编辑器产出同一种字节序列，消灭"整文件 diff"
+# 规则依据：CONTRIBUTING.md R2（UTF-8 + LF + 4 空格）
+# ============================================================================
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+max_line_length = 110
+
+[*.{yml,yaml,json,jsonl}]
+indent_size = 2
+
+[*.{md,markdown}]
+# Markdown 的行尾双空格表示换行，不能裁掉
+trim_trailing_whitespace = false
+max_line_length = off
+
+[*.{toml,cfg,ini}]
+indent_size = 2
+
+[Makefile]
+indent_style = tab
+
+[*.{bat,cmd,ps1}]
+end_of_line = crlf
+
+[*.csv]
+trim_trailing_whitespace = false
+
+[*.{pt,pth,onnx,png,jpg,jpeg,mp4,avi,gif}]
+insert_final_newline = false

@@ -1,0 +1,165 @@
+# ============================================================================
+# CI —— 与本地 `make check` 完全一致的门禁
+# ----------------------------------------------------------------------------
+# 设计原则（重要）：**CI 里不允许出现本地跑不到的命令**。
+#   如果 CI 能拦下的问题本地拦不住，组员就会养成"先推再修"的习惯，
+#   这个仓库的规则也就名存实亡。
+#   本地对标命令：  make check
+# ============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONUNBUFFERED: "1"
+  HANDWASH_LOG_LEVEL: WARNING
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 快速门禁：不需要重依赖，2 分钟内必须出结果
+  # ---------------------------------------------------------------------------
+  lint-and-structure:
+    name: 格式 / 分层依赖 / 配置契约
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 安装轻依赖（只装检查所需，不装 torch）
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy pyyaml ruff
+          pip install -e ".[torch]" --no-deps || true
+
+      - name: 代码格式与静态检查（ruff）
+        run: python -m ruff check .
+
+      - name: 分层依赖体检（禁止越层 import / 硬编码路径 / print）
+        run: python scripts/check_structure.py --verbose
+
+      - name: 配置契约检查（所有 configs/*.yaml 必须能严格加载）
+        run: python scripts/check_config.py
+
+      - name: 确认没有把数据/权重/输出提交进来
+        run: |
+          set -e
+          if git ls-files --error-unmatch 'data/raw/*' 2>/dev/null; then
+            echo "::error::data/raw 下有文件被提交；数据集不得进入仓库（见 CONTRIBUTING.md R6）"
+            exit 1
+          fi
+          if git ls-files 'models/*' 'outputs/*' '*.pt' '*.pth' | grep -q .; then
+            echo "::error::发现被提交的模型权重或实验产物（见 CONTRIBUTING.md R6）"
+            git ls-files 'models/*' 'outputs/*' '*.pt' '*.pth'
+            exit 1
+          fi
+          echo "仓库卫生检查通过"
+
+  # ---------------------------------------------------------------------------
+  # 单元测试：契约层必须秒级完成，不许 import torch
+  # ---------------------------------------------------------------------------
+  unit-tests:
+    name: 单元测试（契约层）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 安装测试依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy pyyaml pytest pytest-cov
+          pip install -e . --no-deps
+
+      - name: 运行单元测试
+        run: python -m pytest -m "not integration and not slow and not gpu" --cov --cov-report=term-missing
+
+      - name: 存档覆盖率报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: .coverage
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # 冒烟训练：证明"数据 -> 模型 -> 指标"这条链路没断
+  #   故意只在 PR 上跑（比较慢），push 到 main 也跑一次作为回归
+  # ---------------------------------------------------------------------------
+  smoke-train:
+    name: 冒烟训练（合成数据）
+    runs-on: ubuntu-latest
+    needs: [lint-and-structure, unit-tests]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 安装 CPU 版 torch 与项目
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[torch,viz]"
+
+      - name: 冒烟训练（合成数据，2 epoch，CPU）
+        run: |
+          python -m handwash.cli train config=configs/experiments/smoke.yaml \
+            runtime.num_workers=0 train.epochs=1
+
+      - name: 冒烟评估（验证指标与混淆矩阵能产出）
+        run: |
+          python -m handwash.cli evaluate config=configs/experiments/smoke.yaml \
+            runtime.num_workers=0 eval.save_confusion_matrix=false
+
+      - name: 检查产物是否齐全
+        run: |
+          set -e
+          for f in outputs/smoke/resolved_config.yaml outputs/smoke/history.json \
+                   outputs/smoke/models/best.pt outputs/smoke/eval/eval_val.json; do
+            test -f "$f" || { echo "::error::缺少产物 $f"; exit 1; }
+          done
+          echo "冒烟产物齐全"
+
+      - name: 存档冒烟产物（排查失败时用）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-outputs
+          path: outputs/smoke
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # 环境文件一致性：pyproject 与 environment.yml 不能各说各话
+  # ---------------------------------------------------------------------------
+  env-consistency:
+    name: 依赖声明一致性
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 检查 environment.yml 的 pip 依赖是否都在 pyproject 里登记
+        run: python scripts/check_config.py --env-consistency

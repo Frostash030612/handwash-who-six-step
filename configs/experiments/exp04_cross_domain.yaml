@@ -1,0 +1,41 @@
+# ============================================================================
+# 实验 E4：跨场景评估 —— PSKUS 训练，METC / 自采视频测试
+# ----------------------------------------------------------------------------
+# 目的：回答研究问题 2"在医院数据上训练后，换到普通洗手池还能否识别"。
+#
+# 步骤：
+#   1) 用 PSKUS 训练并产出 checkpoint：
+#          python -m handwash.cli train config=configs/config.yaml \
+#              runtime.run_name=e4_pskuss_train
+#      （建议同时叠加 configs/data/pskuss.yaml 的 dataset/assess 段）
+#
+#   2) 把 METC 帧准备好（见 configs/data/metc.yaml 的说明），
+#      再在外部数据上评估同一个 checkpoint：
+#          python -m handwash.cli evaluate \
+#              --checkpoint outputs/e4_pskuss_train/models/best.pt \
+#              --splits external
+#
+#   3) 用组员自采视频做**完整流程**评估（最有说服力）：
+#          python -m handwash.cli assess --folder data/external/self_recorded/full
+#
+# 报告要点：把"跨场景性能下降"本身当成发现来写，而不是当成失败。
+#   需要分别报告：同场景 (PSKUS test) / 跨场景 (METC) / 自采视频 三组数字，
+#   并讨论背景变化带来的影响。
+# ============================================================================
+
+runtime:
+  run_name: e4_cross_domain
+
+eval:
+  splits: [test, external]
+  save_confusion_matrix: true
+  save_predictions: true
+  bootstrap_ci: true
+  bootstrap_samples: 1000
+  extra_datasets: [metc]
+
+assess:
+  require_faucet_events: false
+  duration_check: ratio
+  min_total_duration_s: 30.0
+  reference_total_duration_s: 45.0
