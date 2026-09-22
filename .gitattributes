@@ -22,8 +22,18 @@
 *.ini       text
 Makefile    text
 *.ps1       text eol=crlf
+# Windows 批处理必须保持 CRLF，且**不能**标成 binary：
+#   * cmd.exe 按行解析，LF-only 会把多行粘成一行（真实踩过，报错是
+#     `'xxx' is not recognized as an internal or external command`）；
+#   * 标成 binary 的话 Git 完全不管换行，别人 clone 下来就丢了 CRLF。
+#   注意 `text eol=crlf` 只规范化换行，**不会剥掉 UTF-8 BOM** ——
+#   BOM 是 cmd.exe 正确按 UTF-8 读取中文的关键，必须保留。
 *.bat       text eol=crlf
 *.cmd       text eol=crlf
+# macOS 双击启动器是 shell 脚本，必须用 LF：CRLF 会让 shebang 解析失败
+#   （报错形如 `bad interpreter: /bin/bash^M`）。
+*.command    text eol=lf
+*.sh         text eol=lf
 
 # 二进制：不做任何换行或文本 diff 处理
 *.png       binary

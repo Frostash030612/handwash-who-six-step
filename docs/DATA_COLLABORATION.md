@@ -104,9 +104,39 @@ and they are much smaller:
 | **A. The extractor** (one person, R1) | `bootstrap_dataset.py` | Needs the full raw dataset to produce the authoritative split |
 | **B. Everyone else** | `pack_processed_data.py --verify` then `--unpack` | Only needs the finished frames; no download, no extraction |
 
+**The extractor has three ways to start, pick whichever suits you.**
+
+| How | Who it is for | What it does |
+| --- | --- | --- |
+| **Double-click** `scripts/launchers/一键出结果.bat` (Windows) or `一键出结果.command` (macOS) | anyone who does not want to touch a terminal | Runs the full, authoritative pipeline with no options to get wrong |
+| `python scripts/bootstrap_dataset.py --dataset pskuss` | comfortable with a terminal | Same thing, plus every variant flag |
+| The four sub-scripts individually | debugging a single stage | `download_data.py` → `prepare_data.py` → `pack_processed_data.py` |
+
+The double-click entry **deliberately accepts no options** beyond `--dataset`. Someone
+double-clicking a file is unlikely to read a flag list, and the one mistake that matters here —
+extracting from a partial download — produces a split that *looks* fine but silently makes every
+team member's numbers incomparable. So the launcher always runs the complete path.
+
 ```bash
-# ---- Role A: the extractor, in one command ----
+# ---- Role A, option 1: double-click (Windows) ----
+scripts\launchers\一键出结果.bat
+
+# ---- Role A, option 2: one command ----
 python scripts/bootstrap_dataset.py --dataset pskuss
+```
+
+**Before frame extraction the script now stops if the data is incomplete.** This is the only
+check that aborts on purpose, because it is the only mistake that produces no error at all:
+
+```
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! 数据不完整 —— 不能产出权威划分
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  视频分片：3/11 个已就绪
+  缺失    ：DataSet3.zip, DataSet7.zip, DataSet9.zip, ...
+  怎么办，二选一：
+    1) 下全数据后重跑（推荐）：python scripts/bootstrap_dataset.py --dataset pskuss
+    2) 只想先验证链路（结果不可用于正式实验）：加 --allow-partial
 ```
 
 It is designed to be **re-run without fear**. Each stage detects what is already done:

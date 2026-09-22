@@ -42,6 +42,9 @@ __all__ = [
     "requires_manual_download",
     "total_size_bytes",
     "total_size_gb",
+    "count_video_shards",
+    "expected_shard_bytes",
+    "summarise_download_progress",
 ]
 
 ZENODO_API: Final[str] = "https://zenodo.org/api/records/{record}"
@@ -217,3 +220,53 @@ def total_size_bytes(name: str) -> int:
 def total_size_gb(name: str) -> float:
     """登记的文件体积合计（GiB），仅用于提示；真实大小以 API 为准。"""
     return round(total_size_bytes(name) / GiB, 2)
+
+
+def count_video_shards(name: str) -> int:
+    """登记的**视频分片**（``*.zip``）数量，例如 PSKUS 是 11 个。
+
+    与 ``len(iter_registered_files(...))`` 的区别：后者把 README/statistics/summary
+    这些几百 KB 的元数据文件也算进去了，用它报进度会让人误以为还差很多。
+    """
+    return sum(1 for key, _, _ in iter_registered_files(name) if key.lower().endswith(".zip"))
+
+
+def expected_shard_bytes(name: str) -> int:
+    """**完整**视频分片（``*.zip``）的体积合计，用于判断"数据是否下全"。"""
+    return int(
+        sum(
+            size
+            for key, size, _ in iter_registered_files(name)
+            if key.lower().endswith(".zip")
+        )
+    )
+
+
+def summarise_download_progress(name: str, directory: "object") -> dict[str, object]:
+    """对比"登记的完整分片"与"本地实际存在的分片"，给出一份完整性摘要。
+
+    Returns
+    -------
+    ``{"shards_expected": int, "shards_present": int, "bytes_expected": int,
+       "bytes_present": int, "complete": bool, "missing": [文件名...]}``
+
+    ``complete`` 只看视频分片是否齐全 —— 元数据小文件缺失不影响数据完整性。
+    """
+    from pathlib import Path
+
+    base = Path(str(directory))
+    shards = [
+        (key, size)
+        for key, size, _ in iter_registered_files(name)
+        if key.lower().endswith(".zip")
+    ]
+    present = [key for key, _ in shards if (base / key).exists()]
+    missing = [key for key, _ in shards if key not in present]
+    return {
+        "shards_expected": len(shards),
+        "shards_present": len(present),
+        "bytes_expected": int(sum(size for _, size in shards)),
+        "bytes_present": int(sum(size for key, size in shards if key in present)),
+        "complete": not missing,
+        "missing": missing,
+    }

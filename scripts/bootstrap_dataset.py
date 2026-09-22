@@ -281,9 +281,9 @@ def preflight(dataset: str, *, only_shards: list[str] | None) -> dict:
     complete = not missing_shards
     if not complete:
         print()
-        print("      ⚠️  视频分片尚未下全。基于子集抽帧得到的划分**不是权威划分**，")
-        print("          与别人的不一致，实验数字不可比。")
-        print("          要产出权威划分，请去掉 --shards 限制后重跑本命令补齐。")
+        print("      注意：视频分片尚未下全。稍后抽帧之前会**主动中止**并给出补齐方法，")
+        print("            因为基于子集的划分与别人的不一致，实验数字不可比。")
+        print("            （若只想先验证链路，加 --allow-partial。）")
 
     return {
         "root": raw,
@@ -307,6 +307,45 @@ def do_download(dataset: str, state: dict, *, dry_run: bool) -> int:
         ["--dataset", dataset, "--all", "--extract"],
         dry_run=dry_run,
     )
+
+
+def assert_authoritative_ready(dataset: str, state: dict, *, allow_partial: bool) -> None:
+    """抽帧之前，确认数据是完整的 —— 否则划分没有意义。
+
+    这是**唯一一处会主动中止**的检查，因为它是唯一一个"错了也看不出来"的错误：
+    少下几个分片时，脚本会安静地跑完，产出一份基于子集的 manifest；
+    它看起来完全正常，但和别人的划分不同，于是所有实验数字都不可比。
+
+    （真实教训：曾经把一份只含 1/11 分片的 manifest 提交进 Git，
+      pull 下来的人都会用到错误的划分。）
+
+    ``allow_partial=True`` 时只警告不中止 —— 这是给"先用小数据验证链路"的场景留的口子。
+    """
+    if state["complete"]:
+        return
+
+    missing = state["missing"]
+    print()
+    print("!" * 78)
+    print("! 数据不完整 —— 不能产出权威划分")
+    print("!" * 78)
+    print(f"  视频分片：{len(state['have'])}/{len(state['shards'])} 个已就绪")
+    print(f"  缺失    ：{', '.join(missing[:6])}{' 等' if len(missing) > 6 else ''}")
+    print()
+    print("  为什么必须中止：划分是按「本地实际有哪些视频」算出来的。")
+    print("  少下分片 -> 少一批视频 -> 划分与别人不同 -> 实验数字不可比，")
+    print("  而这一切**不会有任何报错**，产出的 manifest 看起来完全正常。")
+    print()
+    if allow_partial:
+        print("  （已指定 --allow-partial：仅警告，继续执行。产出的划分不可用于正式实验。）")
+        print("!" * 78)
+        return
+    print("  怎么办，二选一：")
+    print(f"    1) 下全数据后重跑（推荐）：python scripts/bootstrap_dataset.py --dataset {dataset}")
+    print("       同一条命令会自动补齐缺失的分片，已有分片会 md5 校验后跳过。")
+    print("    2) 只想先验证链路（结果不可用于正式实验）：加 --allow-partial")
+    print("!" * 78)
+    raise SystemExit(2)
 
 
 def do_prepare(dataset: str, *, dry_run: bool) -> int:
@@ -471,6 +510,14 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="即使已有抽帧结果也重新抽帧（默认会跳过，因为抽帧最慢）",
     )
+    parser.add_argument(
+        "--allow-partial",
+        action="store_true",
+        help=(
+            "数据没下全时也继续执行（只警告不中止）。"
+            "仅用于先用小数据验证链路；产出的划分不是权威划分，不可用于正式实验"
+        ),
+    )
     parser.add_argument("--skip-pack", action="store_true", help="跳过打包（只为自己训练）")
     parser.add_argument("--format", default="zip", choices=("zip", "tar.gz"), help="包格式")
     parser.add_argument("--dry-run", action="store_true", help="只打印会执行什么，不真的跑")
@@ -510,6 +557,8 @@ def main(argv: list[str] | None = None) -> int:
         print("\n（--skip-download：跳过下载）")
 
     if not args.skip_prepare:
+        # 抽帧之前先确认数据完整 —— 不完整的划分"错了也看不出来"，所以这里主动中止
+        assert_authoritative_ready(args.dataset, state, allow_partial=args.allow_partial)
         step_index += 1
         frames_have, manifest_have = existing_frames(args.dataset)
         if frames_have and manifest_have and not args.force_prepare:
