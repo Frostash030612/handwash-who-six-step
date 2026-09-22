@@ -38,6 +38,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shutil
 import subprocess
@@ -206,13 +207,54 @@ def preflight(dataset: str, *, only_shards: list[str] | None) -> dict:
     shards = [row for row in targets if row[0].lower().endswith(".zip")]
     extras = [row for row in targets if not row[0].lower().endswith(".zip")]
 
-    def ready(row: tuple[str, int, str]) -> bool:
-        """就绪 = 文件存在。真实校验交给 download_data.py 的 md5（它还会跳过已通过的）。"""
-        return (raw / row[0]).exists()
+    def _md5_of(path: Path, *, chunk: int = 1024 * 1024) -> str:
+        digest = hashlib.md5()  # noqa: S324 - 对齐 Zenodo 公布的校验算法，非安全用途
+        with path.open("rb") as handle:
+            for block in iter(lambda: handle.read(chunk), b""):
+                digest.update(block)
+        return digest.hexdigest()
 
-    have_shards = [row[0] for row in shards if ready(row)]
-    missing_shards = [row[0] for row in shards if not ready(row)]
-    missing_extras = [row[0] for row in extras if not ready(row)]
+    def ready(row: tuple[str, int, str]) -> bool:
+        """就绪 = 文件存在**且校验通过**。
+
+        为什么必须校验而不是只看文件存在（真实风险）：
+            半截下载（.part 改名失败、网络中断）会在磁盘上留下一个**看起来存在**
+            但内容不完整的 zip。后续 --skip-download 会直接放行它，
+            直到解压或抽帧时才以"文件损坏"的形式爆炸，白白浪费几十分钟。
+            校验代价是要读一遍文件（17 GB 约几分钟），因此只对本次要用的分片做，
+            并且下面会明确打印"校验中"。
+        """
+        path = raw / row[0]
+        if not path.exists():
+            return False
+        expected = row[2]
+        if not expected:
+            # 登记表没有校验值（离线模式）：只能退化为大小检查
+            return True
+        return _md5_of(path) == expected
+
+    print("      校验已就绪的分片（读一遍文件算 md5，请稍候）……")
+    have_shards: list[str] = []
+    corrupt_shards: list[str] = []
+    for row in shards:
+        path = raw / row[0]
+        if not path.exists():
+            continue
+        if ready(row):
+            have_shards.append(row[0])
+        else:
+            corrupt_shards.append(row[0])
+    missing_shards = [row[0] for row in shards if row[0] not in have_shards]
+    # 校验失败的分片要删掉，否则下载阶段会以为"已存在"而跳过它
+    for name in corrupt_shards:
+        (raw / name).unlink(missing_ok=True)
+    if corrupt_shards:
+        print(f"      ⚠️  {len(corrupt_shards)} 个分片校验失败，已删除以便重新下载：")
+        for name in corrupt_shards:
+            print(f"          {name}")
+
+    ready_extras = [row[0] for row in extras if (raw / row[0]).exists()]
+    missing_extras = [row[0] for row in extras if row[0] not in ready_extras]
 
     remaining = sum(size for key, size, _ in shards if key in missing_shards)
     remaining += sum(size for key, size, _ in extras if key in missing_extras)
@@ -221,11 +263,10 @@ def preflight(dataset: str, *, only_shards: list[str] | None) -> dict:
     print(f"      数据集     : {dataset}（{entry.get('name', '')}）")
     print(f"      许可       : {entry.get('license', '?')}")
     print(f"      落地目录   : {raw}")
-    print(f"      视频分片   : {len(have_shards)}/{len(shards)} 个已就绪，"
+    print(f"      视频分片   : {len(have_shards)}/{len(shards)} 个已校验通过，"
           f"{human(sum(size for _, size, _ in shards))} 合计")
     if extras:
-        ready_extras = len(extras) - len(missing_extras)
-        print(f"      元数据文件 : {ready_extras}/{len(extras)} 个已就绪"
+        print(f"      元数据文件 : {len(ready_extras)}/{len(extras)} 个已就绪"
               f"（README/statistics/summary，合计几百 KB）")
     print(f"      待下载     : {len(missing_shards) + len(missing_extras)} 个，{human(remaining)}")
     print(f"      磁盘可用   : {human(disk.free)}")
@@ -278,6 +319,21 @@ def do_prepare(dataset: str, *, dry_run: bool) -> int:
             "若要新增，请在 CONFIG_FOR_DATASET 里补一行。"
         )
     return run_script("prepare_data.py", ["--config", config], dry_run=dry_run)
+
+
+def existing_frames(dataset: str) -> tuple[int, Path | None]:
+    """返回 ``(帧文件数, manifest 路径或 None)``，用于判断是否已经抽过帧。
+
+    抽帧是整个流程里最慢的一步（PSKUS 全集要几十分钟到几小时）。
+    重跑时不检查就无条件重来，等于白白浪费这段时间 —— 而"可反复重跑"正是本脚本的核心卖点。
+    """
+    processed = data_root() / "processed" / dataset
+    frames_dir = processed / "frames"
+    count = 0
+    if frames_dir.is_dir():
+        count = sum(1 for path in frames_dir.rglob("*") if path.is_file())
+    manifest = processed / "manifest.csv"
+    return count, (manifest if manifest.exists() else None)
 
 
 def do_pack(dataset: str, *, dry_run: bool, fmt: str) -> tuple[int, Path]:
@@ -410,6 +466,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--skip-download", action="store_true", help="跳过下载（数据已在本地）")
     parser.add_argument("--skip-prepare", action="store_true", help="跳过抽帧（已有抽帧结果）")
+    parser.add_argument(
+        "--force-prepare",
+        action="store_true",
+        help="即使已有抽帧结果也重新抽帧（默认会跳过，因为抽帧最慢）",
+    )
     parser.add_argument("--skip-pack", action="store_true", help="跳过打包（只为自己训练）")
     parser.add_argument("--format", default="zip", choices=("zip", "tar.gz"), help="包格式")
     parser.add_argument("--dry-run", action="store_true", help="只打印会执行什么，不真的跑")
@@ -450,12 +511,22 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.skip_prepare:
         step_index += 1
-        with Step(step_index, total_steps, "抽帧 + 划分 + 写 manifest",
-                  "按原始视频划分（防数据泄漏）"):
-            code = do_prepare(args.dataset, dry_run=args.dry_run)
-            if code != 0:
-                print("\n抽帧失败，请查看上面的日志。")
-                return code
+        frames_have, manifest_have = existing_frames(args.dataset)
+        if frames_have and manifest_have and not args.force_prepare:
+            # 抽帧是最慢的一步，已有结果就跳过；要重来请显式加 --force-prepare
+            print()
+            print("=" * 78)
+            print(f"[{step_index}/{total_steps}] 抽帧 + 划分 —— 跳过（已有结果）")
+            print("=" * 78)
+            print(f"      已存在 {frames_have:,} 帧与 manifest：{manifest_have.name}")
+            print("      如需按当前配置重新抽帧（会覆盖），加 --force-prepare")
+        else:
+            with Step(step_index, total_steps, "抽帧 + 划分 + 写 manifest",
+                      "按原始视频划分（防数据泄漏）；这一步最慢，可中断后重跑"):
+                code = do_prepare(args.dataset, dry_run=args.dry_run)
+                if code != 0:
+                    print("\n抽帧失败，请查看上面的日志。")
+                    return code
     else:
         print("\n（--skip-prepare：跳过抽帧）")
 

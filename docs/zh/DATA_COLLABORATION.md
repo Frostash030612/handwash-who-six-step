@@ -90,36 +90,33 @@ DataSet8.zip   4475.3 MB
 > python scripts/pack_processed_data.py --dataset pskuss --report
 > ```
 
-**谁做什么**
+**这里有两种角色，跑的命令不同。** 只看属于你的那一行。
 
-| 步骤 | 谁 | 命令 |
+| 你的角色 | 你跑什么 | 为什么 |
 | --- | --- | --- |
-| 1. 预检 | 一个人（R1） | `python scripts/bootstrap_dataset.py --dataset pskuss --dry-run` |
-| 2. 下载 + 抽帧 + 划分 + 打包 | 同一人 | **`python scripts/bootstrap_dataset.py --dataset pskuss`** |
-| 3. 上传**三个文件**到网盘 | 同一人 | `.zip`、`.zip.sha256`、`pskuss_package.json` |
-| 4. 下载这个包 | 其余三人 | — |
-| 5. 先校验、再解包 | 其余三人 | `--verify` 然后 `--unpack` |
-
-**第 2 步就一条命令。** `bootstrap_dataset.py` 把四个阶段串起来，而且**可以反复重跑**：
-已完成的部分（校验通过的分片、已抽好的帧）会被跳过，所以中断了、或者只下了一部分分片，
-再跑同一条命令就能续上。
+| **A. 抽帧的人**（一个人，R1） | `bootstrap_dataset.py` | 需要完整的原始数据才能产出权威划分 |
+| **B. 其余三人** | `pack_processed_data.py --verify` 然后 `--unpack` | 只需要抽好的帧；不用下载、不用抽帧 |
 
 ```bash
-# ---- 抽帧的人：一条命令 ----
+# ---- 角色 A：抽帧的人，一条命令 ----
 python scripts/bootstrap_dataset.py --dataset pskuss
-#   [1/4] 预检   : 磁盘空间、已有分片、还缺什么
-#   [2/4] 下载   : 11 个分片，断点续传 + md5 校验
-#   [3/4] 抽帧   : 抽帧 + 按原始视频划分 + 写 manifest
-#   [4/4] 打包   : 一个压缩包 + sha256 + 包内容说明
-# 跑完会打印一段"交接清单"，可以直接复制到群里
 ```
 
-常用变体：
+这个脚本**可以放心反复重跑**，每个阶段都会自己判断已完成的部分：
+
+| 已经有的东西 | 重跑时会怎样 |
+| --- | --- |
+| 已校验通过的分片 | **校验 md5 后跳过**。校验失败的分片会被删掉以便重新下载，而不是被静默使用 |
+| 已抽好的帧 + `manifest.csv` | **整个抽帧阶段直接跳过**（它是最慢的一步）。要故意重抽请加 `--force-prepare` |
+| 已存在的压缩包 | 重新打包，旧包在被替换前一直保留 |
+
+所以**中断了、或者只下了一部分分片，再跑同一条命令就能续上** —— 不需要先清理任何东西。
 
 ```bash
-python scripts/bootstrap_dataset.py --dataset pskuss --dry-run         # 只打印计划，不执行
-python scripts/bootstrap_dataset.py --dataset pskuss --skip-pack       # 只为自己训练
+python scripts/bootstrap_dataset.py --dataset pskuss --dry-run         # 只打印计划，不改动任何东西
 python scripts/bootstrap_dataset.py --dataset pskuss --skip-download   # 数据已在本地
+python scripts/bootstrap_dataset.py --dataset pskuss --skip-pack       # 只要帧，自己训练
+python scripts/bootstrap_dataset.py --dataset pskuss --force-prepare   # 故意重新抽帧
 python scripts/bootstrap_dataset.py --dataset pskuss \
     --shards DataSet4.zip,DataSet3.zip                                 # 约 1.2 GB 验证链路
 ```
@@ -138,6 +135,10 @@ python scripts/pack_processed_data.py --dataset pskuss --unpack pskuss_frames_<�
 python scripts/train_model.py config=configs/experiments/exp02_yolo26n_gru.yaml \
     config=configs/data/pskuss.yaml
 ```
+
+包参数支持**裸文件名**（会自动在 `<data_root>/packages/` 下查找）、相对路径、完整路径，
+或通配符如 `pskuss_frames_*.zip`。找不到时，报错会列出所有查找位置和该目录下实际存在的包，
+省得靠猜。
 
 > **注意配置叠加顺序：实验配置在前，数据配置在后。**
 > `config=` 是依次深合并、后者覆盖前者，而 `configs/experiments/*.yaml` 里也写了

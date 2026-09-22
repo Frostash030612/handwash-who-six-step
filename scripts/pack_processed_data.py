@@ -264,8 +264,47 @@ def _expected_sha256(archive: Path) -> str:
     return ""
 
 
+def resolve_archive(raw: str | Path) -> Path:
+    """把一个"包参数"解析成真实路径。
+
+    允许三种写法，减少队友敲错路径的概率（这是实际协作里最容易出问题的一步）：
+        * 完整路径：``D:/下载/pskuss_frames_2026-09-22.zip``
+        * 相对路径：``data/packages/pskuss_frames_2026-09-22.zip``
+        * **裸文件名**：``pskuss_frames_2026-09-22.zip``
+          -> 自动在 ``<data_root>/packages/`` 与当前目录下查找
+        * 通配：``pskuss_frames_*.zip``（取匹配到的最后一个，即最新日期）
+    """
+    candidate = Path(raw)
+    if candidate.exists():
+        return candidate
+
+    search_dirs = [data_root() / "packages", Path.cwd(), PROJECT_ROOT]
+    for directory in search_dirs:
+        found = directory / str(raw)
+        if found.exists():
+            return found
+        if any(ch in str(raw) for ch in "*?["):
+            matches = sorted(directory.glob(str(raw)))
+            if matches:
+                return matches[-1]
+
+    searched = "\n".join(f"    {d}" for d in search_dirs)
+    packages = data_root() / "packages"
+    listing = ""
+    if packages.is_dir():
+        names = sorted(p.name for p in packages.glob("*.*"))
+        if names:
+            listing = "\n该目录下现有的包：\n" + "\n".join(f"    {n}" for n in names)
+    raise SystemExit(
+        f"找不到数据包：{raw}\n"
+        f"已在这些位置查找：\n{searched}{listing}\n\n"
+        "可以给出完整路径，或只给文件名（脚本会自动在 data/packages/ 下找）。"
+    )
+
+
 def verify(dataset: str, archive: Path) -> int:
     """校验包的 sha256 并列出内容摘要。"""
+    archive = resolve_archive(archive)
     if not archive.exists():
         raise SystemExit(f"找不到包：{archive}")
     print(f"校验 {archive.name}（{human(archive.stat().st_size)}）")
@@ -312,6 +351,7 @@ def unpack(dataset: str, archive: Path, *, into: Path | None = None) -> int:
     刻意**先解到临时目录再合并**，避免解到一半失败留下半套数据
     —— 半套数据比没有数据更危险，因为它会让训练静默地只用了部分样本。
     """
+    archive = resolve_archive(archive)
     if not archive.exists():
         raise SystemExit(f"找不到包：{archive}")
     target = into or processed_dir(dataset)

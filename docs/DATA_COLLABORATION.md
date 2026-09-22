@@ -76,15 +76,15 @@ the videos never move.
 
 ### 3.0 Recommended: one extractor, one archive, one link
 
-**Why extract before uploading.** The raw dataset is 17.1 GiB across 11 zip shards (the largest
-is 4.4 GB), which is slow and fragile to upload. The extracted frames are what everyone actually
-needs, and they are much smaller:
+**Why extract before uploading.** The raw dataset is 17.1 GiB across 11 zip shards (the largest is
+4.4 GB), which is slow and fragile to upload. The extracted frames are what everyone actually needs,
+and they are much smaller:
 
 | Extraction setting | Full PSKUS frame set | Note |
 | --- | --- | --- |
 | 5 fps, 256 px, q92 | ~10.4 GB | larger than you would expect — see the note below |
 | 5 fps, 224 px, q85 | ~6.4 GB | the previous default |
-| **2 fps, 224 px, q85** | **~2.8 GB** | **the setting this project now uses** |
+| **2 fps, 224 px, q85** | **~2.8 GB** | **the setting this project uses** |
 | 1 fps, 224 px, q85 | ~1.4 GB | too coarse for per-step duration checks |
 
 > **Surprise worth knowing:** PSKUS source video is only **320×240**, so extracting frames does
@@ -97,36 +97,34 @@ needs, and they are much smaller:
 > python scripts/pack_processed_data.py --dataset pskuss --report
 > ```
 
-**Who does what**
+**There are two roles, and they run different commands.** Read the row that applies to you.
 
-| Step | Who | Command |
+| Your role | What you run | Why |
 | --- | --- | --- |
-| 1. Preflight | one person (R1) | `python scripts/bootstrap_dataset.py --dataset pskuss --dry-run` |
-| 2. Download + extract + split + pack | same person | **`python scripts/bootstrap_dataset.py --dataset pskuss`** |
-| 3. Upload **3 files** to cloud storage | same person | the `.zip`, the `.zip.sha256`, and `pskuss_package.json` |
-| 4. Download the package | everyone else | — |
-| 5. Verify, then unpack | everyone else | `--verify` then `--unpack` |
-
-**Step 2 is a single command.** `bootstrap_dataset.py` chains the four stages and is **safe to
-re-run**: anything already done (verified shards, existing frames) is skipped, so an interrupted
-run — or a run that only covered some shards — resumes by running the same command again.
+| **A. The extractor** (one person, R1) | `bootstrap_dataset.py` | Needs the full raw dataset to produce the authoritative split |
+| **B. Everyone else** | `pack_processed_data.py --verify` then `--unpack` | Only needs the finished frames; no download, no extraction |
 
 ```bash
-# ---- the extractor: one command ----
+# ---- Role A: the extractor, in one command ----
 python scripts/bootstrap_dataset.py --dataset pskuss
-#   [1/4] preflight : disk space, which shards are present, what is missing
-#   [2/4] download  : 11 shards, resumable, md5-verified
-#   [3/4] prepare   : frame extraction + video-level split + manifest
-#   [4/4] pack      : one archive + sha256 + package description
-# then it prints a handover block you can paste straight into the group chat
 ```
 
-Useful variants:
+It is designed to be **re-run without fear**. Each stage detects what is already done:
+
+| Already present | What happens on a re-run |
+| --- | --- |
+| Verified shard files | **md5-checked and skipped.** A shard that fails its checksum is deleted so it gets re-downloaded rather than silently used |
+| Extracted frames + `manifest.csv` | **Frame extraction is skipped entirely** (it is the slowest stage). Pass `--force-prepare` to deliberately re-extract |
+| An existing archive | Repacked; the old one stays in place until replaced |
+
+So an interrupted run, or a run that only covered some shards, resumes by running the *same*
+command again — nothing needs to be cleaned up first.
 
 ```bash
-python scripts/bootstrap_dataset.py --dataset pskuss --dry-run         # print the plan only
-python scripts/bootstrap_dataset.py --dataset pskuss --skip-pack       # for your own training
-python scripts/bootstrap_dataset.py --dataset pskuss --skip-download   # data already present
+python scripts/bootstrap_dataset.py --dataset pskuss --dry-run         # print the plan, change nothing
+python scripts/bootstrap_dataset.py --dataset pskuss --skip-download   # data already on disk
+python scripts/bootstrap_dataset.py --dataset pskuss --skip-pack       # frames for your own training
+python scripts/bootstrap_dataset.py --dataset pskuss --force-prepare   # re-extract on purpose
 python scripts/bootstrap_dataset.py --dataset pskuss \
     --shards DataSet4.zip,DataSet3.zip                                 # ~1.2 GB pipeline test
 ```
@@ -136,16 +134,17 @@ python scripts/bootstrap_dataset.py --dataset pskuss \
 > subset, so it will not match anyone else's and the numbers stop being comparable. Use
 > `--shards` to validate the pipeline, then re-run without it to produce the real split.
 
-**Step 3 is where the plan pays off: upload ~2.8 GB once instead of 17.1 GB**, and the other three
-members download one file each instead of coordinating over 11 shards.
-
 ```bash
-# everyone else
+# ---- Role B: teammates ----
 python scripts/pack_processed_data.py --dataset pskuss --verify pskuss_frames_<date>.zip
 python scripts/pack_processed_data.py --dataset pskuss --unpack pskuss_frames_<date>.zip
 python scripts/train_model.py config=configs/experiments/exp02_yolo26n_gru.yaml \
     config=configs/data/pskuss.yaml
 ```
+
+The archive argument accepts a **bare filename** (looked up in `<data_root>/packages/`), a relative
+path, a full path, or a glob such as `pskuss_frames_*.zip`. If it cannot be found, the error lists
+every location searched and every package that does exist.
 
 > **Mind the config overlay order:** the **experiment** config first, the **data** config second.
 > Overlays are merged in order and later ones win, and every `configs/experiments/*.yaml` also
