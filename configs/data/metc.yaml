@@ -24,7 +24,7 @@ dataset:
   include_non_wash: true
   prep:
     fps: 5.0
-    resize_hw: [256, 256]
+    resize_hw: [224, 224]
     min_frames_per_clip: 10
 
 split:

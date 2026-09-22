@@ -509,6 +509,23 @@ def prepare(rc: ResolvedConfig, *, stage: str = "all") -> PrepareResult:
     if prepared_frames:
         write_manifest(manifest_path, prepared_frames)
 
+    # 划分报告里同时给出"抽帧前"和"实际写入 manifest"的帧数。
+    # 两者常常不等，因为 split.max_frames_per_clip_* 会对长视频等间隔截断；
+    # 只报一个数字会让人以为 manifest 写坏了（真实踩过这个坑）。
+    actual_by_split: dict[str, int] = defaultdict(int)
+    for record in prepared_frames:
+        actual_by_split[record.split] += 1
+    for split_name, info in report.items():
+        written = actual_by_split.get(split_name, 0)
+        info["num_frames_extracted"] = info["num_frames"]
+        info["num_frames_in_manifest"] = written
+        info["num_frames"] = written
+        if written and written != info["num_frames_extracted"]:
+            info["note"] = (
+                f"抽帧得到 {info['num_frames_extracted']} 帧，"
+                f"按 max_frames_per_clip 等间隔截断后写入 manifest {written} 帧"
+            )
+
     write_json(
         out_root / "split_report.json",
         {
@@ -517,6 +534,11 @@ def prepare(rc: ResolvedConfig, *, stage: str = "all") -> PrepareResult:
             "manifest": str(manifest_path),
             "split": report,
             "config_hash": rc.config_hash,
+            "notes": (
+                "num_frames_extracted 是抽帧产出的帧数；num_frames/num_frames_in_manifest "
+                "是实际写入 manifest 的帧数（受 split.max_frames_per_clip_* 限制）。"
+                "训练与评估用的是后者。"
+            ),
         },
     )
 
@@ -528,7 +550,7 @@ def prepare(rc: ResolvedConfig, *, stage: str = "all") -> PrepareResult:
         stages_run=[stage],
     )
     log.info(
-        "准备完成：%d 段视频 / %d 帧；manifest=%s",
+        "准备完成：%d 段视频 / manifest 中 %d 帧；manifest=%s",
         result.num_clips, result.num_frames, result.manifest_path,
     )
     return result

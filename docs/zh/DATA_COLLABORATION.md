@@ -63,9 +63,74 @@ DataSet8.zip   4475.3 MB
 
 ---
 
-## 3. 第 2 层：共享介质，四选一
+## 3. 第 2 层：共享介质
 
-### 方案 A —— OneDrive / SharePoint 共享文件夹（学校提供的话最省事）
+> **本项目采用的做法**：由一个人下载全量原始数据、**抽一次帧**、打包，把包传到网盘；
+> 其余三人下载同一个包。实测体积与完整命令见 **§3.0**，先看它；后面的方案是备选。
+
+### 3.0 推荐做法：一个人抽帧，一个包，一个链接
+
+**为什么先抽帧再上传。** 原始数据是 17.1 GiB、11 个 zip 分片（最大 4.4 GB），上传又慢又脆。
+而大家真正需要的是抽帧结果，它小得多：
+
+| 抽帧配置 | PSKUS 全集体积 | 说明 |
+| --- | --- | --- |
+| 5 fps, 256 px, q92 | 约 10.4 GB | 比预想的大 —— 见下方提示 |
+| 5 fps, 224 px, q85 | 约 6.4 GB | 之前的默认值 |
+| **2 fps, 224 px, q85** | **约 2.8 GB** | **本项目现在采用** |
+| 1 fps, 224 px, q85 | 约 1.4 GB | 太粗，做不了"某步时长不足"的细粒度判定 |
+
+> **一个反直觉的实测发现：** PSKUS 原视频分辨率只有 **320×240**，
+> 所以抽帧**并不会自动变小** —— 决定体积的是**帧率**，不是分辨率。
+> 上表数字来自"对已下载数据实测每帧 jpg 字节数 × 官方 summary.csv 的真实总时长"
+> （3,185 段 / 139,881 秒 / 原生 30 fps），并且已计入 `max_frames_per_clip` 截断。
+> 随时可以复核：
+>
+> ```bash
+> python scripts/pack_processed_data.py --dataset pskuss --report
+> ```
+
+**谁做什么**
+
+| 步骤 | 谁 | 命令 |
+| --- | --- | --- |
+| 1. 下载全部 11 个分片 | 一个人（R1） | `python scripts/download_data.py --dataset pskuss --all --extract` |
+| 2. 抽帧 + 生成划分 | 同一人 | `python scripts/prepare_data.py --config configs/data/pskuss.yaml` |
+| 3. 看体积 | 同一人 | `python scripts/pack_processed_data.py --dataset pskuss --report` |
+| 4. 打包 | 同一人 | `python scripts/pack_processed_data.py --dataset pskuss --build` |
+| 5. 上传**三个文件**到网盘 | 同一人 | `.zip`、`.zip.sha256`、`pskuss_package.json` |
+| 6. 下载这个包 | 其余三人 | — |
+| 7. 先校验、再解包 | 其余三人 | `--verify` 然后 `--unpack` |
+
+**第 5 步就是整个方案的价值所在：一次上传约 2.8 GB，而不是 17.1 GB**，
+其余三人各下一个文件，不用去协调 11 个分片。
+
+```bash
+# 抽帧的人
+python scripts/download_data.py --dataset pskuss --all --extract
+python scripts/prepare_data.py --config configs/data/pskuss.yaml
+python scripts/pack_processed_data.py --dataset pskuss --build
+# -> data/packages/pskuss_frames_<日期>.zip           （约 2.8 GB）
+#    data/packages/pskuss_frames_<日期>.zip.sha256    （校验值）
+#    data/packages/pskuss_package.json                （包内容说明）
+# 三个文件一起传网盘，把链接发到群里
+
+# 其余三人
+python scripts/pack_processed_data.py --dataset pskuss --verify pskuss_frames_<日期>.zip
+python scripts/pack_processed_data.py --dataset pskuss --unpack pskuss_frames_<日期>.zip
+python scripts/train_model.py --config configs/experiments/exp02_yolo26n_gru.yaml
+```
+
+**为什么包里要连划分一起带。** 包里含 `frames/`、`manifest.csv`、`split_report.json`
+和 `SOURCES.json`。因为 `manifest.csv` 存的是**相对数据集根目录**的路径
+（`frames/<clip_id>/00003.jpg`），解包后就直接复现了那份权威划分，
+**没有任何人需要重新生成它**，因此四个人评估用的是完全相同的测试集。
+这正是让数字可比的关键。
+
+> **解包之后不要再跑 `prepare_data.py`。** 重新抽帧会重新采样，可能得到不同的划分，
+> 那你的结果就会在不知不觉中变得不可比。解包，然后训练。
+
+### 3.1 方案 A —— OneDrive / SharePoint 共享文件夹（学校提供的话最省事）
 
 如果 NUS 给了 OneDrive/SharePoint 组空间，这是首选。校园机器上已经装好，不用引入新工具，
 而且"按需同步"意味着每个人只把自己要用的拉下来。

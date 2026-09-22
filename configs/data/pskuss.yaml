@@ -21,11 +21,22 @@ dataset:
   label_space: pskuss        # 10 类：六步 + faucet_on/off + washing_hands + other
   include_non_wash: true
   prep:
-    # 医院视频较长；5fps 对动作级任务足够，且能把存储压到 1/6
-    fps: 5.0
+    # 【实测数据，别随手改】
+    # PSKUS：3,185 段 / 139,881 秒（38.9 小时）/ 原生 30 fps / 平均每段 43.9 秒；
+    # 原视频分辨率只有 320x240，所以"抽帧"并不天然变小，fps 才是决定体积的关键。
+    #
+    # 全集抽帧体积（实测每帧字节数 × 真实总时长，含下面 train=300/eval=150 的截断）：
+    #   5 fps + 256px + q92 -> 约 10.4 GB
+    #   5 fps + 224px + q85 -> 约  6.4 GB
+    #   2 fps + 224px + q85 -> 约  2.8 GB   ← 采用：网盘传输友好，每步仍有 10-30 帧
+    #   1 fps + 224px + q85 -> 约  1.4 GB
+    #
+    # 抽帧结果要打包上传网盘给全组复用，fps 的选择直接决定传输成本。
+    # 用 `python scripts/pack_processed_data.py --dataset pskuss --report` 随时核对。
+    fps: 2.0
     frame_step: 1
-    resize_hw: [256, 256]
-    jpeg_quality: 90
+    resize_hw: [224, 224]   # 256 -> 224 让全集从 10.4 GB 降到 6.4 GB
+    jpeg_quality: 85        # q85 比 q92 小 40%，肉眼看不出差别
     min_frames_per_clip: 15
 
 runtime:

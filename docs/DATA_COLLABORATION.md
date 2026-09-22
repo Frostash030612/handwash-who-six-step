@@ -67,9 +67,77 @@ the videos never move.
 
 ---
 
-## 3. Layer 2: the shared medium — pick one
+## 3. Layer 2: the shared medium
 
-### Option A — OneDrive / SharePoint shared folder (simplest if your institution provides it)
+> **The setup this project uses:** one person downloads the full raw dataset, extracts frames
+> **once**, packs the result, and uploads that package to cloud storage. Everyone else downloads
+> the one package. Measured sizes and the exact commands are in **§3.0** — read that first; the
+> options after it are alternatives.
+
+### 3.0 Recommended: one extractor, one archive, one link
+
+**Why extract before uploading.** The raw dataset is 17.1 GiB across 11 zip shards (the largest
+is 4.4 GB), which is slow and fragile to upload. The extracted frames are what everyone actually
+needs, and they are much smaller:
+
+| Extraction setting | Full PSKUS frame set | Note |
+| --- | --- | --- |
+| 5 fps, 256 px, q92 | ~10.4 GB | larger than you would expect — see the note below |
+| 5 fps, 224 px, q85 | ~6.4 GB | the previous default |
+| **2 fps, 224 px, q85** | **~2.8 GB** | **the setting this project now uses** |
+| 1 fps, 224 px, q85 | ~1.4 GB | too coarse for per-step duration checks |
+
+> **Surprise worth knowing:** PSKUS source video is only **320×240**, so extracting frames does
+> *not* automatically shrink the data — frame **rate** controls the size, not resolution.
+> These figures come from measuring real jpg sizes on downloaded data and multiplying by the
+> official `summary.csv` totals (3,185 clips / 139,881 s / native 30 fps), including the
+> `max_frames_per_clip` capping. Re-check any time with:
+>
+> ```bash
+> python scripts/pack_processed_data.py --dataset pskuss --report
+> ```
+
+**Who does what**
+
+| Step | Who | Command |
+| --- | --- | --- |
+| 1. Download all 11 shards | one person (R1) | `python scripts/download_data.py --dataset pskuss --all --extract` |
+| 2. Extract frames + build the split | same person | `python scripts/prepare_data.py --config configs/data/pskuss.yaml` |
+| 3. Check the size | same person | `python scripts/pack_processed_data.py --dataset pskuss --report` |
+| 4. Pack | same person | `python scripts/pack_processed_data.py --dataset pskuss --build` |
+| 5. Upload **3 files** to cloud storage | same person | the `.zip`, the `.zip.sha256`, and `pskuss_package.json` |
+| 6. Download the package | everyone else | — |
+| 7. Verify, then unpack | everyone else | `--verify` then `--unpack` |
+
+**Step 5 is where the plan pays off: you upload ~2.8 GB once instead of 17.1 GB**, and the other
+three members download one file each instead of coordinating over 11 shards.
+
+```bash
+# the extractor
+python scripts/download_data.py --dataset pskuss --all --extract
+python scripts/prepare_data.py --config configs/data/pskuss.yaml
+python scripts/pack_processed_data.py --dataset pskuss --build
+# -> data/packages/pskuss_frames_<date>.zip          (~2.8 GB)
+#    data/packages/pskuss_frames_<date>.zip.sha256   (checksum)
+#    data/packages/pskuss_package.json               (what is inside)
+# upload all three, paste the link in the group chat
+
+# everyone else
+python scripts/pack_processed_data.py --dataset pskuss --verify pskuss_frames_<date>.zip
+python scripts/pack_processed_data.py --dataset pskuss --unpack pskuss_frames_<date>.zip
+python scripts/train_model.py --config configs/experiments/exp02_yolo26n_gru.yaml
+```
+
+**Why the archive carries the split too.** The package contains `frames/`, `manifest.csv`,
+`split_report.json` **and** `SOURCES.json`. Because `manifest.csv` stores paths *relative to the
+dataset root* (`frames/<clip_id>/00003.jpg`), unpacking it reproduces the canonical split without
+anyone regenerating it — so all four members evaluate on an identical test set. That is exactly
+what makes the reported numbers comparable.
+
+> **Do not run `prepare_data.py` again after unpacking.** Re-extracting would resample frames and
+> can produce a different split, which silently makes your results incomparable. Unpack, train.
+
+### 3.1 Option A — OneDrive / SharePoint shared folder (simplest if your institution provides it)
 
 Recommended if NUS gives you a OneDrive/SharePoint group. It is already installed on campus
 machines, requires no new tooling, and Sync-on-demand means each member only pulls what they use.
