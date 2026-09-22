@@ -75,7 +75,7 @@ datasets:
     manifest: data/processed/kaggle/manifest.csv
     notes: "Kaggle realtimear/hand-wash-dataset：规模小，用于快速跑通流程"
   pskuss:
-    root: data/raw/pskuss
+    root: data/raw/pskuss/extracted
     processed_dir: data/processed/pskuss
     frames_dir: data/processed/pskuss/frames
     manifest: data/processed/pskuss/manifest.csv

@@ -50,27 +50,86 @@
 
 - 链接：<https://zenodo.org/records/4537209>
 - 论文：<https://doi.org/10.3390/data6040038>
-- 内容：真实医院环境，WHO 六步动作 + 开关水龙头 + 其他动作，**逐帧标注**。
+- 内容：真实医院环境，WHO 六步动作 + 关闭水龙头 + 其他动作，**逐帧标注**。
+- 获取方式：`python scripts/download_data.py --dataset pskuss --share 1/4 --extract`
+  （17.1 GiB，按分片分给 4 个人，见 [`DATA_COLLABORATION.md`](/docs/zh/DATA_COLLABORATION.md)）
 
-**目录结构（框架期望）**
-
-```
-data/raw/pskuss/
-  ├── step_1_palm_to_palm/        # 目录名 = 标签（可用别名，见 core/labels.py）
-  │   ├── clip_0001.mp4
-  │   └── clip_0002.mp4
-  ├── faucet_on/
-  └── ...
-```
-
-或者"每段视频一个逐帧标注 CSV"的形式：
+### 2.1 真实目录结构（**已对照实际下载数据核实**）
 
 ```
-data/raw/pskuss/<clip_id>.csv      # 列：frame, label[, timestamp]
+data/raw/pskuss/                     ← 原始 zip 分片（11 个 DataSet*.zip）
+  DataSet1.zip ... DataSet8.zip
+  SOURCES.json                       ← 来源与 md5 清单，**这个要提交进 Git**
+  extracted/                         ← 解压落地目录（configs 里 dataset.root 指向这里）
+    DataSet4/
+      Videos/
+        2020-06-26_21-26-56_camera104.mp4      ← 一段视频 = 一个 clip
+      Annotations/
+        Annotator1/2020-06-26_21-26-56_camera104.csv
+        Annotator2/...
+      statistics.csv        ← 本 DataSet 每个文件的各动作时长
+      summary.csv           ← 本 DataSet 的八类动作时长汇总
 ```
 
-**建议**：不要一次下全量。先取 300—500 段跑通，确认抽帧参数与标签映射正确，
-再补全 —— 18.4 GB 抽帧后会占用数十 GB 磁盘。
+> 官方在**顶层**还放了 `README.md`、`statistics.csv`、`summary.csv`，
+> 它们被登记为"每个人都要下"的小文件（合计几百 KB），不含视频。
+
+### 2.2 标注格式与标签映射（**最容易搞错的地方**）
+
+标注 CSV 只有三列：
+
+```csv
+frame_time,is_washing,movement_code
+0.000,1,0
+33.333,1,0
+```
+
+`movement_code` 是 0–7 的整数，含义来自数据集自带的 `summary.csv`：
+它按顺序列出八种动作，而 `statistics.csv` 的列顺序是
+`movement_1 … movement_7, movement_0`。对齐后得到：
+
+| code | 动作（summary.csv 原文） | 映射到规范标签 |
+| --- | --- | --- |
+| 1 | Palm to palm | `step_1_palm_to_palm` |
+| 2 | Palm over dorsum, fingers interlaced | `step_2_palm_over_dorsum` |
+| 3 | Palm to palm, fingers interlaced | `step_3_fingers_interlaced` |
+| 4 | Backs of fingers to opposing palm, fingers interlocked | `step_4_backs_of_fingers` |
+| 5 | Rotational rubbing of the thumb | `step_5_rotational_thumbs` |
+| 6 | Fingertips to palm | `step_6_rotational_fingertips` |
+| 7 | Turning off the faucet with a paper towel | `faucet_off` |
+| 0 | Other movement | `other` |
+
+**这个映射是验证过的，不是猜的。** 方法：统计 DataSet4 的 80 个标注文件（77,688 帧）
+里各 code 的占比 —— code 0 占 **62.6%**（最大），code 7 占 15.2%，
+与"Other movement 是 summary 里最后一项、且占绝大多数时长"完全吻合。
+
+> **两个必须写进报告的注意点**
+>
+> 1. **PSKUS 没有 `faucet_on`（开水龙头）**，只有 code 7 = 关水龙头。
+>    因此 `faucet_on` 这一类的 support 会是 0；评估时 macro-F1 会按
+>    `ignore_absent` 跳过它，但混淆矩阵上仍会有一列全 0 ——
+>    **报告里要说明这是数据本身没有该类，不是模型学不会**。
+> 2. **`other`（code 0）占 62.6%**，类别极不平衡。
+>    这正是必须用 Macro-F1 而不是 Accuracy 选模的原因：
+>    一个"全部预测为 other"的模型准确率就有 62.6%，但毫无用处。
+
+### 2.3 双标注者
+
+每个视频有两份独立标注（`Annotator1`、`Annotator2`），可以：
+* 用其中一份训练、另一份做**标注一致性**交叉检查（写进报告是加分项）；
+* 或计算两者的一致性（Cohen's kappa），作为"人类水平"上界的参考。
+
+适配器默认取 `Annotator1`，可在数据集配置里改：
+
+```yaml
+# configs/data/pskuss.yaml
+datasets:
+  pskuss:
+    annotators: [Annotator2]      # 或 ["Annotator2", "Annotator1"] 按优先级回退
+```
+
+**建议**：先做一次双标注者一致性分析再训练 —— 如果两个人对某一步的一致性都很低，
+说明该步骤本身难以从视觉区分，模型做不好是合理的，这会直接成为报告里的"发现"。
 
 **配置**：`configs/data/pskuss.yaml`（标签空间 10 类，`include_non_wash: true`）
 

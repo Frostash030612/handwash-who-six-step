@@ -51,6 +51,13 @@ log = get_logger(__name__)
 
 SOURCE_NAMES: tuple[str, ...] = ("kaggle", "pskuss", "metc", "jurmala", "selfrecorded", "synthetic", "frames")
 
+#: 数据集 -> 专门的适配器函数名。结构特殊的数据集在这里登记自己的解析函数，
+#: 主流程只按名字分派，不写 if/else 判断数据集（CONTRIBUTING.md R12）。
+#: 未登记的数据集走 ``_records_from_video_dirs`` 通用兜底。
+_SOURCE_ADAPTERS: dict[str, str] = {
+    "pskuss": "_records_from_pskuss",
+}
+
 
 class PrepareResult:
     """准备结果摘要。"""
@@ -172,16 +179,140 @@ def _clip_from_frames(clip_id: str, recs: Sequence[FrameRecord]) -> ClipRecord:
     )
 
 
+def _records_from_pskuss(rc: ResolvedConfig, root: Path) -> tuple[list[FrameRecord], list[ClipRecord]]:
+    """PSKUS 真实结构适配器（已对着 DataSet4 的实际文件核对过）。
+
+    解压后的真实结构（``<root>`` 指 ``data/raw/pskuss``）：:
+
+        pskuss/                       # 解压落地目录（HANDWASH_DATA_ROOT 下）
+          DataSet1/  DataSet2/  ...  DataSet11/
+            Videos/2020-06-26_21-26-56_camera104.mp4
+            Annotations/Annotator1/2020-06-26_21-26-56_camera104.csv
+            Annotations/Annotator1/2020-06-26_21-26-56_camera104.json
+            Annotations/Annotator2/...
+            statistics.csv  summary.csv
+
+    标注 CSV 三列：``frame_time``（毫秒）, ``is_washing``（0/1）, ``movement_code``（0-7）。
+    movement_code 到 WHO 步骤的映射在 ``core/labels.py`` 的 ``_DATASET_ALIASES['pskuss']``，
+    并且是用真实数据分布验证过的（code 0 = Other movement，占 62.6%）。
+
+    **每段视频 = 一个 clip**：因此这里的 ``ClipRecord.label_sequence`` 是该视频完整
+    的逐帧标签序列，划分阶段就能按视频单位做到互斥（防数据泄漏）。
+    """
+    from handwash.io.utils import read_csv
+
+    space = get_label_space(rc.label_space)
+    annotators = tuple(
+        str(a).strip() for a in (rc.dataset_spec().get("annotators") or ["Annotator1"]) if str(a).strip()
+    )
+
+    frames: list[FrameRecord] = []
+    clips: list[ClipRecord] = []
+    skipped_no_annotation = 0
+    skipped_unknown_label = 0
+
+    dataset_dirs = sorted(p for p in root.rglob("DataSet*") if p.is_dir())
+    if not dataset_dirs:
+        raise DataError(
+            f"在 {root} 下找不到 DataSet* 目录",
+            hint="PSKUS 分片解压后应当出现 pskuss/DataSet1 ... DataSet11；"
+            "先运行 python scripts/download_data.py --dataset pskuss --all --extract",
+        )
+
+    for dataset_dir in dataset_dirs:
+        videos_dir = dataset_dir / "Videos"
+        ann_root = dataset_dir / "Annotations"
+        if not videos_dir.is_dir():
+            continue
+
+        # 每个视频在若干标注者目录里各有一份 csv；按优先级取第一个存在的
+        for video in sorted(videos_dir.glob("*.mp4")):
+            clip_id = video.stem  # 例如 2020-06-26_21-26-56_camera104
+            annotation: Path | None = None
+            for annotator in annotators:
+                candidate = ann_root / annotator / f"{clip_id}.csv"
+                if candidate.exists():
+                    annotation = candidate
+                    break
+            if annotation is None:
+                skipped_no_annotation += 1
+                continue
+
+            rows = read_csv(annotation)
+            if not rows or "movement_code" not in rows[0]:
+                skipped_no_annotation += 1
+                continue
+
+            clip_frames: list[FrameRecord] = []
+            labels: list[Step] = []
+            for index, row in enumerate(rows):
+                try:
+                    label = space.canonicalize(row["movement_code"])
+                except Exception:  # noqa: BLE001 - 无法识别的 code 记为 unknown 并计数
+                    skipped_unknown_label += 1
+                    label = Step.UNKNOWN
+                labels.append(label)
+                clip_frames.append(
+                    FrameRecord(
+                        clip_id=clip_id,
+                        frame_index=index,
+                        image_path=str(video.relative_to(_project_root())).replace("\\", "/"),
+                        label=label,
+                        dataset=str(rc.dataset.name),
+                        split="train",  # 占位：真实 split 由划分阶段写入
+                        timestamp_s=_frame_time_to_seconds(row.get("frame_time", ""), index, rc),
+                    )
+                )
+
+            frames.extend(clip_frames)
+            clips.append(
+                ClipRecord(
+                    clip_id=clip_id,
+                    dataset=str(rc.dataset.name),
+                    split="train",
+                    video_path=str(video.relative_to(_project_root())).replace("\\", "/"),
+                    frame_count=len(clip_frames),
+                    fps=rc.dataset.prep.fps,
+                    duration_s=len(clip_frames) / rc.dataset.prep.fps,
+                    label_sequence=tuple(labels),
+                    metadata={
+                        "pskuss_dataset": dataset_dir.name,
+                        "annotation": str(annotation.relative_to(_project_root())).replace("\\", "/"),
+                    },
+                )
+            )
+
+    if skipped_no_annotation:
+        log.warning("有 %d 段视频找不到标注文件，已跳过", skipped_no_annotation)
+    if skipped_unknown_label:
+        log.warning("有 %d 帧的 movement_code 无法识别，已记为 unknown", skipped_unknown_label)
+    if not clips:
+        raise DataError(
+            f"没有解析出任何 PSKUS 片段（root={root}）",
+            hint="检查目录结构是否为 <root>/DataSet*/Videos/*.mp4 与 Annotations/AnnotatorN/*.csv",
+        )
+
+    log.info(
+        "PSKUS 适配完成：%d 段视频 / %d 帧（标注者优先级 %s）",
+        len(clips), len(frames), list(annotators),
+    )
+    return frames, clips
+
+
+def _frame_time_to_seconds(raw: str, index: int, rc: ResolvedConfig) -> float:
+    """把 PSKUS 的 ``frame_time``（毫秒）换算成秒；解析失败则按抽帧率估算。"""
+    try:
+        return float(str(raw).strip()) / 1000.0
+    except (TypeError, ValueError):
+        return index / rc.dataset.prep.fps
+
+
 def _records_from_video_dirs(rc: ResolvedConfig, root: Path) -> tuple[list[FrameRecord], list[ClipRecord]]:
-    """从"原始视频 + 标注文件"的结构生成 clip 级记录（PSKUS / METC / Jurmala 走这条）。
+    """通用兜底适配器：``<root>/<label_name>/<video>.mp4`` 或 ``<root>/<clip_id>.csv``。
 
-    支持的标注形式（按优先级）：
-        1. ``<root>/annotations.csv``：列含 video/clip 与 label/step（逐帧或逐段）
-        2. ``<root>/<clip_id>.csv``：单段视频的逐帧标注，列含 frame 与 label
-        3. 目录名即标签：``<root>/<label_name>/<video>.mp4``（自采视频常用）
-
-    说明：PSKUS 官方标注为每种动作一个 csv。若你的下载版本结构不同，
-    **只改这个函数**，不要改主流程（并同步更新 docs/DATA.md）。
+    用于 METC / Jurmala / 自采视频这类"目录名即标签"或"逐帧 csv"的结构。
+    若某个数据集的结构与众不同，**在这里加一个专门的适配器函数**，
+    并在 ``_SOURCE_FACTORIES`` 里注册，不要改主流程。
     """
     from handwash.io.utils import read_csv
 
@@ -189,7 +320,7 @@ def _records_from_video_dirs(rc: ResolvedConfig, root: Path) -> tuple[list[Frame
     frames: list[FrameRecord] = []
     clips: dict[str, list[FrameRecord]] = defaultdict(list)
 
-    # 形式 3：目录名即标签
+    # 形式 1：目录名即标签
     video_dirs = [p for p in sorted(root.iterdir()) if p.is_dir()]
     handled = False
     for label_dir in video_dirs:
@@ -237,7 +368,8 @@ def _records_from_video_dirs(rc: ResolvedConfig, root: Path) -> tuple[list[Frame
     if not handled:
         raise DataError(
             f"在 {root} 下没有识别出任何可用的标注结构",
-            hint="见 docs/DATA.md 对各数据集目录结构的说明；必要时改 data/pipelines/prepare.py 的适配器。",
+            hint="见 docs/DATA.md 对各数据集目录结构的说明；"
+            "必要时在 pipelines/prepare.py 里为该数据集新增一个专门适配器。",
         )
 
     clip_records = [
@@ -341,7 +473,14 @@ def prepare(rc: ResolvedConfig, *, stage: str = "all") -> PrepareResult:
         )
         prepared_frames = frames
     else:
-        _, clips = _records_from_video_dirs(rc, root)
+        # 结构特殊的数据集走专门适配器；其余走通用兜底
+        adapter_name = _SOURCE_ADAPTERS.get(name)
+        adapter = globals().get(adapter_name) if adapter_name else None
+        if adapter is None:
+            adapter = _records_from_video_dirs
+        elif adapter_name:
+            log.info("使用专门适配器：%s", adapter_name)
+        _, clips = adapter(rc, root)
         split_map = split_clips(
             clips,
             ratios={"train": rc.split.train, "val": rc.split.val, "test": rc.split.test},

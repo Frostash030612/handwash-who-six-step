@@ -153,8 +153,47 @@ def is_wash_step(label: "Step | str") -> bool:
 #: 各数据集原始标签 -> 规范 Step 的映射。
 #: 新增数据集时**只改这里**，不要在任何 pipeline 里写 if/else 判断数据集名。
 _DATASET_ALIASES: Final[Mapping[str, Mapping[str, Step]]] = {
-    # PSKUS（Zenodo 4537209）：逐帧标注，类名形如 "Step 1" / "Faucet on"
+    # PSKUS（Zenodo 4537209）：逐帧标注，列名 movement_code，取值 0-7。
+    #
+    # 【重要】这份映射是照着**真实数据**核对出来的，不是猜的：
+    #   数据里每段视频一个标注 csv，三列：frame_time, is_washing, movement_code；
+    #   PSKUS 自带的 summary.csv 按固定顺序列出八种动作，
+    #   statistics.csv 的列顺序是 movement_1..movement_7, movement_0。
+    #   用 DataSet4 的 80 个标注文件（77,688 帧）统计验证：
+    #       code 0 占 62.6%（最大）-> 对应 summary 最后一项 "Other movement" ✅
+    #       code 7 占 15.2%        -> "Turning off the faucet with a paper towel"
+    #   因此：movement_1..6 = WHO 步骤 1..6，movement_7 = 关水龙头，movement_0 = 其他。
+    #
+    # 【注意】PSKUS **只有"关水龙头"，没有"开水龙头"**（movement_7 即关闭动作）。
+    #   所以 pskuss 命名空间里的 faucet_on 在该数据集中不会出现。
     "pskuss": {
+        "movement_0": Step.OTHER,
+        "movement_1": Step.STEP_1,
+        "movement_2": Step.STEP_2,
+        "movement_3": Step.STEP_3,
+        "movement_4": Step.STEP_4,
+        "movement_5": Step.STEP_5,
+        "movement_6": Step.STEP_6,
+        "movement_7": Step.FAUCET_OFF,
+        # 纯数字 code 也接受（适配器会传 int：0-7）
+        "0": Step.OTHER,
+        "1": Step.STEP_1,
+        "2": Step.STEP_2,
+        "3": Step.STEP_3,
+        "4": Step.STEP_4,
+        "5": Step.STEP_5,
+        "6": Step.STEP_6,
+        "7": Step.FAUCET_OFF,
+        # summary.csv 里的完整动作名（用于交叉核对）
+        "palm to palm": Step.STEP_1,
+        "palm over dorsum, fingers interlaced": Step.STEP_2,
+        "palm to palm, fingers interlaced": Step.STEP_3,
+        "backs of fingers to opposing palm, fingers interlocked": Step.STEP_4,
+        "rotational rubbing of the thumb": Step.STEP_5,
+        "fingertips to palm": Step.STEP_6,
+        "turning off the faucet with a paper towel": Step.FAUCET_OFF,
+        "other movement": Step.OTHER,
+        # 旧版/常见写法
         "step 1": Step.STEP_1,
         "step 2": Step.STEP_2,
         "step 3": Step.STEP_3,
@@ -368,7 +407,12 @@ class LabelSpace:
 
 #: 预置命名空间。**索引顺序已冻结**：改动等于让所有旧 checkpoint 失效。
 LABEL_SPACES: Final[Mapping[str, LabelSpace]] = {
-    # 主实验：六步 + 开关龙头等辅助动作
+    # 主实验：六步 + 关水龙头等辅助动作
+    #
+    # 【重要】PSKUS 真实数据里**没有 faucet_on**，只有 movement_7（关水龙头）。
+    #   这里保留 faucet_on 是为了让"自采视频"和"METC（含开关龙头）"能用同一命名空间，
+    #   但评估 PSKUS 时该类的 support 会是 0，macro-F1 计算会按 ignore_absent 跳过它。
+    #   报告里必须说明这一点，否则混淆矩阵上那一列会被误解为"模型完全学不会"。
     "pskuss": LabelSpace(
         "pskuss",
         (

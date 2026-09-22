@@ -185,6 +185,7 @@ See `docs/DATA.md` for how to obtain the datasets; checkpoints are shared throug
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | **Modification rules (required reading)**: Iron Rules, change levels, commit and PR flow |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Layer diagram, the five contracts, RFC process, extension guides |
 | [`docs/DATA.md`](docs/DATA.md) | The five public datasets: sources, layouts, downloads, preparation |
+| [`docs/DATA_COLLABORATION.md`](docs/DATA_COLLABORATION.md) | **How four people share 2–17 GB without uploading it anywhere** |
 | [`docs/CONFIG.md`](docs/CONFIG.md) | Every configuration key, plus recipes for common changes |
 | [`docs/PROTOCOL.md`](docs/PROTOCOL.md) | Assessment criteria: exact definitions of missed / out-of-order / insufficient duration |
 | [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md) | Experiment log (in Chinese — internal team working document) |

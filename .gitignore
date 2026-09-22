@@ -3,11 +3,46 @@
 # 核心原则：数据、权重、输出、密钥 一律不进仓库（详见 CONTRIBUTING.md R6）
 # ============================================================================
 
-# --- 数据（体积大，用 scripts/download_data.sh 或 docs/DATA.md 的链接获取）--
-data/raw/
-data/interim/
-data/processed/
-data/external/
+# --- 数据 -------------------------------------------------------------------
+# 原则：**大数据按文件类型排除，不按目录排除**。
+#
+# 为什么不用 `data/raw/` 这种写法？Git 有一条铁律：**一旦某个目录被排除，
+# 就无法再用 `!` 把里面的文件重新包含进来** —— Git 根本不会进入被排除的目录去遍历。
+# 所以"排除整个目录、只放行几个小文件"是做不到的。
+#
+# 正确做法：排除大文件类型，放行小文件类型。
+#   被排除：原始压缩包、视频、抽帧图像、逐帧预测
+#   被放行：SOURCES.json（数据来源与校验清单）、manifest.csv（划分契约）、
+#           split_report.json、README —— 见 docs/DATA_COLLABORATION.md 的三层划分
+data/**/*.zip
+data/**/*.tar
+data/**/*.tar.gz
+data/**/*.gz
+data/**/*.7z
+data/**/*.rar
+data/**/*.mp4
+data/**/*.avi
+data/**/*.mov
+data/**/*.mkv
+data/**/*.webm
+data/**/*.m4v
+data/**/*.jpg
+data/**/*.jpeg
+data/**/*.png
+data/**/*.bmp
+data/**/*.webp
+data/**/*.jsonl
+data/raw/*
+data/interim/*
+data/external/*
+!data/raw/SOURCES.json
+!data/raw/README.md
+!data/interim/README.md
+!data/external/README.md
+data/processed/*/*
+!data/processed/*/manifest.csv
+!data/processed/*/split_report.json
+!data/processed/*/README.md
 !data/**/.gitkeep
 
 # --- 模型权重与导出 ---------------------------------------------------------

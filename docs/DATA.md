@@ -57,30 +57,90 @@ how the split is done, and the three pitfalls that are easiest to fall into.
 - Contents: a real hospital environment; the WHO six-step actions plus turning the faucet
   on/off and other actions, with **per-frame annotation**.
 
-**Directory layout (what the framework expects)**
+**How to obtain it**: `python scripts/download_data.py --dataset pskuss --share 1/4 --extract`
+(17.1 GiB, split across 4 members — see [`DATA_COLLABORATION.md`](DATA_COLLABORATION.md))
+
+### 2.1 Real directory layout (**verified against the actual downloaded data**)
 
 ```
-data/raw/pskuss/
-  ├── step_1_palm_to_palm/        # directory name = label (aliases allowed, see core/labels.py)
-  │   ├── clip_0001.mp4
-  │   └── clip_0002.mp4
-  ├── faucet_on/
-  └── ...
+data/raw/pskuss/                     ← the raw zip shards (11 × DataSet*.zip)
+  DataSet1.zip ... DataSet8.zip
+  SOURCES.json                       ← source + md5 manifest, **commit this to Git**
+  extracted/                         ← unpacked layout (configs point dataset.root here)
+    DataSet4/
+      Videos/
+        2020-06-26_21-26-56_camera104.mp4      ← one video = one clip
+      Annotations/
+        Annotator1/2020-06-26_21-26-56_camera104.csv
+        Annotator1/2020-06-26_21-26-56_camera104.json
+        Annotator2/...
+      statistics.csv        ← per-file durations for each movement
+      summary.csv           ← eight-movement duration summary for this DataSet
 ```
 
-Or as "one per-frame annotation CSV per clip":
+> The dataset also ships `README.md`, `statistics.csv` and `summary.csv` at the **top level**.
+> These are registered as "everyone downloads these" small files (a few hundred KB in total);
+> they contain no video.
 
+### 2.2 Annotation format and label mapping (**the easiest thing to get wrong**)
+
+The annotation CSV has exactly three columns:
+
+```csv
+frame_time,is_washing,movement_code
+0.000,1,0
+33.333,1,0
+66.667,1,0
 ```
-data/raw/pskuss/<clip_id>.csv      # columns: frame, label[, timestamp]
+
+`movement_code` is an integer 0–7. Its meaning comes from the dataset's own `summary.csv`,
+which lists eight movements in order, while `statistics.csv` uses the column order
+`movement_1 … movement_7, movement_0`. Aligning the two gives:
+
+| code | Movement (verbatim from `summary.csv`) | Canonical label |
+| --- | --- | --- |
+| 1 | Palm to palm | `step_1_palm_to_palm` |
+| 2 | Palm over dorsum, fingers interlaced | `step_2_palm_over_dorsum` |
+| 3 | Palm to palm, fingers interlaced | `step_3_fingers_interlaced` |
+| 4 | Backs of fingers to opposing palm, fingers interlocked | `step_4_backs_of_fingers` |
+| 5 | Rotational rubbing of the thumb | `step_5_rotational_thumbs` |
+| 6 | Fingertips to palm | `step_6_rotational_fingertips` |
+| 7 | Turning off the faucet with a paper towel | `faucet_off` |
+| 0 | Other movement | `other` |
+
+**This mapping was verified, not guessed.** Method: count the share of each code across
+DataSet4's 80 annotation files (77,688 frames) — code 0 accounts for **62.6%** (the largest)
+and code 7 for 15.2%, which matches "Other movement is the last entry in `summary.csv` and
+dominates total duration". Both the direction and the ordering line up, so the mapping holds.
+
+> **Two things you must state in the report**
+>
+> 1. **PSKUS has no `faucet_on`**, only code 7 = turning the faucet *off*.
+>    So the `faucet_on` class in the `pskuss` label space will have zero support;
+>    macro-F1 skips absent classes via `ignore_absent`, but the confusion matrix will still
+>    show an all-zero column — **say explicitly that this is the data, not the model**.
+> 2. **`other` (code 0) is 62.6% of all frames**, so the classes are severely imbalanced.
+>    This is exactly why model selection uses Macro-F1 and not accuracy: a model that predicts
+>    `other` for everything scores 62.6% accuracy and is worthless.
+
+### 2.3 Two independent annotators
+
+Every video has two independent annotations (`Annotator1`, `Annotator2`). You can:
+* train on one and use the other as a **cross-check on annotation quality** (a strong report point);
+* or compute Cohen's kappa between them as a reference "human ceiling".
+
+The adapter uses `Annotator1` by default; change it in the dataset config:
+
+```yaml
+# configs/data/pskuss.yaml
+datasets:
+  pskuss:
+    annotators: [Annotator2]      # or ["Annotator2", "Annotator1"] for priority fallback
 ```
 
-**Recommendation**: do not download the full 18.4 GB up front. Start with 300—500 clips and
-get the pipeline working end to end, confirm that the frame-extraction parameters and the
-label mapping are correct, and only then fill in the rest — after frame extraction, 18.4 GB
-will occupy tens of GB of disk.
-
-**Config**: `configs/data/pskuss.yaml` (a 10-class label space, `label_space: pskuss`,
-`include_non_wash: true`)
+**Recommendation**: run the inter-annotator agreement analysis *before* training. If the two
+annotators disagree heavily on a particular step, that step is genuinely hard to distinguish
+visually — the model failing on it is then an explainable finding rather than a defect.
 
 ---
 

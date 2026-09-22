@@ -171,6 +171,7 @@ python -m pre_commit run --all-files
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | **修改规则（必读）**：铁律、分级、提交与 PR 流程 |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | 分层图、五个契约、RFC 流程、扩展指南 |
 | [`docs/DATA.md`](docs/DATA.md) | 五个公开数据集的来源、结构、下载与准备 |
+| [`docs/DATA_COLLABORATION.md`](docs/zh/DATA_COLLABORATION.md) | **不上传任何东西，四个人怎么共用 2–17 GB 数据** |
 | [`docs/CONFIG.md`](docs/CONFIG.md) | 配置逐键说明与常见改法 |
 | [`docs/PROTOCOL.md`](docs/PROTOCOL.md) | 完整性判定口径：漏步/乱序/时长的精确定义 |
 | [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md) | 实验记录表（每跑一次都要填） |

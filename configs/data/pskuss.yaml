@@ -17,7 +17,7 @@
 
 dataset:
   name: pskuss
-  root: data/raw/pskuss
+  root: data/raw/pskuss/extracted
   label_space: pskuss        # 10 类：六步 + faucet_on/off + washing_hands + other
   include_non_wash: true
   prep:
