@@ -94,36 +94,59 @@ DataSet8.zip   4475.3 MB
 
 | 步骤 | 谁 | 命令 |
 | --- | --- | --- |
-| 1. 下载全部 11 个分片 | 一个人（R1） | `python scripts/download_data.py --dataset pskuss --all --extract` |
-| 2. 抽帧 + 生成划分 | 同一人 | `python scripts/prepare_data.py --config configs/data/pskuss.yaml` |
-| 3. 看体积 | 同一人 | `python scripts/pack_processed_data.py --dataset pskuss --report` |
-| 4. 打包 | 同一人 | `python scripts/pack_processed_data.py --dataset pskuss --build` |
-| 5. 上传**三个文件**到网盘 | 同一人 | `.zip`、`.zip.sha256`、`pskuss_package.json` |
-| 6. 下载这个包 | 其余三人 | — |
-| 7. 先校验、再解包 | 其余三人 | `--verify` 然后 `--unpack` |
+| 1. 预检 | 一个人（R1） | `python scripts/bootstrap_dataset.py --dataset pskuss --dry-run` |
+| 2. 下载 + 抽帧 + 划分 + 打包 | 同一人 | **`python scripts/bootstrap_dataset.py --dataset pskuss`** |
+| 3. 上传**三个文件**到网盘 | 同一人 | `.zip`、`.zip.sha256`、`pskuss_package.json` |
+| 4. 下载这个包 | 其余三人 | — |
+| 5. 先校验、再解包 | 其余三人 | `--verify` 然后 `--unpack` |
 
-**第 5 步就是整个方案的价值所在：一次上传约 2.8 GB，而不是 17.1 GB**，
+**第 2 步就一条命令。** `bootstrap_dataset.py` 把四个阶段串起来，而且**可以反复重跑**：
+已完成的部分（校验通过的分片、已抽好的帧）会被跳过，所以中断了、或者只下了一部分分片，
+再跑同一条命令就能续上。
+
+```bash
+# ---- 抽帧的人：一条命令 ----
+python scripts/bootstrap_dataset.py --dataset pskuss
+#   [1/4] 预检   : 磁盘空间、已有分片、还缺什么
+#   [2/4] 下载   : 11 个分片，断点续传 + md5 校验
+#   [3/4] 抽帧   : 抽帧 + 按原始视频划分 + 写 manifest
+#   [4/4] 打包   : 一个压缩包 + sha256 + 包内容说明
+# 跑完会打印一段"交接清单"，可以直接复制到群里
+```
+
+常用变体：
+
+```bash
+python scripts/bootstrap_dataset.py --dataset pskuss --dry-run         # 只打印计划，不执行
+python scripts/bootstrap_dataset.py --dataset pskuss --skip-pack       # 只为自己训练
+python scripts/bootstrap_dataset.py --dataset pskuss --skip-download   # 数据已在本地
+python scripts/bootstrap_dataset.py --dataset pskuss \
+    --shards DataSet4.zip,DataSet3.zip                                 # 约 1.2 GB 验证链路
+```
+
+> **下全分片才产出"权威划分"。** 只下部分分片时脚本照样会跑完，但会打印醒目警告：
+> 它基于子集产生的划分与别人的不一致，实验数字就不可比了。
+> 用 `--shards` 验证链路，然后去掉这个参数重跑，才产出真正的划分。
+
+**第 3 步就是整个方案的价值所在：一次上传约 2.8 GB，而不是 17.1 GB**，
 其余三人各下一个文件，不用去协调 11 个分片。
 
 ```bash
-# 抽帧的人
-python scripts/download_data.py --dataset pskuss --all --extract
-python scripts/prepare_data.py --config configs/data/pskuss.yaml
-python scripts/pack_processed_data.py --dataset pskuss --build
-# -> data/packages/pskuss_frames_<日期>.zip           （约 2.8 GB）
-#    data/packages/pskuss_frames_<日期>.zip.sha256    （校验值）
-#    data/packages/pskuss_package.json                （包内容说明）
-# 三个文件一起传网盘，把链接发到群里
-
 # 其余三人
 python scripts/pack_processed_data.py --dataset pskuss --verify pskuss_frames_<日期>.zip
 python scripts/pack_processed_data.py --dataset pskuss --unpack pskuss_frames_<日期>.zip
-python scripts/train_model.py --config configs/experiments/exp02_yolo26n_gru.yaml
+python scripts/train_model.py config=configs/experiments/exp02_yolo26n_gru.yaml \
+    config=configs/data/pskuss.yaml
 ```
 
+> **注意配置叠加顺序：实验配置在前，数据配置在后。**
+> `config=` 是依次深合并、后者覆盖前者，而 `configs/experiments/*.yaml` 里也写了
+> `dataset.name`。把数据配置放前面会被覆盖，训练就会静默地跑在默认数据集上。
+> `bootstrap_dataset.py` 会把正确顺序的命令直接打印给你。
+
 **为什么包里要连划分一起带。** 包里含 `frames/`、`manifest.csv`、`split_report.json`
-和 `SOURCES.json`。因为 `manifest.csv` 存的是**相对数据集根目录**的路径
-（`frames/<clip_id>/00003.jpg`），解包后就直接复现了那份权威划分，
+和 `SOURCES.json`。因为 `manifest.csv` 存的是**相对 `frames_dir`** 的路径
+（`<clip_id>/00003.jpg`），解包后就直接复现了那份权威划分，
 **没有任何人需要重新生成它**，因此四个人评估用的是完全相同的测试集。
 这正是让数字可比的关键。
 

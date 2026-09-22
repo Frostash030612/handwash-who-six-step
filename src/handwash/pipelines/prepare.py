@@ -638,7 +638,13 @@ def _extract_and_register(
             label = clip.label_sequence[0] if clip.label_sequence else None
 
             for local_index, (_, stamp, frame) in enumerate(zip(indices, stamps, frames, strict=True)):
-                relative = Path("frames") / clip.clip_id / f"{local_index:05d}.jpg"
+                # 【关键】image_path 记录成**相对 frames_root** 的路径（`<clip_id>/00000.jpg`），
+                # 与 data/dataset.py 的 _image_root_from() 约定一致：那边把 image_root
+                # 解析为配置里的 frames_dir，再用 image_root / image_path 打开文件。
+                # 早期版本这里写成 `frames/<clip_id>/...`（相对数据集 root），
+                # 导致训练时报"帧图像不存在：<dataset.root>/frames/..."，
+                # 而实际帧落在 data/processed/<dataset>/frames/ 下。
+                relative = Path(clip.clip_id) / f"{local_index:05d}.jpg"
                 save_frame(frame, frames_root / clip.clip_id / f"{local_index:05d}.jpg",
                            quality=rc.dataset.prep.jpeg_quality)
                 records.append(

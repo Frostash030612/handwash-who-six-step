@@ -29,7 +29,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _bootstrap import PROJECT_ROOT  # noqa: E402,F401
-from _common import build_config_parser  # noqa: E402
+from _common import build_config_parser, load_config_from_args  # noqa: E402
 
 from handwash.cli import split_argv  # noqa: E402
 from handwash.core.config import load_config, parse_overrides  # noqa: E402
@@ -52,8 +52,7 @@ def main() -> int:
         parser.error(f"无法识别的参数：{unknown}")
     setup_logging(args.log_level, force=True)
 
-    overrides = parse_overrides(override_items)
-    rc = load_config(list(args.config or ["configs/config.yaml"]), overrides=overrides)
+    rc = load_config_from_args(args, parse_overrides(override_items))
 
     if args.inspect:
         return _inspect(rc)

@@ -101,32 +101,56 @@ needs, and they are much smaller:
 
 | Step | Who | Command |
 | --- | --- | --- |
-| 1. Download all 11 shards | one person (R1) | `python scripts/download_data.py --dataset pskuss --all --extract` |
-| 2. Extract frames + build the split | same person | `python scripts/prepare_data.py --config configs/data/pskuss.yaml` |
-| 3. Check the size | same person | `python scripts/pack_processed_data.py --dataset pskuss --report` |
-| 4. Pack | same person | `python scripts/pack_processed_data.py --dataset pskuss --build` |
-| 5. Upload **3 files** to cloud storage | same person | the `.zip`, the `.zip.sha256`, and `pskuss_package.json` |
-| 6. Download the package | everyone else | — |
-| 7. Verify, then unpack | everyone else | `--verify` then `--unpack` |
+| 1. Preflight | one person (R1) | `python scripts/bootstrap_dataset.py --dataset pskuss --dry-run` |
+| 2. Download + extract + split + pack | same person | **`python scripts/bootstrap_dataset.py --dataset pskuss`** |
+| 3. Upload **3 files** to cloud storage | same person | the `.zip`, the `.zip.sha256`, and `pskuss_package.json` |
+| 4. Download the package | everyone else | — |
+| 5. Verify, then unpack | everyone else | `--verify` then `--unpack` |
 
-**Step 5 is where the plan pays off: you upload ~2.8 GB once instead of 17.1 GB**, and the other
-three members download one file each instead of coordinating over 11 shards.
+**Step 2 is a single command.** `bootstrap_dataset.py` chains the four stages and is **safe to
+re-run**: anything already done (verified shards, existing frames) is skipped, so an interrupted
+run — or a run that only covered some shards — resumes by running the same command again.
 
 ```bash
-# the extractor
-python scripts/download_data.py --dataset pskuss --all --extract
-python scripts/prepare_data.py --config configs/data/pskuss.yaml
-python scripts/pack_processed_data.py --dataset pskuss --build
-# -> data/packages/pskuss_frames_<date>.zip          (~2.8 GB)
-#    data/packages/pskuss_frames_<date>.zip.sha256   (checksum)
-#    data/packages/pskuss_package.json               (what is inside)
-# upload all three, paste the link in the group chat
+# ---- the extractor: one command ----
+python scripts/bootstrap_dataset.py --dataset pskuss
+#   [1/4] preflight : disk space, which shards are present, what is missing
+#   [2/4] download  : 11 shards, resumable, md5-verified
+#   [3/4] prepare   : frame extraction + video-level split + manifest
+#   [4/4] pack      : one archive + sha256 + package description
+# then it prints a handover block you can paste straight into the group chat
+```
 
+Useful variants:
+
+```bash
+python scripts/bootstrap_dataset.py --dataset pskuss --dry-run         # print the plan only
+python scripts/bootstrap_dataset.py --dataset pskuss --skip-pack       # for your own training
+python scripts/bootstrap_dataset.py --dataset pskuss --skip-download   # data already present
+python scripts/bootstrap_dataset.py --dataset pskuss \
+    --shards DataSet4.zip,DataSet3.zip                                 # ~1.2 GB pipeline test
+```
+
+> **Downloading every shard is what makes the split authoritative.** If you fetch only some
+> shards the script still finishes, but prints a loud warning: the split it produced is based on a
+> subset, so it will not match anyone else's and the numbers stop being comparable. Use
+> `--shards` to validate the pipeline, then re-run without it to produce the real split.
+
+**Step 3 is where the plan pays off: upload ~2.8 GB once instead of 17.1 GB**, and the other three
+members download one file each instead of coordinating over 11 shards.
+
+```bash
 # everyone else
 python scripts/pack_processed_data.py --dataset pskuss --verify pskuss_frames_<date>.zip
 python scripts/pack_processed_data.py --dataset pskuss --unpack pskuss_frames_<date>.zip
-python scripts/train_model.py --config configs/experiments/exp02_yolo26n_gru.yaml
+python scripts/train_model.py config=configs/experiments/exp02_yolo26n_gru.yaml \
+    config=configs/data/pskuss.yaml
 ```
+
+> **Mind the config overlay order:** the **experiment** config first, the **data** config second.
+> Overlays are merged in order and later ones win, and every `configs/experiments/*.yaml` also
+> sets `dataset.name`. Put the data config first and it gets overwritten — training then silently
+> runs on the default dataset. `bootstrap_dataset.py` prints the correct command for you.
 
 **Why the archive carries the split too.** The package contains `frames/`, `manifest.csv`,
 `split_report.json` **and** `SOURCES.json`. Because `manifest.csv` stores paths *relative to the

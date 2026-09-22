@@ -73,12 +73,33 @@ def resolve_from_args(argv: list[str] | None = None, *, description: str = "") -
         parser.error(f"无法识别的参数：{unknown}")
 
     setup_logging(args.log_level, force=True)
-
-    overrides: dict[str, Any] = parse_overrides(override_items)
-    if args.run_name:
-        overrides.setdefault("runtime", {})
-        overrides["runtime"] = {**overrides["runtime"], "run_name": args.run_name}
-
-    paths = list(args.config or ["configs/config.yaml"])
-    rc = load_config(paths, overrides=overrides)
+    rc = load_config_from_args(args, parse_overrides(override_items))
     return args, rc
+
+
+def load_config_from_args(args: Any, overrides: dict[str, Any]) -> ResolvedConfig:
+    """把 ``--config`` / ``config=`` / ``--run-name`` 与覆盖项合并成最终配置。
+
+    为什么必须有这个函数（真实 bug 来源）：
+        CLI 侧（``handwash.cli._load``）会把位置参数 ``config=<文件>`` 从覆盖项里
+        **摘出来**再合并，因为它不是 AppConfig 的字段；
+        但 scripts/ 下的几个脚本各自手写 ``load_config(list(args.config), overrides=overrides)``，
+        忘了摘 —— 于是 ``config=configs/data/pskuss.yaml`` 被当成"未知配置键 config"，
+        报错信息还很不直观。这里统一一份实现，所有脚本复用，避免再各写一遍。
+
+    叠加语义与 CLI 完全一致：
+        * ``--config <文件>``（可多次）：作为**基础**配置，默认 ``configs/config.yaml``；
+        * 位置参数 ``config=<文件>``（可多次）：作为**叠加层**，按顺序覆盖前面的。
+    """
+    overrides = dict(overrides)
+    overlay = overrides.pop("config", None)
+    paths: list[str] = list(args.config or ["configs/config.yaml"])
+    if overlay is not None:
+        # 位置参数可重复，覆盖项解析成的是单个值或列表
+        paths.extend(overlay if isinstance(overlay, list) else [overlay])
+
+    if getattr(args, "run_name", None):
+        runtime = {**overrides.get("runtime", {}), "run_name": args.run_name}
+        overrides["runtime"] = runtime
+
+    return load_config([str(path) for path in paths], overrides=overrides)

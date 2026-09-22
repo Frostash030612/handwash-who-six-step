@@ -200,13 +200,23 @@ def build_dataset(
 def _image_root_from(rc: ResolvedConfig) -> Path:
     """从配置推断图像根目录。
 
-    约定（务必与 ``pipelines/prepare.py`` 的写盘逻辑一致）：
-    manifest 里的 ``image_path`` 是**相对数据集根目录**的路径
-    （例如 ``frames/<clip_id>/00003.jpg``），因此这里解析 ``root``。
-    使用相对路径的好处：整个数据目录可以搬走/挂载到别的盘，manifest 不用改。
+    约定（**必须与 pipelines/prepare.py 的写盘逻辑一致**）：
+        manifest 里的 ``image_path`` 是**相对 frames_dir** 的路径
+        （形如 ``<clip_id>/00003.jpg``），因此这里解析 ``frames_dir``。
+
+    为什么用 frames_dir 而不是 dataset.root：
+        抽帧结果落在 ``data/processed/<dataset>/frames/``，而 ``dataset.root`` 指的是
+        **原始视频**所在目录（例如 ``data/raw/pskuss/extracted``）。两者不是同一层。
+        早期版本误用 root 拼路径，训练时报"帧图像不存在" —— 帧其实好好地在 processed 下。
+
+    frames_dir 可在 ``configs/config.yaml`` 的 ``datasets.<name>`` 段或
+    ``configs/data/<name>.yaml`` 里显式指定；未指定时按上面的默认约定推导。
     """
+    from handwash.paths import DATA_PROCESSED_DIRNAME
+
     spec = rc.dataset_spec()
-    return resolve_relative(spec.get("root") or rc.dataset.root)
+    raw = spec.get("frames_dir") or f"{DATA_PROCESSED_DIRNAME}/{rc.dataset.name}/frames"
+    return resolve_relative(raw)
 
 
 def _project_root() -> Path:
