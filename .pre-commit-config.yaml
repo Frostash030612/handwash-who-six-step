@@ -82,6 +82,18 @@ repos:
         always_run: true
         files: \.md$
 
+      # .gitignore 的数据规则一旦顺序写错就会**静默失效**：
+      # 要么 17 GB 数据变成"可提交"，要么划分契约被误提交（真实事故：一份只含
+      # 1/11 分片的 manifest 被提交，pull 下来的人都会用到错误的划分）。
+      # 所以只要改动 .gitignore 就必须跑这个体检。
+      - id: handwash-data-ignores
+        name: .gitignore 数据规则体检
+        entry: python scripts/check_data_ignores.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        files: ^\.gitignore$
+
       - id: handwash-unit-tests
         name: 单元测试 (快速子集)
         entry: python -m pytest -m "not integration and not slow and not gpu" -q

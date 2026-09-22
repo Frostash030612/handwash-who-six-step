@@ -4,46 +4,59 @@
 # ============================================================================
 
 # --- 数据 -------------------------------------------------------------------
-# 原则：**大数据按文件类型排除，不按目录排除**。
+# 【设计原则：默认全忽略，只白名单放行】
 #
-# 为什么不用 `data/raw/` 这种写法？Git 有一条铁律：**一旦某个目录被排除，
-# 就无法再用 `!` 把里面的文件重新包含进来** —— Git 根本不会进入被排除的目录去遍历。
-# 所以"排除整个目录、只放行几个小文件"是做不到的。
+# 为什么不用"排除大文件扩展名 + 放行若干小文件"的写法：那是**黑名单**思路，
+# 每出现一种新的数据文件类型（标注 json、统计 csv、校验文件、.extracted 标记……）
+# 都会被默认放行，于是"顺手"被提交。这个仓库真的踩过：
+# 一份只含 1/11 分片的 manifest.csv 被提交，任何 pull 下来的人都会拿到错误划分并在训练时使用。
 #
-# 正确做法：排除大文件类型，放行小文件类型。
-#   被排除：原始压缩包、视频、抽帧图像、逐帧预测
-#   被放行：SOURCES.json（数据来源与校验清单）、manifest.csv（划分契约）、
-#           split_report.json、README —— 见 docs/DATA_COLLABORATION.md 的三层划分
-data/**/*.zip
-data/**/*.tar
-data/**/*.tar.gz
-data/**/*.gz
-data/**/*.7z
-data/**/*.rar
-data/**/*.mp4
-data/**/*.avi
-data/**/*.mov
-data/**/*.mkv
-data/**/*.webm
-data/**/*.m4v
-data/**/*.jpg
-data/**/*.jpeg
-data/**/*.png
-data/**/*.bmp
-data/**/*.webp
-data/**/*.jsonl
-data/raw/*
-data/interim/*
-data/external/*
+# 所以改成：**`data/` 下一切内容默认都进不了 Git**，只有极少数文件名例外。
+#
+# 【Git 的规则，改这里之前务必看懂】
+#   1. 忽略**目录**会让整个目录被跳过，里面的文件再也无法用 `!` 捞回来。
+#      所以必须**逐层忽略内容、逐层放行目录链**，而不是一句 `data/**`。
+#      （踩过：`data/**` 会连 `data/raw/` 这样的子目录一起忽略，
+#        结果 `!data/**/SOURCES.json` 完全失效。）
+#   2. 规则**先匹配先生效**，后面的 `!` 可以覆盖前面的排除。所以白名单放在最后。
+#
+# 自检命令（改完务必跑）：python scripts/check_data_ignores.py
+# 第 1 步：数据顶层默认全忽略
+data/*
+# 第 2 步：只放行**目录本身**（不是内容），让 Git 愿意进入 data/raw/
+!data/raw/
+# 第 3 步：data/raw/ 下的内容同样默认全忽略
+data/raw/**
+# 第 4 步：白名单 —— 全仓库只有**两个数据文件**允许提交：
+#   data/README.md          data/ 目录说明（唯一一份，别再散落多份）
+#   data/raw/SOURCES.json   数据来源 + md5 清单，协作契约（见 docs/DATA_COLLABORATION.md）
+!data/README.md
 !data/raw/SOURCES.json
-!data/raw/README.md
-!data/interim/README.md
-!data/external/README.md
-data/processed/*/*
-!data/processed/*/manifest.csv
-!data/processed/*/split_report.json
-!data/processed/*/README.md
-!data/**/.gitkeep
+#
+# 【为什么白名单这么窄】
+#   gitignore **无法干净地表达"任意深度只放行某文件名"** —— 放行一个深层文件，
+#   必须把路径上每一级目录都显式放行；漏一层就静默失效。
+#   （踩过：`data/**` 会连 `data/raw/` 这样的子目录一起忽略，
+#    于是 `!data/**/SOURCES.json` 完全无效，而表面上规则写得很"漂亮"。）
+#   所以这里改成"显式列出允许的两个路径"，范围小、可读、可验证：
+#   想让新文件进 Git，就必须来改这一行 —— 强制一次有意识的选择。
+
+# ---------------------------------------------------------------------------
+# 【特别说明：manifest.csv 与 split_report.json 为什么不提交】
+#
+# 它们体积很小、看起来很适合进 Git，但它们是**划分契约** —— 谁拿到就用它训练与评估。
+# 如果某人只下了部分分片（例如 11 个分片里的 1 个）就跑 prepare 并提交 manifest，
+# 那么全组 pull 下来拿到的都是这份基于 1.2% 数据的错误划分，而它**看起来完全正常**。
+# 这是最危险的地方：没有报错、没有异常，只是所有结论都不可比。
+#
+# 正确做法：**划分随抽帧结果的压缩包分发**（scripts/pack_processed_data.py 生成的
+# frames zip 里就带 manifest 与 split_report），那个包由"下全数据的那个人"生成，
+# 有 sha256 可校验，队友解包即复现同一份划分。见 docs/DATA_COLLABORATION.md §3.0。
+#
+# 若确实要把权威划分提交进 Git（例如交付最终快照），请显式强制添加，
+# 并在 PR 里说明数据完整性（分片数 / 段数）：
+#     git add -f data/processed/pskuss/manifest.csv
+# ---------------------------------------------------------------------------
 
 # --- 模型权重与导出 ---------------------------------------------------------
 models/

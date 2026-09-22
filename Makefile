@@ -71,6 +71,10 @@ archcheck:  ## 分层依赖体检：禁止越层 import、禁止散落魔数
 configcheck:  ## 配置契约检查：所有 configs/*.yaml 必须能严格加载
 	$(PY) scripts/check_config.py
 
+.PHONY: datacheck
+datacheck:  ## .gitignore 数据规则体检：大数据必须被忽略，划分契约必须不被提交
+	$(PY) scripts/check_data_ignores.py
+
 .PHONY: doccheck
 doccheck:  ## 文档体检：双语配对 + 链接不断链
 	$(PY) scripts/check_docs.py
@@ -92,7 +96,7 @@ test-cov:  ## 带覆盖率报告
 	$(PYTEST) $(PYTEST_FAST) --cov --cov-report=term-missing
 
 .PHONY: check
-check: lint archcheck configcheck doccheck typecheck test  ## 提交前本地必跑（与 CI 完全一致）
+check: lint archcheck configcheck doccheck datacheck typecheck test  ## 提交前本地必跑（与 CI 完全一致）
 
 .PHONY: hooks
 hooks:  ## 安装 pre-commit 钩子

@@ -57,6 +57,9 @@ jobs:
       - name: 文档体检（双语配对 + 链接不断链）
         run: python scripts/check_docs.py
 
+      - name: .gitignore 数据规则体检（大数据必须被忽略，划分契约必须不被提交）
+        run: python scripts/check_data_ignores.py
+
       - name: 确认没有把数据/权重/输出提交进来
         run: |
           set -e
