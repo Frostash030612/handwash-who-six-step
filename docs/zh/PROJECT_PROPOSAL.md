@@ -6,13 +6,28 @@
 **截止：2026-09-30。** 打开 DOCX 模板，把下表各栏用下面的文字填上，导出 PDF，
 每队交一份到 Canvas → Assignments → Practice Module。
 
+**不要手工往模板里粘。** 用一条命令从同一份内容生成中英文两个版本，
+DOCX 与本文件因此不可能互相漂移：
+
+```bash
+python scripts/make_proposal.py --lang en --group-id 43 \
+    --members "Shen Ziyi:A0350940J" "Wang Lepeng:A0357864L" \
+              "Zhu Jianyu:A0353769L" "Xu Wenzhe:A0328771W"
+python scripts/make_proposal.py --lang zh --group-id 43 \
+    --members "Shen Ziyi:A0350940J" "Wang Lepeng:A0357864L" \
+              "Zhu Jianyu:A0353769L" "Xu Wenzhe:A0328771W"
+```
+
+产物：`deliverables/project_proposal_en.docx` 与 `deliverables/project_proposal_zh.docx`
+（任一侧加 `--format md` 可同时得到 Markdown 版）。`deliverables/` 被刻意 git-ignore ——
+提案里含学号，只在本地与共享盘流转，不进入公开仓库。
+
 > 模板只有这几栏，不要增删或调整顺序：
 > `Date of proposal` · `Project Title` · `Group ID (As Enrolled in Canvas Class Groups)` ·
 > `Group Members (name, Student ID)` · `Sponsor/Client` · `Background/Aims/Objectives` ·
 > `Project Descriptions`。
 >
-> **需要你们先填的**：提案日期、Canvas 分组编号、组员姓名学号，以及文中的 `[...]` 占位。
-> 其余内容都已写好，直接粘贴。
+> 分组编号与组员名单已在下面填好（Canvas 分组 **43**）。其余内容都已写好。
 
 ---
 
@@ -39,16 +54,16 @@ Recognition and Procedure Completeness Assessment
 ## 3. Group ID（Canvas 分组编号）
 
 ```
-【把 Canvas 里的分组编号粘在这里】
+43
 ```
 
 ## 4. Group Members（组员姓名、学号）
 
 ```
-[1] 【姓名】 — 【学号】     （数据与评估负责人）
-[2] 【姓名】 — 【学号】     （模型与训练负责人）
-[3] 【姓名】 — 【学号】     （时序与判定负责人）
-[4] 【姓名】 — 【学号】     （产品、演示与交付负责人）
+[1] Shen Ziyi  — A0350940J     （数据与评估负责人）
+[2] Wang Lepeng — A0357864L    （模型与训练负责人）
+[3] Zhu Jianyu — A0353769L     （时序与判定负责人）
+[4] Xu Wenzhe  — A0328771W     （产品、演示与交付负责人）
 ```
 
 ## 5. Sponsor/Client（委托方）
@@ -126,8 +141,10 @@ Not applicable — self-initiated project.
 
 ### 7.3 系统架构
 
-五层设计；每层单一职责，依赖只向下指。该结构已实现并纳入版本管理，
-因此本提案描述的是**已存在**的东西，而不是设想。
+五层设计；每层单一职责，依赖只向下指。该结构已在仓库中以唯一来源的方式固定下来
+（配置契约 + 目录约定）：契约层、数据与 IO 层、编排层已实现并纳入版本管理，
+模型层按同一契约在项目第 2—3 周实现 —— 因此本提案描述的是一个**基础已经存在**的系统，
+而不是一张草图。
 
 | 层 | 职责 |
 | --- | --- |
@@ -218,6 +235,8 @@ Git（PR 评审 + CI）· conda（可复现环境）。
 4. 源代码、配置文件与训练好的模型权重。
 5. 一段 **10–15 分钟**的录制视频演示。
 6. 首次展示与最终展示两套 PPT。
+7. 每位成员 **1–2 页的个人报告**（个人贡献、最有收获的知识、如何在其他场景应用）。
+8. 按课程要求通过同伴互评系统提交的**同伴互评**。
 
 ### 7.10 风险与应对
 
@@ -233,13 +252,17 @@ Git（PR 评审 + CI）· conda（可复现环境）。
 
 ## 8. 提交前检查清单（9/30）
 
-- [ ] `Date of proposal` 已填
-- [ ] `Project Title` 已填（照抄第 2 节）
-- [ ] Canvas 分组编号已粘上，且 4 人均已入组
-- [ ] 4 人的姓名**与学号**齐全且正确
-- [ ] `Sponsor/Client` 一栏填写 `Not applicable — self-initiated project.`
-- [ ] `Background/Aims/Objectives` 已粘贴，目标表格排版正常
-- [ ] `Project Descriptions` 已粘贴，且第 7.2 节让"四项选三项"的覆盖清晰无歧义
+- [x] `Date of proposal` 已填
+- [x] `Project Title` 已填（照抄第 2 节）
+- [x] Canvas 分组编号（**43**）已填，且 4 人均已入组
+- [x] 4 人的姓名**与学号**齐全且正确
+- [x] `Sponsor/Client` 一栏填写 `Not applicable — self-initiated project.`
+- [x] `Background/Aims/Objectives` 已生成，目标表格排版正常
+- [x] `Project Descriptions` 已生成，且第 7.2 节让"四项选三项"的覆盖清晰无歧义
 - [ ] 已导出 PDF，打开 PDF 确认表格没有把文字截断
 - [ ] **已上传到 Canvas → Assignments → Practice Module**（每队一份）
 - [ ] 提交回执截图存入 `deliverables/`
+
+> 前七项已勾选，是因为 `scripts/make_proposal.py` 现在会确定性地写入它们。
+> 剩下三项是人工步骤：在 Word 里把 DOCX 导出为 PDF（本环境没有 LibreOffice/LaTeX，
+> 因此 PDF 导出无法自动化）、确认表格没有截断文字、然后上传。

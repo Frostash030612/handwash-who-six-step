@@ -165,8 +165,10 @@ PROJECT_DESCRIPTIONS: Final[tuple[dict[str, Any], ...]] = (
         "heading": "3. System architecture",
         "paragraphs": (
             "A five-layer design; each layer has one responsibility and dependencies point only "
-            "downwards. This structure is already implemented and version-controlled, so the "
-            "proposal describes something that exists rather than something intended.",
+            "downwards. The structure is fixed in the repository as a single source of truth (the "
+            "configuration contract plus the directory convention): the contract layer, the data and "
+            "IO layer and the orchestration layer are already implemented and version-controlled, "
+            "and the model layer is implemented against the same contract in weeks 2-3.",
             "L0 Infrastructure - path constants, logging, exception hierarchy. "
             "L1 Contract layer - the label space (single authoritative definition of the six WHO "
             "steps), data contracts, configuration schema, metrics, and the completeness decision "
@@ -281,6 +283,9 @@ PROJECT_DESCRIPTIONS: Final[tuple[dict[str, Any], ...]] = (
             "Source code, configuration files and trained model weights.",
             "A 10-15 minute recorded video presentation.",
             "Slides for both the first and the final presentation.",
+            "A 1-2 page individual report per member (personal contribution; what was learnt that "
+            "is most useful; how it applies elsewhere).",
+            "Peer review submitted through the peer review system.",
         ),
     },
     {

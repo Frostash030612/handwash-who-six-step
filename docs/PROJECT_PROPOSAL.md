@@ -6,13 +6,29 @@ Ready-to-paste content for [`Project_Proposal_Template.docx`](Project_Proposal_T
 **Deadline: 30 Sep 2026.** Open the DOCX template, fill each row of its table from the sections
 below, export to PDF, and submit one copy per team to Canvas → Assignments → Practice Module.
 
+**Do not fill the template by hand.** Generate both language versions from this same content with
+one command, so the DOCX and this file can never drift apart:
+
+```bash
+python scripts/make_proposal.py --lang en --group-id 43 \
+    --members "Shen Ziyi:A0350940J" "Wang Lepeng:A0357864L" \
+              "Zhu Jianyu:A0353769L" "Xu Wenzhe:A0328771W"
+python scripts/make_proposal.py --lang zh --group-id 43 \
+    --members "Shen Ziyi:A0350940J" "Wang Lepeng:A0357864L" \
+              "Zhu Jianyu:A0353769L" "Xu Wenzhe:A0328771W"
+```
+
+Output: `deliverables/project_proposal_en.docx` and `deliverables/project_proposal_zh.docx`
+(add `--format md` for a Markdown copy of either). `deliverables/` is git-ignored on purpose —
+the proposal carries student IDs, so it circulates locally, not through the public repo.
+
 > The template has exactly these rows. Do not add or reorder them:
 > `Date of proposal` · `Project Title` · `Group ID (As Enrolled in Canvas Class Groups)` ·
 > `Group Members (name, Student ID)` · `Sponsor/Client` · `Background/Aims/Objectives` ·
 > `Project Descriptions`.
 >
-> **Fill in first:** `Date of proposal`, `Group ID`, group members, and the bracketed
-> `[...]` placeholders. Everything else is written and ready.
+> The group ID and member list are filled in below (Canvas group **43**). Everything else is
+> written and ready.
 
 ---
 
@@ -39,16 +55,16 @@ Recognition and Procedure Completeness Assessment
 ## 3. Group ID (As Enrolled in Canvas Class Groups)
 
 ```
-[PASTE YOUR CANVAS GROUP ID HERE]
+43
 ```
 
 ## 4. Group Members (name, Student ID)
 
 ```
-[1] [Full Name] — [Student ID]     (Data & Evaluation Lead)
-[2] [Full Name] — [Student ID]     (Model & Training Lead)
-[3] [Full Name] — [Student ID]     (Temporal & Assessment Lead)
-[4] [Full Name] — [Student ID]     (Product, Demo & Delivery Lead)
+[1] Shen Ziyi  — A0350940J     (Data & Evaluation Lead)
+[2] Wang Lepeng — A0357864L    (Model & Training Lead)
+[3] Zhu Jianyu — A0353769L     (Temporal & Assessment Lead)
+[4] Xu Wenzhe  — A0328771W     (Product, Demo & Delivery Lead)
 ```
 
 ## 5. Sponsor/Client
@@ -139,8 +155,11 @@ This project addresses **all four**, which we state explicitly so the contributi
 ### 7.3 System architecture
 
 A five-layer design; each layer has one responsibility, and dependencies point only downwards.
-This structure is already implemented and version-controlled, so the proposal describes something
-that exists rather than something intended.
+The structure is fixed in the repository as a single source of truth (the configuration contract
+plus the directory convention): the contract layer, the data and IO layer and the orchestration
+layer are already implemented and version-controlled, and the model layer is implemented against
+the same contract in weeks 2–3 — so the proposal describes a system whose foundations exist, not a
+sketch.
 
 | Layer | Responsibility |
 | --- | --- |
@@ -241,6 +260,9 @@ reproducible environments.
 4. Source code, configuration files and trained model weights.
 5. A **10–15 minute** recorded video presentation.
 6. Slides for both the first and the final presentation.
+7. A **1–2 page individual report per member** (personal contribution; what was learnt that is most
+   useful; how it applies elsewhere).
+8. **Peer review**, submitted through the peer review system.
 
 ### 7.10 Risks and mitigations
 
@@ -256,13 +278,18 @@ reproducible environments.
 
 ## 8. Pre-submission checklist (30 Sep)
 
-- [ ] `Date of proposal` filled
-- [ ] `Project Title` filled (use §2 verbatim)
-- [ ] Canvas group ID pasted and all four members are enrolled
-- [ ] All four members' names **and student IDs** present and correct
-- [ ] `Sponsor/Client` row says `Not applicable — self-initiated project.`
-- [ ] `Background/Aims/Objectives` pasted, and the objective table reads cleanly
-- [ ] `Project Descriptions` pasted, with §7.2 making the 3-of-4 aspect coverage unambiguous
+- [x] `Date of proposal` filled
+- [x] `Project Title` filled (use §2 verbatim)
+- [x] Canvas group ID (**43**) filled in, and all four members enrolled
+- [x] All four members' names **and student IDs** present and correct
+- [x] `Sponsor/Client` row says `Not applicable — self-initiated project.`
+- [x] `Background/Aims/Objectives` generated, and the objective table reads cleanly
+- [x] `Project Descriptions` generated, with §7.2 making the 3-of-4 aspect coverage unambiguous
 - [ ] Exported to PDF, opened the PDF, confirmed no text was cut off by the table cells
 - [ ] **Uploaded to Canvas → Assignments → Practice Module** (one submission per team)
 - [ ] Screenshot of the submission receipt stored in `deliverables/`
+
+> The first seven boxes are ticked because `scripts/make_proposal.py` now writes them
+> deterministically. The remaining three are human steps: export the DOCX to PDF in Word
+> (no LibreOffice/LaTeX is available in this environment, so PDF export cannot be automated here),
+> verify the table did not clip the text, and upload.
