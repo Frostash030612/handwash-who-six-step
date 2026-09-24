@@ -14,19 +14,29 @@
     # 英文正式提案（官方提交格式）：填上 Canvas 分组编号与四个人的姓名学号
     python scripts/make_proposal.py --lang en \
         --group-id "43" \
-        --members "Shen Ziyi:A0350940J" "Wang Lepeng:A0357864L" \
-                  "Zhu Jianyu:A0353769L" "Xu Wenzhe:A0328771W"
+        --members "Full Name:A0000000X" "Full Name:A0000000Y" \
+                  "Full Name:A0000000Z" "Full Name:A0000000W"
 
     # 中文正式提案（姓名沿用学籍登记拼写，避免臆造汉字姓名）
     python scripts/make_proposal.py --lang zh \
-        --group-id "43" --members "Shen Ziyi:A0350940J" ...
+        --group-id "43" --members "Full Name:A0000000X" ...
 
     # Markdown 版本（便于评审与 diff），以及与 DOCX 完全同源的内容
     python scripts/make_proposal.py --lang zh --format md
 
+    # 可入 Git 的脱敏副本（学号 A0123456X -> A012****X），写到 deliverables/repo/
+    python scripts/make_proposal.py --lang zh --mask-ids
+
 生成物（默认）:
-    deliverables/project_proposal_en.docx  ← 用 Word 打开 → 导出 PDF → 交 Canvas
-    deliverables/project_proposal_zh.docx  ← 组内评审 / 存档
+    deliverables/project_proposal_{en,zh}.docx  ← 完整学号，用 Word 导出 PDF 交 Canvas
+    deliverables/project_proposal_{en,zh}.md    ← 完整学号，组内评审
+    deliverables/repo/project_proposal_*.{docx,md}  ← --mask-ids 产物，学号已脱敏，可进 Git
+
+为什么要有脱敏副本:
+    `deliverables/` 被 .gitignore 整体排除，原因是提交件含姓名与学号。
+    但组内需要在仓库里看到提案，所以额外产出 `repo/` 下的脱敏版：
+    保留可辨识度（一眼知道是哪位组员），但无法还原成完整学号。
+    **`repo/` 里的副本不能直接交 Canvas** —— 交作业请用没有 `repo/` 的那一层。
 
 设计约束（CONTRIBUTING.md R3）
     正文文案全部来自 `src/handwash/proposal_content.py`（英文）与
@@ -453,6 +463,40 @@ def _format_members(members: list[str]) -> list[str]:
     return formatted
 
 
+def _mask_id(sid: str, *, keep_prefix: int = 4, keep_suffix: int = 1) -> str:
+    """学号脱敏：保留前 ``keep_prefix`` 位与末 ``keep_suffix`` 位，中间一律打星。
+
+    例：``A0123456X`` -> ``A012****X``。
+
+    为什么前后各留几位、而不是整段打星：脱敏副本仍要能被人一眼对上是哪位组员
+    （组内评审、与导师沟通都需要），但**无法还原**成可冒用的完整学号。
+    交 Canvas 的正式版本请用不带 ``--mask-ids`` 的完整版。
+    """
+    sid = sid.strip()
+    if not sid:
+        return sid
+    if len(sid) <= keep_prefix + keep_suffix:
+        return "*" * len(sid)
+    return sid[:keep_prefix] + "*" * (len(sid) - keep_prefix - keep_suffix) + sid[-keep_suffix:]
+
+
+def _mask_id_field(value: str) -> str:
+    """只脱敏字段里的学号本身，保留紧随其后的角色说明。
+
+    ``"A0123456X (Data & Evaluation)"`` -> ``"A012****X (Data & Evaluation)"``
+    """
+    head, sep, tail = value.strip().partition(" ")
+    return _mask_id(head) + (f"{sep}{tail}" if sep else "")
+
+
+def _mask_member(raw: str) -> str:
+    """``"姓名:学号 (角色)"`` -> ``"姓名:脱敏学号 (角色)"``；没有冒号时原样返回。"""
+    if ":" not in raw:
+        return raw
+    name, _, sid = raw.partition(":")
+    return f"{name.strip()}:{_mask_id_field(sid)}"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="从官方模板生成填好的项目提案（DOCX / Markdown，中英文）",
@@ -460,8 +504,7 @@ def main() -> int:
         epilog=(
             "示例：\n"
             "  python scripts/make_proposal.py --lang en --group-id 43 \\\n"
-            "      --members 'Shen Ziyi:A0350940J' 'Wang Lepeng:A0357864L' \\\n"
-            "                'Zhu Jianyu:A0353769L' 'Xu Wenzhe:A0328771W'\n"
+            "      --members 'Full Name:A0000000X' 'Full Name:A0000000Y'\n"
             "\n成员格式为 姓名:学号；只写姓名也可以（学号留占位，稍后在 Word 里补）。"
         ),
     )
@@ -475,6 +518,11 @@ def main() -> int:
     parser.add_argument("--members", nargs="*", default=[], help='成员，"姓名:学号" 形式，可多个')
     parser.add_argument("--member-names", default="", help="只给姓名时的快捷方式：逗号分隔")
     parser.add_argument("--date", default="", help="提案日期（默认取内容模块的 PROPOSAL_DATE）")
+    parser.add_argument(
+        "--mask-ids",
+        action="store_true",
+        help="脱敏学号（A0123456X -> A012****X），并把产物写到 deliverables/repo/",
+    )
     parser.add_argument("--dry-run", action="store_true", help="只检查，不写文件")
     args = parser.parse_args()
 
@@ -486,10 +534,18 @@ def main() -> int:
         members = [name.strip() for name in args.member_names.split(",") if name.strip()]
     if not members:
         members = ["[Name 1]", "[Name 2]", "[Name 3]", "[Name 4]"]
+    if args.mask_ids:
+        members = [_mask_member(raw) for raw in members]
     formatted = _format_members(members)
 
     default_name = f"project_proposal_{args.lang}.{args.format}"
-    out = Path(args.out) if args.out else OUT_DIR / default_name
+    if args.out:
+        out = Path(args.out)
+    elif args.mask_ids:
+        # 脱敏副本单独放 repo/，绝不覆盖待交 Canvas 的完整版
+        out = OUT_DIR / "repo" / default_name
+    else:
+        out = OUT_DIR / default_name
 
     if args.dry_run:
         print("语言  :", args.lang)

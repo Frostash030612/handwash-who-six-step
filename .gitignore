@@ -71,8 +71,14 @@ models/
 # --- 提交件（含个人姓名/学号，不进 Git）-------------------------------------
 # 提案、报告、视频、PPT、最终 ZIP 都由脚本生成或人工产出，
 # 统一放 deliverables/ 并在本地/共享盘流转；不要提交到公开可查的地方。
-deliverables/
+#
+# 【必须用 deliverables/* 而不是 deliverables/】
+# Git 不允许重新包含"父目录已被排除"的文件：写了 `deliverables/` 之后，
+# 下面的 `!deliverables/README.md` 会完全失效（本仓库曾经就是这个问题）。
+deliverables/*
 !deliverables/README.md
+# 脱敏副本进仓库供组内查看（学号掩码为 A035****J）；完整学号的版本一律不进。
+!deliverables/repo/
 
 # --- 实验输出（保留结构，不保留内容）---------------------------------------
 outputs/*
