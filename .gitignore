@@ -79,9 +79,7 @@ data/raw/**
 #
 # 【必须用 deliverables/* 而不是 deliverables/】
 # Git 不允许重新包含"父目录已被排除"的文件：写了 `deliverables/` 之后，
-# 下面的 `!deliverables/README.md
-# User-requested upload of this specific presentation. Other deliverables stay ignored.
-!deliverables/Video-based-Six-Step-Handwashing-Assessment.pptx` 会完全失效（本仓库曾经就是这个问题）。
+# 下面的 `!deliverables/README.md` 会完全失效（本仓库曾经就是这个问题）。
 deliverables/*
 !deliverables/README.md
 # User-requested upload of this specific presentation. Other deliverables stay ignored.
