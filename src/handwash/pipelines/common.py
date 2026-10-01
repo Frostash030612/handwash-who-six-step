@@ -18,19 +18,19 @@ from torch.utils.data import DataLoader
 from handwash.core.config import ResolvedConfig
 from handwash.core.labels import get_label_space
 from handwash.core.schema import FrameRecord, Split
-from handwash.core.temporal import window_starts
 from handwash.core.seeding import worker_init_fn
+from handwash.core.temporal import window_starts
 from handwash.errors import DataError, TrainingError
 from handwash.logging import get_logger
 
 __all__ = [
-    "resolve_device",
-    "describe_device",
     "build_manifest_loader",
     "clip_collate",
+    "describe_device",
     "group_records_by_clip",
-    "resolve_split_records",
     "maybe_enable_tf32",
+    "resolve_device",
+    "resolve_split_records",
 ]
 
 log = get_logger(__name__)
@@ -289,7 +289,7 @@ class ClipBatchSampler(torch.utils.data.Sampler[list[int]]):
         self._window = window
         self._stride = window
 
-    def set_window(self, window: int, stride: int | None = None) -> "ClipBatchSampler":
+    def set_window(self, window: int, stride: int | None = None) -> ClipBatchSampler:
         """Set temporal window and stride from the resolved model configuration."""
         self._window = max(1, int(window))
         self._stride = self._window if stride is None else int(stride)

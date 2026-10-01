@@ -30,12 +30,12 @@ from handwash.paths import ensure_dir
 
 __all__ = [
     "VideoMeta",
-    "probe_video",
-    "iter_frames",
+    "available_backend",
     "extract_frames",
+    "iter_frames",
+    "probe_video",
     "save_frame",
     "write_video",
-    "available_backend",
 ]
 
 log = get_logger(__name__)
@@ -120,7 +120,7 @@ def probe_video(path: str | Path, *, backend: Backend | None = None) -> VideoMet
 
     try:
         meta = iio.immeta(str(target), plugin="pyav")
-    except Exception:  # noqa: BLE001 - imageio 各插件报错类型不统一
+    except Exception:
         meta = iio.immeta(str(target))
     fps = float(meta.get("fps", 0.0) or 0.0)
     duration = float(meta.get("duration", 0.0) or 0.0)
@@ -238,7 +238,7 @@ def _iter_imageio(
     if max_frames is not None and meta.frame_count <= 0:
         try:
             frame_count = sum(1 for _ in iio.imiter(str(target)))
-        except Exception as exc:  # noqa: BLE001 - decoder errors vary by plugin
+        except Exception as exc:
             raise VideoDecodeError(target, f"无法统计视频帧数：{exc}") from exc
     else:
         frame_count = meta.frame_count
@@ -279,12 +279,12 @@ def _evenly_selected_raw_indices(frame_count: int, stride: int, max_frames: int 
         return None
     candidates = np.arange(0, frame_count, stride, dtype=np.int64)
     if len(candidates) <= max_frames:
-        return set(int(index) for index in candidates)
+        return {int(index) for index in candidates}
     if max_frames == 1:
         return {int(candidates[len(candidates) // 2])}
     positions = np.linspace(0, len(candidates) - 1, num=max_frames)
     selected_positions = np.rint(positions).astype(np.int64)
-    return set(int(index) for index in candidates[selected_positions])
+    return {int(index) for index in candidates[selected_positions]}
 
 
 def extract_frames(
@@ -357,7 +357,7 @@ def write_video(
     try:
         iio.imwrite(str(target), np.stack(arrays), fps=fps, codec="libx264")
         return target
-    except Exception as exc:  # noqa: BLE001 - 具体异常类型由 ffmpeg 后端决定
+    except Exception as exc:
         log.warning("mp4 编码失败（%s），改为写出 GIF", exc)
         return _write_gif(arrays, target.with_suffix(".gif"), fps)
 

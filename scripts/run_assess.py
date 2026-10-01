@@ -23,13 +23,12 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _bootstrap import PROJECT_ROOT  # noqa: E402,F401
-from _common import build_config_parser, load_config_from_args  # noqa: E402
-
-from handwash.cli import split_argv  # noqa: E402
-from handwash.core.config import load_config, parse_overrides  # noqa: E402
-from handwash.io.utils import read_csv, write_csv  # noqa: E402
-from handwash.logging import get_logger, setup_logging  # noqa: E402
+from _bootstrap import PROJECT_ROOT  # noqa: F401
+from _common import build_config_parser, load_config_from_args
+from handwash.cli import split_argv
+from handwash.core.config import parse_overrides
+from handwash.io.utils import read_csv, write_csv
+from handwash.logging import get_logger, setup_logging
 
 log = get_logger(__name__)
 
@@ -113,7 +112,7 @@ def _table(rows: list[dict[str, object]]) -> str:
     lines = [header, "-" * len(header)]
     for row in rows:
         lines.append(
-            f"{str(row['clip_id']):<26}"
+            f"{row['clip_id']!s:<26}"
             f"{'是' if row['is_complete'] else '否':<6}"
             f"{'是' if row['is_in_order'] else '否':<6}"
             f"{float(row['overall_score']):>7.2f}"

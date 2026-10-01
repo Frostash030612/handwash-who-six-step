@@ -13,19 +13,12 @@ import pytest
 
 from handwash import paths
 from handwash.paths import (
-    CONFIGS_DIR,
     DATA_DIR,
     DATA_EXTERNAL,
     DATA_INTERIM,
     DATA_PROCESSED,
     DATA_RAW,
-    DOCS_DIR,
-    MODELS_DIR,
-    OUTPUTS_DIR,
     PROJECT_ROOT,
-    SCRIPTS_DIR,
-    SRC_DIR,
-    TESTS_DIR,
     data_root,
     ensure_dir,
     project_path,

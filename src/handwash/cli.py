@@ -27,7 +27,7 @@ from handwash.errors import HandwashError
 from handwash.logging import get_logger, setup_logging
 from handwash.paths import checkpoint_path
 
-__all__ = ["main", "build_parser", "split_argv"]
+__all__ = ["build_parser", "main", "split_argv"]
 
 log = get_logger(__name__)
 
@@ -149,7 +149,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except KeyboardInterrupt:
         log.warning("被用户中断")
         return 130
-    except Exception:  # noqa: BLE001 - 未知错误必须保留完整 traceback，否则无法调试
+    except Exception:
         log.exception("发生未预期的错误（这是 bug，请把下面的堆栈贴到 issue 里）")
         return EXIT_ERROR
 

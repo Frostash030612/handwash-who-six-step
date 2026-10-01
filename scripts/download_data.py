@@ -62,9 +62,8 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _bootstrap import PROJECT_ROOT  # noqa: E402,F401
-
-from handwash.data_sources import (  # noqa: E402
+from _bootstrap import PROJECT_ROOT
+from handwash.data_sources import (
     ZENODO_API,
     ZENODO_FILE_URL,
     all_dataset_names,
@@ -213,7 +212,7 @@ def allocate_shares(
     )
 
     buckets: dict[int, list[dict]] = {i: [] for i in range(1, shares + 1)}
-    loads: dict[int, int] = {i: 0 for i in range(1, shares + 1)}
+    loads: dict[int, int] = dict.fromkeys(range(1, shares + 1), 0)
     for item in payload:
         target = min(loads, key=lambda i: (loads[i], i))  # 平票取下标小的，保证确定性
         buckets[target].append(item)
@@ -240,7 +239,7 @@ def parse_share(text: str) -> tuple[int, int]:
 # 下载与校验
 # ===========================================================================
 def _md5_of(path: Path, *, chunk: int = 1024 * 1024) -> str:
-    digest = hashlib.md5()  # noqa: S324 - 对齐 Zenodo 公布的校验算法，不用于安全用途
+    digest = hashlib.md5()
     with path.open("rb") as handle:
         for block in iter(lambda: handle.read(chunk), b""):
             digest.update(block)
@@ -450,7 +449,6 @@ def scan_verified(dataset: str, files: list[dict]) -> dict[str, bool]:
 def cmd_list(dataset: str, *, offline: bool) -> int:
     files = fetch_record_files(dataset, offline=offline)
     entry = get_dataset(dataset)
-    verified = local_verified(dataset)
     destination = raw_dir(dataset)
 
     print(f"数据集 : {dataset}  ({entry.get('name', '')})")

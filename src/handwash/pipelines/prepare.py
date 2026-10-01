@@ -36,21 +36,20 @@ from typing import Any
 from handwash.core.config import ResolvedConfig
 from handwash.core.labels import NON_WASH_STEPS, Step, get_label_space
 from handwash.core.schema import ClipRecord, FrameRecord, Split
-from handwash.errors import ConfigError, DatasetNotFoundError, DataError
+from handwash.errors import ConfigError, DataError, DatasetNotFoundError
 from handwash.io.manifest import write_manifest
-from handwash.io.split import assert_no_leakage, assign_frames, split_clips, split_report
+from handwash.io.split import assert_no_leakage, split_clips, split_report
 from handwash.io.utils import write_json
 from handwash.io.video import extract_frames, save_frame
 from handwash.logging import get_logger
 from handwash.paths import (
     DATA_PROCESSED_DIRNAME,
     SYNTHETIC_DIRNAME,
-    PROJECT_ROOT,
     ensure_dir,
     resolve_relative,
 )
 
-__all__ = ["PrepareResult", "prepare", "SOURCE_NAMES"]
+__all__ = ["SOURCE_NAMES", "PrepareResult", "prepare"]
 
 log = get_logger(__name__)
 
@@ -312,7 +311,7 @@ def _records_from_pskuss(rc: ResolvedConfig, root: Path) -> tuple[list[FrameReco
             for index, row in enumerate(rows):
                 try:
                     label = space.canonicalize(row["movement_code"])
-                except Exception:  # noqa: BLE001 - 无法识别的 code 记为 unknown 并计数
+                except Exception:
                     skipped_unknown_label += 1
                     label = Step.UNKNOWN
                 labels.append(label)
@@ -412,7 +411,7 @@ def _records_from_metc(rc: ResolvedConfig, root: Path) -> tuple[list[FrameRecord
             candidates,
             key=lambda video: sum(
                 1
-                for left, right in zip(ann_parts, video.parent.relative_to(root).parts)
+                for left, right in zip(ann_parts, video.parent.relative_to(root).parts, strict=False)
                 if left == right
             ),
             reverse=True,
@@ -420,12 +419,12 @@ def _records_from_metc(rc: ResolvedConfig, root: Path) -> tuple[list[FrameRecord
         if len(ranked) > 1:
             best_score = sum(
                 1
-                for left, right in zip(ann_parts, ranked[0].parent.relative_to(root).parts)
+                for left, right in zip(ann_parts, ranked[0].parent.relative_to(root).parts, strict=False)
                 if left == right
             )
             next_score = sum(
                 1
-                for left, right in zip(ann_parts, ranked[1].parent.relative_to(root).parts)
+                for left, right in zip(ann_parts, ranked[1].parent.relative_to(root).parts, strict=False)
                 if left == right
             )
             if best_score == next_score:
@@ -493,7 +492,7 @@ def _records_from_metc(rc: ResolvedConfig, root: Path) -> tuple[list[FrameRecord
                     )
             try:
                 label = space.canonicalize(value)
-            except Exception as exc:  # noqa: BLE001 - fail rather than silently poison labels
+            except Exception as exc:
                 raise DataError(
                     f"METC 标签无法映射：{value!r}（{annotation}，第 {index + 1} 条）",
                     hint="公开标签应为 0..6；核对 METC JSON schema 与 dataset.label_space。",
@@ -564,7 +563,7 @@ def _records_from_video_dirs(rc: ResolvedConfig, root: Path) -> tuple[list[Frame
     for label_dir in video_dirs:
         try:
             label = space.canonicalize(label_dir.name)
-        except Exception:  # noqa: BLE001 - 不是标签目录就跳过
+        except Exception:
             continue
         if label not in space:
             if label in NON_WASH_STEPS and not rc.dataset.include_non_wash:
@@ -689,9 +688,9 @@ def _placeholder_frames(rc: ResolvedConfig, clip_id: str, video: Path, label) ->
 
 
 def _project_root() -> Path:
-    from handwash.paths import PROJECT_ROOT as root
+    from handwash.paths import PROJECT_ROOT
 
-    return root
+    return PROJECT_ROOT
 
 
 def _portable_path(path: Path) -> str:
@@ -1057,7 +1056,7 @@ def _extract_and_register(
                     frame_step=rc.dataset.prep.frame_step,
                     max_frames=caps.get(split_name),
                 )
-            except Exception as exc:  # noqa: BLE001 - 单段失败不中断整批
+            except Exception as exc:
                 log.error("抽帧失败，已跳过：%s（%s）", video_path, exc)
                 continue
 

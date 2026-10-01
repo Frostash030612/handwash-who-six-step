@@ -28,22 +28,22 @@ from handwash.core.schema import ProtocolReport, ProtocolViolation, StepStatisti
 from handwash.errors import ProtocolError
 
 __all__ = [
-    "smooth_labels",
-    "segment",
-    "collapse_repeats",
-    "check_coverage",
-    "check_order",
-    "check_durations",
-    "check_repeats",
-    "build_report",
     "Segment",
+    "build_report",
+    "check_coverage",
+    "check_durations",
+    "check_order",
+    "check_repeats",
+    "collapse_repeats",
+    "segment",
+    "smooth_labels",
 ]
 
 
 class Segment:
     """一段连续的同标签动作（半开区间 [start, end)）。"""
 
-    __slots__ = ("label", "start", "end", "mean_confidence")
+    __slots__ = ("end", "label", "mean_confidence", "start")
 
     def __init__(self, label: Step, start: int, end: int, mean_confidence: float = 1.0) -> None:
         if end <= start:
@@ -382,8 +382,8 @@ def build_report(
     )
 
     # --- 逐步骤统计 -------------------------------------------------------
-    duration_by_step: dict[Step, float] = {s: 0.0 for s in STEP_ORDER}
-    frames_by_step: dict[Step, int] = {s: 0 for s in STEP_ORDER}
+    duration_by_step: dict[Step, float] = dict.fromkeys(STEP_ORDER, 0.0)
+    frames_by_step: dict[Step, int] = dict.fromkeys(STEP_ORDER, 0)
     conf_by_step: dict[Step, list[float]] = {s: [] for s in STEP_ORDER}
     for seg, conf in zip(segments, _segment_mean_confs(segments), strict=True):
         if seg.label in STEP_ORDER:

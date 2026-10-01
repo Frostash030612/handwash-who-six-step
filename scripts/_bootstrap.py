@@ -21,8 +21,8 @@ from pathlib import Path
 __all__ = [
     "PROJECT_ROOT",
     "SRC_DIR",
-    "handwash_root",
     "cli_main",
+    "handwash_root",
     "run_cli",
 ]
 

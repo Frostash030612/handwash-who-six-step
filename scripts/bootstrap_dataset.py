@@ -50,9 +50,8 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _bootstrap import PROJECT_ROOT  # noqa: E402,F401
-
-from handwash.data_sources import (  # noqa: E402
+from _bootstrap import PROJECT_ROOT
+from handwash.data_sources import (
     all_dataset_names,
     get_dataset,
     iter_registered_files,
@@ -117,7 +116,7 @@ class Step:
         self.detail = detail
         self.started = 0.0
 
-    def __enter__(self) -> "Step":
+    def __enter__(self) -> Step:
         self.started = time.time()
         print()
         print("=" * 78)
@@ -208,7 +207,7 @@ def preflight(dataset: str, *, only_shards: list[str] | None) -> dict:
     extras = [row for row in targets if not row[0].lower().endswith(".zip")]
 
     def _md5_of(path: Path, *, chunk: int = 1024 * 1024) -> str:
-        digest = hashlib.md5()  # noqa: S324 - 对齐 Zenodo 公布的校验算法，非安全用途
+        digest = hashlib.md5()
         with path.open("rb") as handle:
             for block in iter(lambda: handle.read(chunk), b""):
                 digest.update(block)
@@ -403,7 +402,6 @@ def summary(
     print("#" * 78)
     print()
 
-    raw = state["root"]
     processed = data_root() / "processed" / dataset
 
     frames_dir = processed / "frames"

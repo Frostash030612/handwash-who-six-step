@@ -23,13 +23,12 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _bootstrap import PROJECT_ROOT  # noqa: E402,F401  （副作用：注册导入路径）
-
-from handwash.cli import split_argv  # noqa: E402
-from handwash.cli_doctor import run_doctor  # noqa: E402
-from handwash.core.config import load_config, parse_overrides  # noqa: E402
-from handwash.errors import HandwashError  # noqa: E402
-from handwash.logging import setup_logging  # noqa: E402
+from _bootstrap import PROJECT_ROOT  # noqa: F401  （副作用：注册导入路径）
+from handwash.cli import split_argv
+from handwash.cli_doctor import run_doctor
+from handwash.core.config import load_config, parse_overrides
+from handwash.errors import HandwashError
+from handwash.logging import setup_logging
 
 
 def main() -> int:

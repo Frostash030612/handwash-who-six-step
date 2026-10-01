@@ -14,7 +14,6 @@ from __future__ import annotations
 import importlib
 import platform
 import sys
-from typing import Any
 
 from handwash import __version__
 from handwash.core.config import ResolvedConfig
@@ -22,7 +21,7 @@ from handwash.core.labels import LABEL_SPACES, get_label_space
 from handwash.logging import get_logger
 from handwash.paths import PROJECT_ROOT, data_root, resolve_relative
 
-__all__ = ["run_doctor", "collect_checks"]
+__all__ = ["collect_checks", "run_doctor"]
 
 log = get_logger(__name__)
 
@@ -56,7 +55,7 @@ def _check_packages() -> list[tuple[str, str, str]]:
             module = importlib.import_module(name)
             version = getattr(module, "__version__", "?")
             rows.append((name, _OK, f"{version}"))
-        except Exception as exc:  # noqa: BLE001 - 导入失败原因很多（含二进制不兼容）
+        except Exception as exc:
             status = _FAIL if required else _WARN
             rows.append((name, status, f"缺失（{type(exc).__name__}）；{hint}"))
     return rows
@@ -79,7 +78,7 @@ def _check_runtime() -> list[tuple[str, str, str]]:
             rows.append(("cuda_version", _OK, str(torch.version.cuda)))
         else:
             rows.append(("gpu", _WARN, "不可用：训练会自动使用 CPU（会明显变慢）"))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         rows.append(("torch", _FAIL, f"{type(exc).__name__}: {exc}"))
     return rows
 
@@ -128,7 +127,7 @@ def _check_data(rc: ResolvedConfig | None) -> list[tuple[str, str, str]]:
 
     try:
         spec = rc.dataset_spec()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         rows.append(("dataset", _FAIL, str(exc)))
         return rows
 
@@ -157,7 +156,7 @@ def _check_data(rc: ResolvedConfig | None) -> list[tuple[str, str, str]]:
                     f"split={summary['frames_per_split']}",
                 )
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             rows.append(("manifest", _FAIL, f"存在但校验失败：{exc}"))
     else:
         rows.append(
@@ -191,7 +190,7 @@ def _check_model(rc: ResolvedConfig | None) -> list[tuple[str, str, str]]:
                 rows.append(("yolo 权重", _OK, f"可加载（ultralytics {probe.get('version')}）"))
             else:
                 rows.append(("yolo 权重", _WARN, f"{probe.get('error')}；{probe.get('hint')}"))
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             rows.append(("yolo", _FAIL, f"{type(exc).__name__}: {exc}"))
     else:
         rows.append(("model.arch", _OK, arch))

@@ -56,12 +56,12 @@ def full_sequence(frames: int = STEP_FRAMES) -> list[Step]:
     return seq(*[(step, frames) for step in ALL_STEPS])
 
 
-def kinds(report) -> list[str]:  # noqa: ANN001 - 只用于断言的可读封装
+def kinds(report) -> list[str]:
     """提取违规类型列表，便于用 ``in`` / ``not in`` 做断言。"""
     return [violation.kind for violation in report.violations]
 
 
-def steps_of_kind(report, kind: str) -> list[Step | None]:  # noqa: ANN001
+def steps_of_kind(report, kind: str) -> list[Step | None]:
     """提取某一类违规涉及的步骤。"""
     return [violation.step for violation in report.violations if violation.kind == kind]
 
@@ -323,7 +323,7 @@ def test_check_durations_ratio_mode_compares_to_fair_share() -> None:
 def test_check_durations_ratio_mode_passes_a_perfectly_even_flow() -> None:
     """六步均分的流程不该被 ratio 口径误判为时长不足。"""
     cfg = AssessConfig(duration_check="ratio", step_duration_ratio=0.4)
-    even = check_durations({step: 10.0 for step in ALL_STEPS}, total_wash_s=60.0, cfg=cfg)
+    even = check_durations(dict.fromkeys(ALL_STEPS, 10.0), total_wash_s=60.0, cfg=cfg)
     assert even == []
 
 

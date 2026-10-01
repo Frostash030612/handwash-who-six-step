@@ -28,7 +28,7 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _bootstrap import PROJECT_ROOT  # noqa: E402,F401
+from _bootstrap import PROJECT_ROOT
 
 #: 双语文档配对表（与 scripts/sync_doc_locales.py 保持同步）
 PAIRS: tuple[tuple[str, str], ...] = (

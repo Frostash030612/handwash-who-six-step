@@ -9,14 +9,13 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _bootstrap import PROJECT_ROOT  # noqa: E402,F401
-from _common import build_config_parser, load_config_from_args  # noqa: E402
-
-from handwash.camera_app import serve_camera  # noqa: E402
-from handwash.cli import split_argv  # noqa: E402
-from handwash.core.config import parse_overrides  # noqa: E402
-from handwash.errors import HandwashError  # noqa: E402
-from handwash.logging import setup_logging  # noqa: E402
+from _bootstrap import PROJECT_ROOT  # noqa: F401
+from _common import build_config_parser, load_config_from_args
+from handwash.camera_app import serve_camera
+from handwash.cli import split_argv
+from handwash.core.config import parse_overrides
+from handwash.errors import HandwashError
+from handwash.logging import setup_logging
 
 
 def main() -> int:

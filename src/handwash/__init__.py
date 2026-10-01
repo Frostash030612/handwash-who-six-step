@@ -19,7 +19,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-__all__ = ["__version__", "PROJECT_ROOT", "ensure_src_on_path"]
+__all__ = ["PROJECT_ROOT", "__version__", "ensure_src_on_path"]
 
 __version__ = "0.1.0"
 

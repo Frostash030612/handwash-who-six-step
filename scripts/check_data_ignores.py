@@ -32,7 +32,7 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _bootstrap import PROJECT_ROOT  # noqa: E402,F401
+from _bootstrap import PROJECT_ROOT
 
 #: (路径, 是否应当被忽略, 为什么)
 #:

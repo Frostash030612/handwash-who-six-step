@@ -33,12 +33,12 @@ from handwash.logging import get_logger
 
 __all__ = [
     "MANIFEST_COLUMNS",
-    "write_manifest",
-    "read_manifest",
-    "validate_manifest",
-    "manifest_summary",
     "clips_from_manifest",
     "filter_manifest",
+    "manifest_summary",
+    "read_manifest",
+    "validate_manifest",
+    "write_manifest",
 ]
 
 log = get_logger(__name__)

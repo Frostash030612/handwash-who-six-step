@@ -16,8 +16,8 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
-import math
 import json
+import math
 import types
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, fields, is_dataclass
@@ -26,8 +26,8 @@ from typing import Any, Final, TypeVar, Union, get_args, get_origin, get_type_hi
 
 import yaml
 
-from handwash.errors import ConfigError, ConfigFileNotFoundError
 from handwash.core.labels import CANONICAL_STEPS, Step, get_label_space
+from handwash.errors import ConfigError, ConfigFileNotFoundError
 from handwash.paths import (
     CONFIGS_DIR,
     DATA_PROCESSED_DIRNAME,
@@ -41,11 +41,11 @@ __all__ = [
     "CONFIG_SCHEMA_VERSION",
     "AppConfig",
     "ResolvedConfig",
-    "load_config",
+    "apply_overrides",
     "dump_config",
     "hash_config",
+    "load_config",
     "merge_mappings",
-    "apply_overrides",
     "parse_overrides",
 ]
 
@@ -460,7 +460,7 @@ class ModelConfig(_ConfigBase):
     image_size: int = 224
     normalize: str = "zero_one"
     dropout: float = 0.2
-    temporal: "TemporalConfig" = field(default_factory=lambda: TemporalConfig())
+    temporal: TemporalConfig = field(default_factory=lambda: TemporalConfig())
 
     def validate(self) -> None:
         if isinstance(self.pretrained, str) and not self.pretrained.strip():
@@ -550,7 +550,7 @@ class TrainConfig(_ConfigBase):
     grad_clip_norm: float = 1.0
     precision: str = "fp32"  # fp32 | fp16 | bf16
     accumulate_grad_batches: int = 1
-    augment: "AugmentConfig" = field(default_factory=lambda: AugmentConfig())
+    augment: AugmentConfig = field(default_factory=lambda: AugmentConfig())
     focal_gamma: float = 0.0  # 0 表示普通交叉熵
 
     def validate(self) -> None:
@@ -781,7 +781,7 @@ class AppConfig(_ConfigBase):
                 f"配置 schema_version={self.schema_version} 与代码期望的 {CONFIG_SCHEMA_VERSION} 不一致",
                 hint="请按 CHANGELOG.md 的迁移说明更新配置文件，不要手工改这个数字了事。",
             )
-        for name, section in (
+        for _name, section in (
             ("runtime", self.runtime),
             ("paths", self.paths),
             ("dataset", self.dataset),
@@ -1034,7 +1034,7 @@ def _resolve_pretrained_path(app: AppConfig) -> Path | None:
     if configured.name.lower() in known_model_files:
         # Ultralytics may download its official architecture weight by name.
         return None
-    if configured.suffix.lower() in {".pt", ".pth", ".ckpt"} or configured.parent != Path("."):
+    if configured.suffix.lower() in {".pt", ".pth", ".ckpt"} or configured.parent != Path():
         searched = ", ".join(str(path) for path in candidates)
         raise ConfigError(
             f"找不到 model.pretrained 指定的权重文件：{raw!r}",

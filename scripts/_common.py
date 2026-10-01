@@ -16,12 +16,11 @@ from typing import Any
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _bootstrap import PROJECT_ROOT  # noqa: E402,F401  （副作用：注册导入路径）
+from _bootstrap import PROJECT_ROOT  # noqa: F401  （副作用：注册导入路径）
+from handwash.core.config import ResolvedConfig, load_config, parse_overrides
+from handwash.logging import setup_logging
 
-from handwash.core.config import ResolvedConfig, load_config, parse_overrides  # noqa: E402
-from handwash.logging import setup_logging  # noqa: E402
-
-__all__ = ["build_config_parser", "resolve_from_args", "add_common_flags"]
+__all__ = ["add_common_flags", "build_config_parser", "resolve_from_args"]
 
 
 def add_common_flags(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:

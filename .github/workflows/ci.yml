@@ -60,16 +60,16 @@ jobs:
       - name: .gitignore 数据规则体检（大数据必须被忽略，划分契约必须不被提交）
         run: python scripts/check_data_ignores.py
 
-      - name: 确认没有把数据/权重/输出提交进来
+      - name: 确认没有把数据/非演示权重/输出提交进来
         run: |
           set -e
           if git ls-files --error-unmatch 'data/raw/*' 2>/dev/null; then
             echo "::error::data/raw 下有文件被提交；数据集不得进入仓库（见 CONTRIBUTING.md R6）"
             exit 1
           fi
-          if git ls-files 'models/*' 'outputs/*' '*.pt' '*.pth' | grep -q .; then
-            echo "::error::发现被提交的模型权重或实验产物（见 CONTRIBUTING.md R6）"
-            git ls-files 'models/*' 'outputs/*' '*.pt' '*.pth'
+          if git ls-files 'models/*' 'outputs/*' '*.pt' '*.pth' | grep -v -x 'exp.pt' | grep -q .; then
+            echo "::error::发现被提交的非演示模型权重或实验产物（见 CONTRIBUTING.md R6）"
+            git ls-files 'models/*' 'outputs/*' '*.pt' '*.pth' | grep -v -x 'exp.pt'
             exit 1
           fi
           echo "仓库卫生检查通过"
@@ -127,6 +127,9 @@ jobs:
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install -e ".[torch,viz]"
 
+      - name: 摄像头实时分类契约测试（需要 torch）
+        run: python -m pytest tests/integration/test_live.py -q
+
       - name: 冒烟训练（合成数据，2 epoch，CPU）
         run: |
           python -m handwash.cli train config=configs/experiments/smoke.yaml \
@@ -166,6 +169,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: 安装配置解析依赖
+        run: python -m pip install pyyaml
 
       - name: 检查 environment.yml 的 pip 依赖是否都在 pyproject 里登记
         run: python scripts/check_config.py --env-consistency

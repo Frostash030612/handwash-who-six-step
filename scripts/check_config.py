@@ -23,10 +23,9 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _bootstrap import PROJECT_ROOT  # noqa: E402,F401
-
-from handwash.core.config import load_config  # noqa: E402
-from handwash.errors import HandwashError  # noqa: E402
+from _bootstrap import PROJECT_ROOT
+from handwash.core.config import load_config
+from handwash.errors import HandwashError
 
 CONFIG_DIR = PROJECT_ROOT / "configs"
 BASE_CONFIG = CONFIG_DIR / "config.yaml"
@@ -62,7 +61,7 @@ def check_loaded_overlays() -> list[str]:
         except HandwashError as exc:
             problems.append(f"{rel} 叠加后加载失败：{exc}")
             continue
-        except Exception as exc:  # noqa: BLE001 - 非预期异常也要报成问题而不是崩掉
+        except Exception as exc:
             problems.append(f"{rel} 叠加时发生意外错误：{type(exc).__name__}: {exc}")
             continue
         print(f"[OK]   {rel}  config_hash={resolved.config_hash}")

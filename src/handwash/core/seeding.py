@@ -16,7 +16,7 @@ from typing import Final
 
 import numpy as np
 
-__all__ = ["seed_everything", "DEFAULT_SEED", "worker_init_fn"]
+__all__ = ["DEFAULT_SEED", "seed_everything", "worker_init_fn"]
 
 DEFAULT_SEED: Final[int] = 42
 

@@ -34,17 +34,17 @@ __all__ = [
     "DATASETS",
     "ZENODO_API",
     "ZENODO_FILE_URL",
+    "GiB",
     "KiB",
     "MiB",
-    "GiB",
-    "get_dataset",
     "all_dataset_names",
-    "requires_manual_download",
-    "total_size_bytes",
-    "total_size_gb",
     "count_video_shards",
     "expected_shard_bytes",
+    "get_dataset",
+    "requires_manual_download",
     "summarise_download_progress",
+    "total_size_bytes",
+    "total_size_gb",
 ]
 
 ZENODO_API: Final[str] = "https://zenodo.org/api/records/{record}"
@@ -242,7 +242,7 @@ def expected_shard_bytes(name: str) -> int:
     )
 
 
-def summarise_download_progress(name: str, directory: "object") -> dict[str, object]:
+def summarise_download_progress(name: str, directory: object) -> dict[str, object]:
     """对比"登记的完整分片"与"本地实际存在的分片"，给出一份完整性摘要。
 
     Returns

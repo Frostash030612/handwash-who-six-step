@@ -26,18 +26,18 @@ import numpy as np
 from handwash.core.labels import Step
 
 __all__ = [
-    "Split",
-    "FrameIndex",
-    "FrameRecord",
-    "ClipRecord",
-    "Clip",
-    "Sample",
-    "FramePrediction",
-    "ClipPrediction",
-    "StepStatistic",
-    "ProtocolReport",
-    "EvalResult",
     "SCHEMA_VERSION",
+    "Clip",
+    "ClipPrediction",
+    "ClipRecord",
+    "EvalResult",
+    "FrameIndex",
+    "FramePrediction",
+    "FrameRecord",
+    "ProtocolReport",
+    "Sample",
+    "Split",
+    "StepStatistic",
 ]
 
 #: 契约版本号。任何破坏兼容的改动都必须 +1，并在 CHANGELOG.md 记录。
@@ -79,7 +79,7 @@ class FrameRecord:
         return d
 
     @classmethod
-    def from_dict(cls, row: Mapping[str, Any]) -> "FrameRecord":
+    def from_dict(cls, row: Mapping[str, Any]) -> FrameRecord:
         return cls(
             clip_id=str(row["clip_id"]),
             frame_index=int(row["frame_index"]),
@@ -129,7 +129,7 @@ class ClipRecord:
         }
 
     @classmethod
-    def from_dict(cls, row: Mapping[str, Any]) -> "ClipRecord":
+    def from_dict(cls, row: Mapping[str, Any]) -> ClipRecord:
         return cls(
             clip_id=str(row["clip_id"]),
             dataset=str(row["dataset"]),
@@ -343,7 +343,7 @@ class EvalResult:
         }
 
     @classmethod
-    def from_dict(cls, payload: Mapping[str, Any]) -> "EvalResult":
+    def from_dict(cls, payload: Mapping[str, Any]) -> EvalResult:
         return cls(
             split=str(payload["split"]),
             model_name=str(payload["model_name"]),

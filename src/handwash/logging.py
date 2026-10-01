@@ -16,7 +16,7 @@ import os
 import sys
 from typing import Final
 
-__all__ = ["get_logger", "setup_logging", "LOG_FORMAT", "DEFAULT_LEVEL"]
+__all__ = ["DEFAULT_LEVEL", "LOG_FORMAT", "get_logger", "setup_logging"]
 
 LOG_FORMAT: Final[str] = "%(asctime)s | %(levelname)-7s | %(name)-28s | %(message)s"
 DATE_FORMAT: Final[str] = "%Y-%m-%d %H:%M:%S"

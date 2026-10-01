@@ -5,12 +5,16 @@ from __future__ import annotations
 import unittest
 
 import numpy as np
-import torch
+import pytest
 
-from handwash.core.config import load_config
-from handwash.core.labels import Step, get_label_space
-from handwash.errors import DataError
-from handwash.pipelines.live import LiveClassifier, LiveSession
+torch = pytest.importorskip("torch")
+
+from handwash.core.config import load_config  # noqa: E402
+from handwash.core.labels import Step, get_label_space  # noqa: E402
+from handwash.errors import DataError  # noqa: E402
+from handwash.pipelines.live import LiveClassifier, LiveSession  # noqa: E402
+
+pytestmark = pytest.mark.integration
 
 
 def _config():

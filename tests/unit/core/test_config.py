@@ -341,7 +341,7 @@ def test_explicit_empty_datasets_section_raises(
         load_config([write_config(payload, "emptydatasets.yaml")])
 
 
-@pytest.mark.parametrize("version", [0, 2, 99])
+@pytest.mark.parametrize("version", [0, CONFIG_SCHEMA_VERSION - 1, CONFIG_SCHEMA_VERSION + 1])
 def test_schema_version_mismatch_raises(
     base_config_payload: dict[str, Any], write_config: Any, version: int
 ) -> None:

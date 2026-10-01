@@ -47,7 +47,7 @@ from handwash.pipelines.common import (
     resolve_split_records,
 )
 
-__all__ = ["TrainResult", "train", "EpochMetrics", "evaluate_loader"]
+__all__ = ["EpochMetrics", "TrainResult", "evaluate_loader", "train"]
 
 log = get_logger(__name__)
 

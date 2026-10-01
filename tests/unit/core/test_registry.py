@@ -211,7 +211,7 @@ def test_module_level_decorators_register_into_global_registries() -> None:
             (DATASETS, "pytest-fake-dataset"),
             (TRANSFORMS, "pytest-fake-transform"),
         ):
-            registry._items.pop(name, None)  # noqa: SLF001 - 清理测试写入的全局状态
+            registry._items.pop(name, None)
 
 
 def test_global_registry_names_are_sorted_strings() -> None:

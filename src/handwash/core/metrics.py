@@ -22,15 +22,15 @@ from handwash.errors import EvaluationError
 
 __all__ = [
     "EPS",
-    "confusion_matrix",
     "accuracy",
-    "precision_recall_f1",
-    "macro_f1",
-    "weighted_f1",
-    "per_class_report",
     "bootstrap_ci",
+    "confusion_matrix",
     "expected_calibration_error",
+    "macro_f1",
+    "per_class_report",
+    "precision_recall_f1",
     "top_k_accuracy",
+    "weighted_f1",
 ]
 
 EPS = 1e-12

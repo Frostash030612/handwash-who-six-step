@@ -130,7 +130,7 @@ exclude_lines = [
 line-length = 110
 target-version = "py310"
 src = ["src", "tests", "scripts"]
-extend-exclude = ["data", "outputs", "models", "*.ipynb"]
+extend-exclude = [".tmp", "build", "data", "outputs", "models", "*.egg-info", "*.ipynb"]
 
 [tool.ruff.lint]
 select = [
@@ -150,6 +150,15 @@ select = [
 ignore = [
   "E501",  # 行长由 formatter 处理
   "B008",  # 允许 typer/argparse 风格的函数内默认值
+  "RUF001",  # 中文提示与文档正常使用全角标点
+  "RUF002",
+  "RUF003",
+  "RUF005",  # 列表拼接在测试样例中更直接
+  "RUF007",  # 保留现有相邻元素遍历写法
+  "RUF046",  # 显式 int 转换可把 NumPy 标量转换为 Python int
+  "PTH105",  # os.replace 用于原子替换临时文件
+  "SIM105",  # 明确列出需要忽略的异常便于阅读
+  "SIM108",  # 配置分支保留展开写法
 ]
 
 [tool.ruff.lint.isort]

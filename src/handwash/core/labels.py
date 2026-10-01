@@ -13,30 +13,29 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
 from enum import Enum
 from typing import Final
 
 from handwash.errors import ConfigError
 
 __all__ = [
-    "Step",
-    "StepFamily",
     "CANONICAL_STEPS",
-    "WASH_STEPS",
+    "LABEL_SPACES",
     "NON_WASH_STEPS",
+    "STEP_EN",
     "STEP_ORDER",
     "STEP_ORDER_INDEX",
-    "num_classes",
     "STEP_ZH",
-    "STEP_EN",
-    "LABEL_SPACES",
+    "WASH_STEPS",
     "LabelSpace",
-    "get_label_space",
+    "Step",
+    "StepFamily",
     "canonicalize",
     "canonicalize_sequence",
-    "to_space",
+    "get_label_space",
     "is_wash_step",
+    "num_classes",
+    "to_space",
 ]
 
 
@@ -141,7 +140,7 @@ def num_classes(*, include_non_wash: bool = True) -> int:
     return len(Step) if include_non_wash else len(CANONICAL_STEPS)
 
 
-def is_wash_step(label: "Step | str") -> bool:
+def is_wash_step(label: Step | str) -> bool:
     """判断是否为 WHO 六步之一（接受 Step 或任意别名字符串）。"""
     try:
         return canonicalize(label).family is StepFamily.WASH
@@ -349,7 +348,7 @@ class LabelSpace:
         命名空间内的额外别名，覆盖默认映射。
     """
 
-    __slots__ = ("name", "_labels", "_index", "_aliases")
+    __slots__ = ("_aliases", "_index", "_labels", "name")
 
     def __init__(self, name: str, labels: Sequence[Step], aliases: Mapping[str, Step] | None = None) -> None:
         if not labels:
@@ -425,7 +424,7 @@ class LabelSpace:
             )
         return self._labels[index]
 
-    def to_space(self, label: object, target: "LabelSpace") -> int:
+    def to_space(self, label: object, target: LabelSpace) -> int:
         """把本命名空间的标签转到另一个命名空间的通道下标。
 
         用途：PSKUS 训练的模型 + Kaggle 评估脚本，两边类别数不同也能对齐。

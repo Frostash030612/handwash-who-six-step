@@ -13,7 +13,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from pathlib import Path
 
-import numpy as np
 import torch
 
 from handwash.core.config import ResolvedConfig
@@ -116,7 +115,7 @@ def assess_videos(
             save_report(report, target, stem=Path(path).stem)
             if rc.infer.save_frame_predictions:
                 save_predictions(output, target / f"{Path(path).stem}_frames.jsonl")
-        except Exception as exc:  # noqa: BLE001 - 单段失败不应中断整批
+        except Exception as exc:
             log.error("视频处理失败，已跳过：%s（%s）", path, exc)
 
     if reports:

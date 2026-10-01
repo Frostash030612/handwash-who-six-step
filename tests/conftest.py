@@ -22,6 +22,7 @@ from typing import Any
 import pytest
 import yaml
 
+from handwash.core.config import CONFIG_SCHEMA_VERSION
 from handwash.core.labels import CANONICAL_STEPS, Step
 from handwash.paths import SRC_DIR
 
@@ -163,11 +164,11 @@ def base_config_payload(tmp_path_factory: pytest.TempPathFactory) -> dict[str, A
     """
     out_dir = tmp_path_factory.mktemp("handwash-out") / "outputs"
     return {
-        "schema_version": 1,
+        "schema_version": CONFIG_SCHEMA_VERSION,
         "project": {"name": "testproj"},
         "runtime": {"seed": 7, "run_name": "pytest"},
         "paths": {"out_dir": str(out_dir)},
-        "dataset": {"name": "kaggle", "root": "data/raw/kaggle"},
+        "dataset": {"name": "kaggle", "root": "data/raw/kaggle", "include_non_wash": False},
         "datasets": {"kaggle": {"root": "data/raw/kaggle"}},
         "train": {"epochs": 2},
     }

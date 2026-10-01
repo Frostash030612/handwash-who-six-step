@@ -21,14 +21,14 @@ from __future__ import annotations
 from typing import Any, Final
 
 __all__ = [
+    "BACKGROUND_OBJECTIVES",
+    "OBJECTIVES_TABLE",
+    "PRE_SUBMISSION_CHECKLIST",
+    "PROJECT_DESCRIPTIONS",
     "PROPOSAL_DATE",
     "PROPOSAL_TITLE",
     "PROPOSAL_TITLE_ZH",
     "SPONSOR_CLIENT",
-    "BACKGROUND_OBJECTIVES",
-    "OBJECTIVES_TABLE",
-    "PROJECT_DESCRIPTIONS",
-    "PRE_SUBMISSION_CHECKLIST",
 ]
 
 PROPOSAL_DATE: Final[str] = "30 September 2026"

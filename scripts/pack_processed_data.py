@@ -51,8 +51,8 @@ import hashlib
 import json
 import os
 import re
-import stat
 import shutil
+import stat
 import sys
 import tarfile
 import tempfile
@@ -64,7 +64,7 @@ from pathlib import Path, PurePosixPath
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _bootstrap import PROJECT_ROOT  # noqa: E402,F401
+from _bootstrap import PROJECT_ROOT
 
 #: 打进包里的相对路径白名单（相对数据集根目录）。
 #: 包含可直接训练并能复现原始划分的产物：帧图像、manifest、划分契约与报告。
@@ -444,7 +444,7 @@ def unpack(dataset: str, archive: Path, *, into: Path | None = None) -> int:
         print("⚠️  包里没有 manifest.csv。请让打包的人确认抽帧与划分都已完成。")
     print()
     print("下一步：")
-    print(f"  python scripts/train_model.py --config configs/experiments/exp02_yolo26n_gru.yaml")
+    print("  python scripts/train_model.py --config configs/experiments/exp02_yolo26n_gru.yaml")
     print("  （dataset.root 需要在 configs/data/ 里指向抽帧目录，或用 HANDWASH_DATA_ROOT）")
     return 0
 

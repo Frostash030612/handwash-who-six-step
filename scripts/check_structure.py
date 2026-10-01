@@ -25,7 +25,7 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _bootstrap import PROJECT_ROOT  # noqa: E402,F401  （副作用：注册导入路径）
+from _bootstrap import PROJECT_ROOT
 
 SRC = PROJECT_ROOT / "src" / "handwash"
 SKIP_DIRS = {"__pycache__", ".ipynb_checkpoints"}

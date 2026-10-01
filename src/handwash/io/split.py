@@ -18,8 +18,8 @@
 
 from __future__ import annotations
 
-import random
 import math
+import random
 from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -28,7 +28,7 @@ from handwash.core.schema import ClipRecord, FrameRecord, Split
 from handwash.errors import DataLeakageError, ManifestError
 from handwash.logging import get_logger
 
-__all__ = ["group_key_for", "split_clips", "assign_frames", "assert_no_leakage", "split_report"]
+__all__ = ["assert_no_leakage", "assign_frames", "group_key_for", "split_clips", "split_report"]
 
 log = get_logger(__name__)
 
@@ -246,7 +246,7 @@ def assign_frames(
         for rec in recs:
             buckets[rec.clip_id].append(rec)
         selected: list[FrameRecord] = []
-        for clip_id, clip_recs in buckets.items():
+        for _clip_id, clip_recs in buckets.items():
             ordered = sorted(clip_recs, key=lambda r: r.frame_index)
             selected.extend(_evenly_spaced(ordered, cap) if cap else ordered)
         out[split_name] = sorted(selected, key=lambda r: (r.clip_id, r.frame_index))

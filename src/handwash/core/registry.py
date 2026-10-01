@@ -23,15 +23,15 @@ from handwash.errors import ConfigError, ModelNotFoundError
 
 __all__ = [
     "Registry",
-    "register_model",
-    "register_dataset",
-    "register_transform",
-    "get_model_cls",
-    "get_dataset_cls",
-    "get_transform_cls",
-    "available_models",
     "available_datasets",
+    "available_models",
     "available_transforms",
+    "get_dataset_cls",
+    "get_model_cls",
+    "get_transform_cls",
+    "register_dataset",
+    "register_model",
+    "register_transform",
 ]
 
 T = TypeVar("T")
@@ -43,7 +43,7 @@ class Registry:
     与 ``entry_points`` 相比：零打包开销、组员一眼看得懂、报错信息可控。
     """
 
-    __slots__ = ("kind", "_items")
+    __slots__ = ("_items", "kind")
 
     def __init__(self, kind: str) -> None:
         self.kind = kind
@@ -67,7 +67,7 @@ class Registry:
                     hint="换一个名字，或确认是否重复实现；确需覆盖请显式传 override=True 并说明理由。",
                 )
             if metadata:
-                setattr(cls, "__registry_metadata__", {**getattr(cls, "__registry_metadata__", {}), **metadata})
+                cls.__registry_metadata__ = {**getattr(cls, "__registry_metadata__", {}), **metadata}
             self._items[key] = cls
             return cls
 

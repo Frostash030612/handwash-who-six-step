@@ -35,7 +35,7 @@ from handwash.logging import get_logger
 from handwash.models.voting import fuse_probabilities, sliding_window_probs
 from handwash.pipelines.common import resolve_device
 
-__all__ = ["InferenceOutput", "predict_clip", "predict_video", "extract_clip_from_video", "save_predictions"]
+__all__ = ["InferenceOutput", "extract_clip_from_video", "predict_clip", "predict_video", "save_predictions"]
 
 log = get_logger(__name__)
 
@@ -72,10 +72,10 @@ class InferenceOutput:
 def extract_clip_from_video(path: str | Path, *, sample_fps: float, max_frames: int | None = None) -> Clip:
     """把视频解码成 ``Clip``（RGB uint8，时间顺序）。"""
     meta = probe_video(path)
-    indices, stamps, frames = extract_frames(path, sample_fps=sample_fps, max_frames=max_frames)
+    _indices, stamps, frames = extract_frames(path, sample_fps=sample_fps, max_frames=max_frames)
     if not frames:
         raise DataError(f"视频没有解出任何帧：{path}")
-    positive_deltas = [b - a for a, b in zip(stamps[:-1], stamps[1:]) if b > a]
+    positive_deltas = [b - a for a, b in zip(stamps[:-1], stamps[1:], strict=True) if b > a]
     if positive_deltas:
         effective_fps = 1.0 / float(np.median(positive_deltas))
     elif meta.fps > 0 and sample_fps > 0:

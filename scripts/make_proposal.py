@@ -55,8 +55,8 @@ from typing import Any, Final
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _bootstrap import PROJECT_ROOT  # noqa: E402,F401
-from handwash import (  # noqa: E402
+from _bootstrap import PROJECT_ROOT
+from handwash import (
     proposal_content,
     proposal_content_zh,
 )
@@ -123,7 +123,7 @@ _LABELS: Final[dict[str, dict[str, str]]] = {
 
 def _require_docx():
     try:
-        import docx  # noqa: F401
+        import docx
     except ImportError as exc:  # pragma: no cover - 环境缺依赖
         print(
             "需要 python-docx：conda install -c conda-forge python-docx"

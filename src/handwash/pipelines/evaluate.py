@@ -19,11 +19,10 @@
 
 from __future__ import annotations
 
+import zlib
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
-
-import zlib
 
 import numpy as np
 import torch
@@ -154,6 +153,7 @@ def evaluate_single_split(
 
     model.eval()
     from PIL import Image
+
     from handwash.pipelines.infer import predict_clip
 
     grouped: dict[str, list[FrameRecord]] = {}
@@ -187,7 +187,7 @@ def evaluate_single_split(
         timestamp_deltas = [
             (right_time - left_time) / (right_position - left_position)
             for (left_position, left_time), (right_position, right_time) in zip(
-                timed_stamps[:-1], timed_stamps[1:]
+                timed_stamps[:-1], timed_stamps[1:], strict=True
             )
             if right_position > left_position and right_time > left_time
         ]
@@ -290,7 +290,7 @@ def evaluate(
             hint="先训练，或用 --checkpoint 指定权重路径。",
         )
 
-    model, payload = _load_model_from_checkpoint(rc, ckpt, device=device)
+    model, _payload = _load_model_from_checkpoint(rc, ckpt, device=device)
     wanted = list(splits or rc.eval.splits)
 
     bundle = EvalBundle()
@@ -299,7 +299,7 @@ def evaluate(
         target_datasets = target_datasets or (None,)
         for dataset_name in target_datasets:
             output_split = f"{split}_{dataset_name}" if dataset_name else split
-            result, y_true, y_pred, details = evaluate_single_split(
+            result, _, _, details = evaluate_single_split(
                 rc,
                 model,
                 split=split,
@@ -315,7 +315,7 @@ def evaluate(
             write_csv(
                 eval_dir / f"per_class_{output_split}.csv",
                 [
-                    {"label": name, **{k: v for k, v in stats.items()}}
+                    {"label": name, **stats}
                     for name, stats in result.per_class.items()
                 ],
                 fieldnames=["label", "precision", "recall", "f1", "support", "predicted", "correct"],

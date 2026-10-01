@@ -12,22 +12,22 @@ from pathlib import Path
 from typing import Any
 
 __all__ = [
-    "HandwashError",
+    "BackendUnavailableError",
+    "CheckpointError",
     "ConfigError",
     "ConfigFileNotFoundError",
     "ConfigKeyError",
     "DataError",
-    "DatasetNotFoundError",
-    "VideoDecodeError",
-    "ManifestError",
     "DataLeakageError",
+    "DatasetNotFoundError",
+    "EvaluationError",
+    "HandwashError",
+    "ManifestError",
     "ModelError",
     "ModelNotFoundError",
-    "CheckpointError",
-    "BackendUnavailableError",
-    "TrainingError",
-    "EvaluationError",
     "ProtocolError",
+    "TrainingError",
+    "VideoDecodeError",
 ]
 
 
