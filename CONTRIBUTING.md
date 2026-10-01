@@ -33,6 +33,18 @@ make train-smoke                       # 6) run the data -> model -> metrics pat
 Only when all six steps succeed is your environment "ready". If any step fails, **read the output
 of `handwash doctor` first**; do not guess and start editing code.
 
+Before your first commit in the cloned repository, set your Git author identity to an email
+associated with your GitHub account (or your GitHub-provided `noreply` email):
+
+```bash
+git config user.name "YOUR_GITHUB_USERNAME"
+git config user.email "YOUR_VERIFIED_GITHUB_EMAIL"
+git var GIT_AUTHOR_IDENT
+```
+
+Signing in to push does not set the commit author. Check the identity above before committing;
+GitHub attributes contributions using the email recorded in each commit.
+
 ---
 
 ## 1. The ten Iron Rules (if you remember nothing else, remember these ten)

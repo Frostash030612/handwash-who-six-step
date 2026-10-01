@@ -29,6 +29,18 @@ make train-smoke                       # 6) 30 秒跑通"数据→模型→指�
 六步全部成功，才算"环境就绪"。任何一步失败，
 **先看 `handwash doctor` 的输出**，不要自己猜着改代码。
 
+在克隆的仓库中首次提交前，把 Git 作者设为你的 GitHub 账号及已关联的邮箱
+（也可以使用 GitHub 提供的 `noreply` 邮箱）：
+
+```bash
+git config user.name "你的_GitHub_用户名"
+git config user.email "你的_GitHub_已验证邮箱"
+git var GIT_AUTHOR_IDENT
+```
+
+推送时登录的账号不会自动成为提交作者。提交前核对上述身份；
+GitHub 根据提交中记录的邮箱归属贡献。
+
 ---
 
 ## 1. 十条铁律（记不住全部，至少记住这十条）
