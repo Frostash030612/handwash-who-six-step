@@ -2,7 +2,7 @@
 
 # WHO Six-Step Hand Hygiene: Action Recognition and Completeness Assessment
 
-> **Proposed model implementation plan (Chinese)**: [Model framework and implementation steps](docs/zh/MODEL_FRAMEWORK.md) covers PE-based temporal segmentation, language supervision, optional video review, and grounded Q&A. This plan is not implemented yet; the sections below describe the existing project plan.
+> **Revised model plan (2026-10-01, pending implementation)**: [Model framework and implementation steps](docs/zh/MODEL_FRAMEWORK.md) starts with MobileNetV2 + a simple TCN, followed by an action timeline, code-based statistics, and grounded Q&A. PE and MS-TCN++ remain upgrade candidates; language assistance and local video review are optional, subject to validation. YOLO/GRU remain comparisons. This documentation update does not change code or default configurations; the sections below retain the original project plan.
 
 > Video-based recognition of the WHO six-step hand-washing procedure. The system predicts
 > which step is being performed in each frame and then checks for **missed steps,
