@@ -58,19 +58,48 @@ _ensure_src_on_path()
 #   每个测试仍有自己的目录，测试之间互不干扰，也不会污染 outputs/。
 #
 # 若你希望用系统临时目录（本地开发通常更快），删掉下面三个 fixture 即可。
+#
+# 也可以用环境变量指定根目录（用于受限环境）：
+#     Windows  $env:HANDWASH_TMP_ROOT="$env:TEMP\hw_pytest"
+#     macOS    HANDWASH_TMP_ROOT=/tmp/hw_pytest pytest
+# 为什么需要这个开关：某些受限环境（CI 容器、带 ACL 限制的沙箱）不允许在仓库
+# 目录内新建目录，于是所有用到 tmp_path 的测试都会以 PermissionError 报 setup 错误。
+# 这时把临时根换到系统临时目录即可，不必改动测试代码。
 # ============================================================================
 _WS_TEMP_ROOT = Path(__file__).resolve().parents[1] / ".tmp"
 
 
+def _temp_root() -> Path:
+    """决定测试临时目录的根。
+
+    优先级：``HANDWASH_TMP_ROOT`` 环境变量 > 仓库内 ``.tmp/``。
+    仓库内是默认值（便于在同一盘上做 IO，也方便出问题时手工翻看残留文件），
+    但它要求仓库目录可写；受限环境请用环境变量覆盖到系统临时目录。
+    """
+    override = os.environ.get("HANDWASH_TMP_ROOT", "").strip()
+    if override:
+        return Path(override).expanduser()
+    return _WS_TEMP_ROOT
+
+
 class _WorkspaceTempFactory:
-    """``tmp_path_factory`` 的最小实现：在仓库内的 ``.tmp/`` 下建目录。
+    """``tmp_path_factory`` 的最小实现：在临时根目录下建目录。
 
     目录名带进程号与自增计数，保证并发跑测试（pytest-xdist）也不会撞名。
     """
 
     def __init__(self, root: Path) -> None:
         self._root = root
-        self._root.mkdir(parents=True, exist_ok=True)
+        try:
+            self._root.mkdir(parents=True, exist_ok=True)
+        except PermissionError as exc:
+            raise RuntimeError(
+                f"无法创建测试临时目录：{self._root}\n"
+                "当前环境不允许在仓库内写文件。请改用系统临时目录，例如：\n"
+                '    Windows  $env:HANDWASH_TMP_ROOT="$env:TEMP\\hw_pytest"\n'
+                "    macOS    export HANDWASH_TMP_ROOT=/tmp/hw_pytest\n"
+                "（设置后重新运行 pytest）"
+            ) from exc
         self._counter = 0
 
     @property
@@ -91,7 +120,7 @@ class _WorkspaceTempFactory:
 @pytest.fixture(scope="session")
 def tmp_path_factory() -> _WorkspaceTempFactory:
     """会话级临时目录工厂（见上方说明）。"""
-    return _WorkspaceTempFactory(_WS_TEMP_ROOT)
+    return _WorkspaceTempFactory(_temp_root())
 
 
 @pytest.fixture
