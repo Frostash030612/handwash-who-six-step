@@ -4,14 +4,15 @@
 历史提案生成器仍包含旧的时序模型与录制视频方案；重新生成提案前须先更新文案。
 
 本目录存放最终提交物：项目提案、最终报告、视频演示、PPT、打包 ZIP 等。
-**整个目录除本说明外都被 `.gitignore` 排除**，因为提交件含姓名与学号；这是刻意的约定
+**除本说明和用户明确指定上传的 PPT 外，其余文件均被 `.gitignore` 排除**，因为提交件含姓名与学号；这是刻意的约定
 （见 `.gitignore` 中"提交件（含个人姓名/学号，不进 Git）"一节）。
 
-只有本说明会进入仓库：
+本说明与以下明确指定的 PPT 会进入仓库：
 
 | 内容 | 是否进 Git | 原因 |
 | --- | --- | --- |
 | 本文件 `README.md` | ✅ | `.gitignore` 里显式白名单 |
+| `Video-based-Six-Step-Handwashing-Assessment.pptx` | ✅ | 用户明确要求上传的原始文件，单文件白名单 |
 | `repo/` 下的旧副本 | ❌ | 可能保留姓名、分组信息或文档元数据 |
 | 其余文件（完整版提案、报告、视频、ZIP…） | ❌ | 含完整姓名/学号，只在本地与共享盘流转 |
 
@@ -63,3 +64,7 @@ python scripts/make_proposal.py --lang zh --mask-ids --group-id 0 --members ...
 2. 导出 PDF（本机没有 LibreOffice/LaTeX，PDF 导出需在 Word 中完成）。
 3. 上传 Canvas → Assignments → Practice Module（每队一份）。
 4. 提交回执截图存回本目录，并按需更新 `repo/` 下的脱敏副本。
+
+## Proposal 汇报 PPT
+
+[下载英文项目提案演示文稿](Video-based-Six-Step-Handwashing-Assessment.pptx)。按用户提供的文件原样上传，未修改演示文稿内容；此文件的上传不改变当前代码或模型实施路线。
