@@ -20,7 +20,7 @@ from handwash import __version__
 from handwash.core.config import ResolvedConfig
 from handwash.core.labels import LABEL_SPACES, get_label_space
 from handwash.logging import get_logger
-from handwash.paths import PROJECT_ROOT, data_root
+from handwash.paths import PROJECT_ROOT, data_root, resolve_relative
 
 __all__ = ["run_doctor", "collect_checks"]
 
@@ -96,14 +96,13 @@ def _check_config(rc: ResolvedConfig | None, error: Exception | None) -> list[tu
     rows.append(("arch / mode", _OK, f"{rc.model.arch} / {rc.train.mode}"))
     rows.append(("out_dir", _OK, str(rc.out_dir)))
 
-    # 交叉检查：YOLO 适配器必须配 zero_one 归一化，否则等于归一化两次
-    if "yolo" in str(rc.model.arch).lower() and rc.model.normalize == "imagenet":
+    # 保留展示级检查；配置层也会拦截不匹配，避免训练启动后才发现。
+    if "yolo" in str(rc.model.arch).lower() and rc.model.normalize != "zero_one":
         rows.append(
             (
                 "normalize",
                 _FAIL,
-                "使用 YOLO 分类模型时 model.normalize 必须是 zero_one"
-                "（ultralytics 内部已做归一化，否则会归一化两次，准确率异常偏低）",
+                "使用 YOLO 分类模型时 model.normalize 必须是 zero_one（输入应在 [0, 1]）",
             )
         )
     else:
@@ -133,10 +132,8 @@ def _check_data(rc: ResolvedConfig | None) -> list[tuple[str, str, str]]:
         rows.append(("dataset", _FAIL, str(exc)))
         return rows
 
-    from pathlib import Path
-
     root = spec.get("root") or rc.dataset.root
-    resolved = Path(str(root)) if Path(str(root)).is_absolute() else PROJECT_ROOT / str(root)
+    resolved = resolve_relative(str(root))
     if "synthetic" in str(rc.dataset.name):
         rows.append(("dataset.root", _OK, f"{resolved}（合成数据不需要真实文件）"))
     elif resolved.exists():
@@ -145,7 +142,7 @@ def _check_data(rc: ResolvedConfig | None) -> list[tuple[str, str, str]]:
         rows.append(("dataset.root", _WARN, f"不存在：{resolved}（见 docs/DATA.md 下载数据）"))
 
     manifest = spec.get("manifest") or "data/processed/manifest.csv"
-    manifest_path = Path(str(manifest)) if Path(str(manifest)).is_absolute() else PROJECT_ROOT / str(manifest)
+    manifest_path = resolve_relative(str(manifest))
     if manifest_path.exists():
         try:
             from handwash.io.manifest import manifest_summary, read_manifest
@@ -164,7 +161,7 @@ def _check_data(rc: ResolvedConfig | None) -> list[tuple[str, str, str]]:
             rows.append(("manifest", _FAIL, f"存在但校验失败：{exc}"))
     else:
         rows.append(
-            ("manifest", _WARN, f"未生成：{manifest_path}（先运行 handwash prepare；训练会自动回退到合成数据）")
+            ("manifest", _WARN, f"未生成：{manifest_path}（先运行 handwash prepare；真实数据缺失时训练会报错）")
         )
     return rows
 
@@ -180,7 +177,14 @@ def _check_model(rc: ResolvedConfig | None) -> list[tuple[str, str, str]]:
         try:
             from handwash.models.yolo26_cls import probe_yolo_availability
 
-            probe = probe_yolo_availability(rc.model.pretrained if isinstance(rc.model.pretrained, str) else "yolo26n-cls.pt")
+            pretrained = rc.model.pretrained
+            weights = (
+                str(pretrained)
+                if isinstance(pretrained, str)
+                and pretrained.lower() not in ("auto", "true", "false", "imagenet")
+                else f"{rc.model.arch}.pt"
+            )
+            probe = probe_yolo_availability(weights)
             if not probe.get("ultralytics"):
                 rows.append(("ultralytics", _FAIL, str(probe.get("hint"))))
             elif probe.get("loadable"):

@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>六步洗手 · 实时 YOLO 分类</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #f5f8f8; color: #162d32; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    header { background: #0d5c63; color: white; padding: 24px max(20px, calc((100vw - 1100px)/2)); }
+    h1 { margin: 0 0 6px; font-size: 1.65rem; }
+    header p { margin: 0; opacity: .88; }
+    main { max-width: 1100px; margin: 24px auto; padding: 0 20px 36px; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(300px, 1fr); gap: 18px; }
+    section { background: white; border: 1px solid #dce6e5; border-radius: 14px; padding: 18px; box-shadow: 0 4px 18px #123a3a0a; }
+    .video-wrap { background: #102326; border-radius: 10px; overflow: hidden; aspect-ratio: 4/3; display: grid; place-items: center; }
+    video { width: 100%; height: 100%; object-fit: contain; transform: scaleX(-1); }
+    .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; margin: 16px 0 0; }
+    label { display: grid; gap: 5px; font-size: .9rem; flex: 1 1 220px; }
+    select, button { font: inherit; border-radius: 8px; padding: 10px 12px; }
+    select { width: 100%; border: 1px solid #b9d1cf; background: white; }
+    button { border: 0; background: #0d5c63; color: white; cursor: pointer; }
+    button.secondary { background: #e7f0ef; color: #16494c; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    h2 { margin: 0 0 14px; font-size: 1.14rem; }
+    .current { font-size: 1.45rem; font-weight: 700; margin: 3px 0; }
+    .muted { color: #5a6d70; font-size: .9rem; }
+    .steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin-top: 16px; }
+    .step { border: 1px solid #d5e1df; border-radius: 9px; padding: 10px; font-size: .92rem; }
+    .step.done { border-color: #3ca87d; background: #ebf8f0; }
+    .step span { display: block; color: #607678; font-size: .78rem; }
+    #message { min-height: 1.4em; margin: 12px 0 0; }
+    #message.error { color: #a43134; }
+    #demoNotice { color: #86500a; background: #fff4dd; border: 1px solid #ebcd91; border-radius: 8px; padding: 10px; }
+    #report { display: none; }
+    #report.visible { display: block; }
+    #report ul { padding-left: 20px; }
+    footer { max-width: 1100px; margin: 0 auto 25px; padding: 0 20px; color: #607678; font-size: .82rem; }
+    @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>六步洗手实时识别</h1>
+    <p>外接摄像头 · YOLO 逐帧分类 · 本机推理</p>
+  </header>
+  <main>
+    <section>
+      <h2>摄像头画面</h2>
+      <div class="video-wrap"><video id="preview" autoplay muted playsinline></video></div>
+      <div class="controls">
+        <label>选择摄像头
+          <select id="cameraSelect"><option value="">默认摄像头</option></select>
+        </label>
+        <button id="openButton" class="secondary">开启摄像头</button>
+        <button id="startButton" disabled>开始识别</button>
+        <button id="stopButton" class="secondary" disabled>结束并生成报告</button>
+      </div>
+      <p id="message" class="muted">先开启摄像头，再开始识别。浏览器会请求摄像头权限。</p>
+      <p id="demoNotice" hidden>当前使用 exp.pt 可行性演示模型。画面分类和六步报告仅用于体验流程，不能代表正式清洗数据训练后的准确率。</p>
+    </section>
+    <section>
+      <h2>当前识别</h2>
+      <div id="current" class="current">等待开始</div>
+      <div id="confidence" class="muted">—</div>
+      <div id="elapsed" class="muted">已采样 0 帧</div>
+      <div id="steps" class="steps"></div>
+      <p class="muted">进行中的步骤进度是暂定结果；结束后按完整会话生成报告。</p>
+    </section>
+    <section id="report">
+      <h2 id="reportTitle">最终报告</h2>
+      <div id="verdict" class="current"></div>
+      <div id="score" class="muted"></div>
+      <ul id="violations"></ul>
+    </section>
+  </main>
+  <footer>画面在本机浏览器采集并送往本机推理服务；服务器保存步骤预测和报告，不保存原始视频。</footer>
+  <canvas id="capture" hidden></canvas>
+  <script>
+    const video = document.getElementById("preview");
+    const canvas = document.getElementById("capture");
+    const cameraSelect = document.getElementById("cameraSelect");
+    const openButton = document.getElementById("openButton");
+    const startButton = document.getElementById("startButton");
+    const stopButton = document.getElementById("stopButton");
+    const message = document.getElementById("message");
+    let stream = null;
+    let sessionId = null;
+    let timer = null;
+    let pending = null;
+    let sampleFps = 5;
+
+    function showMessage(value, error) {
+      message.textContent = value;
+      message.className = error ? "error" : "muted";
+    }
+    async function api(path, options) {
+      const response = await fetch(path, options || {method: "POST"});
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "请求失败");
+      return data;
+    }
+    function renderSteps(items) {
+      const root = document.getElementById("steps");
+      root.replaceChildren();
+      for (const item of items) {
+        const node = document.createElement("div");
+        node.className = item.detected ? "step done" : "step";
+        const name = document.createElement("strong");
+        name.textContent = item.name;
+        const state = document.createElement("span");
+        state.textContent = item.detected ? "已检出" : "未检出";
+        node.append(name, state);
+        root.append(node);
+      }
+    }
+    async function listCameras() {
+      const selected = cameraSelect.value;
+      const devices = (await navigator.mediaDevices.enumerateDevices()).filter(item => item.kind === "videoinput");
+      cameraSelect.replaceChildren();
+      devices.forEach((item, index) => {
+        const option = document.createElement("option");
+        option.value = item.deviceId;
+        option.textContent = item.label || "摄像头 " + (index + 1);
+        cameraSelect.append(option);
+      });
+      if (devices.some(item => item.deviceId === selected)) cameraSelect.value = selected;
+    }
+    async function openCamera() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("此浏览器无法访问摄像头，请使用本机浏览器打开页面");
+      }
+      const selected = cameraSelect.value;
+      const videoSettings = selected
+        ? {deviceId: {exact: selected}, width: {ideal: 640}, height: {ideal: 480}}
+        : {width: {ideal: 640}, height: {ideal: 480}};
+      const nextStream = await navigator.mediaDevices.getUserMedia({video: videoSettings, audio: false});
+      const previousStream = stream;
+      video.srcObject = nextStream;
+      try { await video.play(); }
+      catch (error) {
+        nextStream.getTracks().forEach(track => track.stop());
+        video.srcObject = previousStream;
+        throw error;
+      }
+      stream = nextStream;
+      if (previousStream) previousStream.getTracks().forEach(track => track.stop());
+      await listCameras();
+      startButton.disabled = false;
+      showMessage("摄像头已连接，可以开始识别。", false);
+      const track = stream.getVideoTracks()[0];
+      track.addEventListener("ended", () => {
+        if (stream && stream.getVideoTracks()[0] !== track) return;
+        clearInterval(timer);
+        timer = null;
+        startButton.disabled = true;
+        showMessage("摄像头已断开，请重新连接。", true);
+      }, {once: true});
+    }
+    function renderUpdate(data) {
+      document.getElementById("current").textContent = data.label_zh;
+      document.getElementById("confidence").textContent = "置信度 " + Math.round(data.confidence * 100) + "%";
+      document.getElementById("elapsed").textContent =
+        "已采样 " + data.frame_count + " 帧 · " + data.elapsed_s.toFixed(1) + " 秒";
+      renderSteps(data.steps);
+    }
+    function makeJpeg() {
+      const width = Math.min(video.videoWidth, 640);
+      const height = Math.round(video.videoHeight * width / video.videoWidth);
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d").drawImage(video, 0, 0, width, height);
+      return new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.78));
+    }
+    async function sendFrame() {
+      if (!sessionId || pending || !video.videoWidth || !stream || !stream.active) return;
+      const capturedAt = performance.now() / 1000;
+      pending = (async () => {
+        const jpeg = await makeJpeg();
+        if (!jpeg) throw new Error("无法获取摄像头画面");
+        const path = "/api/frame?session_id=" + encodeURIComponent(sessionId) +
+          "&capture_time_s=" + encodeURIComponent(capturedAt.toFixed(6));
+        const data = await api(path, {method: "POST", headers: {"Content-Type": "image/jpeg"}, body: jpeg});
+        renderUpdate(data);
+      })();
+      try { await pending; }
+      finally { pending = null; }
+    }
+    function renderReport(report) {
+      document.getElementById("report").classList.add("visible");
+      document.getElementById("verdict").textContent = report.is_complete ? "流程完整" : "流程待改进";
+      document.getElementById("score").textContent =
+        "综合得分 " + Math.round(report.overall_score * 100) + "% · 搓洗时长 " +
+        report.total_wash_duration_s.toFixed(1) + " 秒";
+      const list = document.getElementById("violations");
+      list.replaceChildren();
+      const issues = report.violations.length ? report.violations.map(item => item.detail) : ["未发现漏步、乱序或时长不足。"];
+      for (const issue of issues) {
+        const item = document.createElement("li");
+        item.textContent = issue;
+        list.append(item);
+      }
+    }
+    openButton.addEventListener("click", async () => {
+      try { await openCamera(); }
+      catch (error) { showMessage("摄像头连接失败：" + error.message, true); }
+    });
+    cameraSelect.addEventListener("change", async () => {
+      if (sessionId) return;
+      if (stream) {
+        try { await openCamera(); }
+        catch (error) { showMessage("切换摄像头失败：" + error.message, true); }
+      }
+    });
+    startButton.addEventListener("click", async () => {
+      try {
+        const state = await api("/api/start");
+        sessionId = state.session_id;
+        sampleFps = state.sample_fps;
+        const demoMode = Boolean(state.demo);
+        document.getElementById("demoNotice").hidden = !demoMode;
+        document.getElementById("reportTitle").textContent = demoMode ? "演示报告" : "最终报告";
+        document.getElementById("report").classList.remove("visible");
+        startButton.disabled = true;
+        stopButton.disabled = false;
+        cameraSelect.disabled = true;
+        openButton.disabled = true;
+        showMessage("正在识别；请将双手保持在画面内。", false);
+        timer = setInterval(() => sendFrame().catch(error => showMessage("推理失败：" + error.message, true)), 1000 / sampleFps);
+        await sendFrame();
+      } catch (error) {
+        showMessage("无法开始识别：" + error.message, true);
+      }
+    });
+    stopButton.addEventListener("click", async () => {
+      clearInterval(timer);
+      timer = null;
+      stopButton.disabled = true;
+      try {
+        if (pending) {
+          try { await pending; }
+          catch (error) { showMessage("最后一帧推理失败，正在保存已收到的结果。", true); }
+        }
+        const result = await api("/api/stop?session_id=" + encodeURIComponent(sessionId));
+        if (result.report) renderReport(result.report);
+        showMessage(result.report ? "评估完成；可重新开始。" : "会话已结束，未收到画面。", false);
+        sessionId = null;
+        startButton.disabled = !stream || !stream.active;
+        cameraSelect.disabled = false;
+        openButton.disabled = false;
+      } catch (error) {
+        showMessage("生成报告失败：" + error.message, true);
+        stopButton.disabled = false;
+      }
+    });
+    listCameras().catch(() => {});
+  </script>
+</body>
+</html>

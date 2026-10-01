@@ -5,17 +5,17 @@
 #
 # 步骤：
 #   1) 用 PSKUS 训练并产出 checkpoint：
-#          python -m handwash.cli train config=configs/config.yaml \
-#              runtime.run_name=e4_pskuss_train
-#      （建议同时叠加 configs/data/pskuss.yaml 的 dataset/assess 段）
+#          python -m handwash.cli train config=configs/experiments/exp04_cross_domain.yaml
 #
-#   2) 把 METC 帧准备好（见 configs/data/metc.yaml 的说明），
-#      再在外部数据上评估同一个 checkpoint：
-#          python -m handwash.cli evaluate \
-#              --checkpoint outputs/e4_pskuss_train/models/best.pt \
-#              --splits external
+#   2) 把 METC 帧准备好：
+#          python scripts/prepare_data.py --config configs/data/metc.yaml
+#      （此配置只准备 external split，不用于训练）
 #
-#   3) 用组员自采视频做**完整流程**评估（最有说服力）：
+#   3) 用同一 checkpoint 跑内部 test 与 METC external：
+#          python -m handwash.cli evaluate config=configs/experiments/exp04_cross_domain.yaml \
+#              --checkpoint outputs/e4_cross_domain/models/best.pt --splits test external
+#
+#   4) 用组员自采视频做**完整流程**评估（最有说服力）：
 #          python -m handwash.cli assess --folder data/external/self_recorded/full
 #
 # 报告要点：把"跨场景性能下降"本身当成发现来写，而不是当成失败。
@@ -25,6 +25,39 @@
 
 runtime:
   run_name: e4_cross_domain
+  device: cuda               # fp16 训练需要 CUDA；无 CUDA 时可覆盖为 fp32 + cpu/mps
+
+dataset:
+  name: pskuss
+  root: data/raw/pskuss/extracted
+  label_space: pskuss
+  include_non_wash: true
+  prep:
+    fps: 2.0
+    frame_step: 1
+    resize_hw: [224, 224]
+    jpeg_quality: 85
+    min_frames_per_clip: 15
+
+model:
+  arch: yolo26n-cls
+  normalize: zero_one
+  temporal:
+    kind: gru
+    hidden_size: 128
+    window: 16
+
+train:
+  mode: clip
+  batch_size: 16
+  epochs: 30
+  lr: 0.0002
+  class_weights: balanced
+  precision: fp16
+
+infer:
+  mode: clip
+  temporal_apply: true
 
 eval:
   splits: [test, external]

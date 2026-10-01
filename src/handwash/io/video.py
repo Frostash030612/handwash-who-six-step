@@ -7,10 +7,11 @@
 **解码细节只存在这个文件里**，其余模块只调用 ``probe_video`` / ``iter_frames`` / ``extract_frames``。
 
 时基约定（重要）
-----------------
-``timestamp_s`` 由 ``frame_index / sample_fps`` 计算，而不是 cv2 的 CAP_PROP_POS_MSEC
-（后者在不同后端下并不一致）。这样"抽帧后的时间轴"是确定的，
-``core.protocol`` 的时长统计才有意义。
+-----------------
+时间戳使用原视频帧号/原生FPS；OpenCV 提供有效解码时间时采用其时间戳。
+不能用原始帧号除以目标采样FPS，否则会把视频时长缩短约采样倍率。
+当帧数元数据缺失但设置了 ``max_frames`` 时，先统计帧数再第二遍均匀抽样，
+避免只保留开头或给时序模型输入不均匀的帧间隔。
 """
 
 from __future__ import annotations
@@ -151,6 +152,8 @@ def iter_frames(
         raise VideoDecodeError(target, f"sample_fps 必须为正，实际 {sample_fps}")
     if frame_step < 1:
         raise VideoDecodeError(target, f"frame_step 必须 >= 1，实际 {frame_step}")
+    if max_frames is not None and max_frames < 1:
+        raise VideoDecodeError(target, f"max_frames 必须 >= 1，实际 {max_frames}")
 
     backend = available_backend()
     if backend == "opencv":
@@ -172,26 +175,48 @@ def _iter_opencv(
         raise VideoDecodeError(target, "OpenCV 无法打开")
 
     native_fps = float(cap.get(cv2.CAP_PROP_FPS)) or 0.0
+    raw_frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
+    if max_frames is not None and raw_frame_count <= 0:
+        raw_frame_count = 0
+        while True:
+            ok, _ = cap.read()
+            if not ok:
+                break
+            raw_frame_count += 1
+        cap.release()
+        cap = cv2.VideoCapture(str(target))
+        if not cap.isOpened():
+            raise VideoDecodeError(target, "无法在统计帧数后重新打开视频")
+
     # 目标采样间隔（原始帧为单位）：sample_fps=5 且原生 30fps -> 每 6 帧取一帧
     if sample_fps is not None and native_fps > 0:
         stride = max(1, int(round(native_fps / sample_fps)))
     else:
         stride = frame_step
-        sample_fps = native_fps / stride if native_fps > 0 else 1.0
+        sample_fps = native_fps / stride if native_fps > 0 else (sample_fps or 1.0)
 
+    selected = _evenly_selected_raw_indices(raw_frame_count, stride, max_frames)
     emitted = 0
     index = 0
+    last_timestamp = -1.0
     try:
         while True:
             ok, frame_bgr = cap.read()
             if not ok:
                 break
-            if index % stride == 0:
+            if index % stride == 0 and (selected is None or index in selected):
                 rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-                yield index, index / sample_fps if sample_fps > 0 else float(index), rgb
+                timestamp = (
+                    index / native_fps
+                    if native_fps > 0
+                    else (index // stride) / max(sample_fps, 1.0)
+                )
+                position_ms = float(cap.get(cv2.CAP_PROP_POS_MSEC))
+                if index > 0 and np.isfinite(position_ms) and position_ms > last_timestamp * 1000.0:
+                    timestamp = position_ms / 1000.0
+                last_timestamp = timestamp
+                yield index, timestamp, rgb
                 emitted += 1
-                if max_frames is not None and emitted >= max_frames:
-                    break
             index += 1
     finally:
         cap.release()
@@ -210,27 +235,56 @@ def _iter_imageio(
 
     meta = probe_video(target, backend="imageio")
     native_fps = meta.fps
+    if max_frames is not None and meta.frame_count <= 0:
+        try:
+            frame_count = sum(1 for _ in iio.imiter(str(target)))
+        except Exception as exc:  # noqa: BLE001 - decoder errors vary by plugin
+            raise VideoDecodeError(target, f"无法统计视频帧数：{exc}") from exc
+    else:
+        frame_count = meta.frame_count
+
     if sample_fps is not None and native_fps > 0:
         stride = max(1, int(round(native_fps / sample_fps)))
         eff_fps = native_fps / stride
     else:
         stride = frame_step
-        eff_fps = native_fps / stride if native_fps > 0 else 1.0
+        eff_fps = native_fps / stride if native_fps > 0 else (sample_fps or 1.0)
 
+    selected = _evenly_selected_raw_indices(frame_count, stride, max_frames)
     emitted = 0
     for index, frame in enumerate(iio.imiter(str(target))):
-        if index % stride != 0:
+        if index % stride != 0 or (selected is not None and index not in selected):
             continue
         arr = np.asarray(frame)
         if arr.ndim == 2:  # 灰度视频：复制成三通道
             arr = np.stack([arr] * 3, axis=-1)
-        yield index, index / eff_fps if eff_fps > 0 else float(index), arr.astype(np.uint8, copy=False)
+        timestamp = (
+            index / native_fps
+            if native_fps > 0
+            else (index // stride) / eff_fps
+            if eff_fps > 0
+            else float(index)
+        )
+        rgb = arr.astype(np.uint8, copy=False)
+        yield index, timestamp, rgb
         emitted += 1
-        if max_frames is not None and emitted >= max_frames:
-            break
 
     if emitted == 0:
         raise VideoDecodeError(target, "未解码出任何帧")
+
+
+def _evenly_selected_raw_indices(frame_count: int, stride: int, max_frames: int | None) -> set[int] | None:
+    """对完整视频等间隔限帧，确保上限不会只保留视频开头。"""
+    if max_frames is None or frame_count <= 0:
+        return None
+    candidates = np.arange(0, frame_count, stride, dtype=np.int64)
+    if len(candidates) <= max_frames:
+        return set(int(index) for index in candidates)
+    if max_frames == 1:
+        return {int(candidates[len(candidates) // 2])}
+    positions = np.linspace(0, len(candidates) - 1, num=max_frames)
+    selected_positions = np.rint(positions).astype(np.int64)
+    return set(int(index) for index in candidates[selected_positions])
 
 
 def extract_frames(

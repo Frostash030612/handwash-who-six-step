@@ -19,9 +19,11 @@ manifest 就是一张表，每行一个已落盘的帧图像：
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from pathlib import Path
+from statistics import median
 
 from handwash.core.labels import Step
 from handwash.core.schema import SPLITS, ClipRecord, FrameRecord, Split
@@ -92,7 +94,7 @@ def read_manifest(path: str | Path, *, validate: bool = True) -> list[FrameRecor
     for lineno, row in enumerate(rows, start=2):  # 第 1 行是表头
         try:
             records.append(FrameRecord.from_dict(row))
-        except (KeyError, ValueError) as exc:
+        except (KeyError, TypeError, ValueError) as exc:
             raise ManifestError(f"manifest 第 {lineno} 行无法解析（{target}）：{exc}") from exc
 
     if validate:
@@ -112,6 +114,27 @@ def validate_manifest(records: Sequence[FrameRecord]) -> None:
     duplicated_clips: set[str] = set()
 
     for rec in records:
+        for field_name, value in (
+            ("clip_id", rec.clip_id),
+            ("dataset", rec.dataset),
+            ("image_path", rec.image_path),
+        ):
+            if not isinstance(value, str) or not value.strip():
+                raise ManifestError(f"manifest 中 {field_name} 不能为空")
+            if value != value.strip():
+                raise ManifestError(f"manifest 中 {field_name} 含首尾空白：{value!r}")
+        if not isinstance(rec.label, Step):
+            raise ManifestError(f"clip={rec.clip_id} 的 label 不是规范 Step：{rec.label!r}")
+        if isinstance(rec.frame_index, bool) or not isinstance(rec.frame_index, int) or rec.frame_index < 0:
+            raise ManifestError(f"clip={rec.clip_id} 的 frame_index 必须是非负整数：{rec.frame_index!r}")
+        if rec.timestamp_s is not None and (
+            not isinstance(rec.timestamp_s, (int, float))
+            or not math.isfinite(float(rec.timestamp_s))
+            or rec.timestamp_s < 0
+        ):
+            raise ManifestError(
+                f"clip={rec.clip_id} 的 timestamp_s 必须是非负有限秒数：{rec.timestamp_s!r}"
+            )
         if rec.image_path in seen_images:
             raise ManifestError(
                 f"重复登记的帧图像：{rec.image_path}",
@@ -176,8 +199,15 @@ def clips_from_manifest(records: Sequence[FrameRecord]) -> list[ClipRecord]:
     for clip_id, recs in sorted(grouped.items()):
         recs_sorted = sorted(recs, key=lambda r: r.frame_index)
         fps_guess = _infer_fps(recs_sorted)
+        valid_times = [
+            float(record.timestamp_s)
+            for record in recs_sorted
+            if record.timestamp_s is not None
+        ]
         duration = (
-            recs_sorted[-1].timestamp_s - recs_sorted[0].timestamp_s if recs_sorted[0].timestamp_s is not None else None
+            max(valid_times) - min(valid_times) + (1.0 / fps_guess)
+            if len(valid_times) >= 2 and fps_guess
+            else None
         )
         clips.append(
             ClipRecord(
@@ -197,13 +227,21 @@ def clips_from_manifest(records: Sequence[FrameRecord]) -> list[ClipRecord]:
 
 def _infer_fps(records: Sequence[FrameRecord]) -> float | None:
     """由 timestamp 序列推断抽帧后的有效帧率（用于时长统计）。"""
-    stamps = [r.timestamp_s for r in records if r.timestamp_s is not None]
-    if len(stamps) < 2:
+    timed = [
+        (position, float(record.timestamp_s))
+        for position, record in enumerate(records)
+        if record.timestamp_s is not None
+    ]
+    if len(timed) < 2:
         return None
-    deltas = [b - a for a, b in zip(stamps[:-1], stamps[1:], strict=True) if b > a]
-    if not deltas:
+    seconds_per_frame = [
+        (right_time - left_time) / (right_position - left_position)
+        for (left_position, left_time), (right_position, right_time) in zip(timed[:-1], timed[1:], strict=True)
+        if right_position > left_position and right_time > left_time
+    ]
+    if not seconds_per_frame:
         return None
-    return round(1.0 / (sum(deltas) / len(deltas)), 6)
+    return round(1.0 / float(median(seconds_per_frame)), 6)
 
 
 def filter_manifest(

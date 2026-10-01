@@ -34,7 +34,8 @@ repos:
       - id: check-toml
       - id: check-merge-conflict
       - id: check-added-large-files
-        args: [--maxkb=2048]        # 2 MB：数据/权重请走 data/ 与 models/
+        args: [--maxkb=2048]        # 仅根目录演示权重 exp.pt 例外
+        exclude: ^exp\.pt$
       - id: check-case-conflict     # 防 Windows/macOS 大小写不敏感带来的坑
       - id: detect-private-key
       - id: forbid-submodules

@@ -3,24 +3,42 @@
 # ----------------------------------------------------------------------------
 # 目的：直接回答研究问题 3"加入时序信息后，能否减少单帧误判"。
 #
-# 做法：**同一份数据、同一个 seed、同一个骨干**，只改后处理方式，跑四次：
-#     A) model.temporal.kind=none         + infer.temporal_apply=false   （纯帧级）
-#     B) model.temporal.kind=none         + infer.temporal_apply=true    （仅概率平滑）
-#     C) model.temporal.kind=mean_pool    （训练时也不建模时序 -> 下界）
-#     D) model.temporal.kind=gru / tcn    + infer.temporal_apply=true    （本方案）
+# 做法：A/B 共用同一个逐帧 checkpoint，只改变推理平滑；C/D 使用 clip 训练，
+# 比较均值上下文与 GRU/TCN。评估会按 infer.* 的设置生成预测：
+#     A) none + frame + temporal_apply=false     （纯逐帧基线）
+#     B) 复用 A 的 checkpoint，仅 temporal_apply=true（概率平滑）
+#     C) mean_pool + clip + infer.mode=clip        （均值上下文）
+#     D) gru / tcn + clip + infer.mode=clip        （可学习的时序模型）
 #
 # 报告要求（重要）：四个数字必须在**同一划分**上得到，并给出宏平均 F1；
 # 只报 accuracy 会掩盖小类别（第 5、6 步）的退化。
 #
-# 运行示例（逐个跑，run_name 不同以便对比）：
+# 运行示例（A/B 复用同一 checkpoint；C/D 分别训练）：
 #     python -m handwash.cli train config=configs/experiments/exp03_ablation_temporal.yaml \
-#         runtime.run_name=e3_A_frame infer.temporal_apply=false
+#         runtime.run_name=e3_A_frame model.temporal.kind=none train.mode=frame infer.mode=frame infer.temporal_apply=false
+#     python -m handwash.cli evaluate config=configs/experiments/exp03_ablation_temporal.yaml \
+#         --checkpoint outputs/e3_A_frame/models/best.pt runtime.run_name=e3_A_frame model.temporal.kind=none train.mode=frame infer.mode=frame infer.temporal_apply=false
+#     python -m handwash.cli evaluate config=configs/experiments/exp03_ablation_temporal.yaml \
+#         --checkpoint outputs/e3_A_frame/models/best.pt runtime.run_name=e3_B_smooth \
+#         model.temporal.kind=none train.mode=frame infer.mode=frame infer.temporal_apply=true
 #     python -m handwash.cli train config=configs/experiments/exp03_ablation_temporal.yaml \
-#         runtime.run_name=e3_B_smooth infer.temporal_apply=true
+#         runtime.run_name=e3_C_mean_pool model.temporal.kind=mean_pool train.mode=clip infer.mode=clip infer.temporal_apply=false
+#     python -m handwash.cli evaluate config=configs/experiments/exp03_ablation_temporal.yaml \
+#         --checkpoint outputs/e3_C_mean_pool/models/best.pt runtime.run_name=e3_C_mean_pool model.temporal.kind=mean_pool train.mode=clip infer.mode=clip infer.temporal_apply=false
+#     python -m handwash.cli train config=configs/experiments/exp03_ablation_temporal.yaml \
+#         runtime.run_name=e3_D_gru model.temporal.kind=gru train.mode=clip infer.mode=clip infer.temporal_apply=false
+#     python -m handwash.cli evaluate config=configs/experiments/exp03_ablation_temporal.yaml \
+#         --checkpoint outputs/e3_D_gru/models/best.pt runtime.run_name=e3_D_gru model.temporal.kind=gru train.mode=clip infer.mode=clip infer.temporal_apply=false
 # ============================================================================
 
 runtime:
   run_name: e3_ablation
+
+dataset:
+  name: pskuss
+  root: data/raw/pskuss/extracted
+  label_space: pskuss
+  include_non_wash: true
 
 model:
   arch: mobilenet_v2
@@ -28,19 +46,20 @@ model:
   normalize: imagenet
   image_size: 224
   temporal:
-    kind: mean_pool      # 由命令行覆盖为 gru / tcn / none
+    kind: mean_pool
     hidden_size: 128
     window: 16
 
 train:
-  mode: frame           # clip 模式下再切到 clip
+  mode: clip
   epochs: 20
   batch_size: 32
   lr: 0.0003
   precision: fp16
 
 infer:
-  temporal_apply: true
+  mode: clip
+  temporal_apply: false
   smooth_window: 9
 
 assess:

@@ -10,6 +10,12 @@
 ## [未发布]
 
 ### 新增
+- `exp.pt` 七类 Ultralytics 可行性演示：`python scripts/run_camera.py --demo-exp` 复用本机
+  摄像头网页和六步报告，严格核对权重类别顺序，演示产物单独保存到 `outputs/exp_demo/`。
+- 当前产品主线改为云端训练 YOLO 逐帧分类模型，再在本机外接摄像头网页动态推理；
+  新增 `configs/experiments/live_yolo_frame.yaml`、`handwash camera`、本机网页服务、
+  逐帧会话状态与最终六步报告。GRU/TCN 与 PE 方案保留为可选研究。
+- 浏览器逐帧发送采集时间和 JPEG；实时显示只平均已到达帧，长缺帧区间在最终报告中标为未知。
 - `docs/PROJECT_PROPOSAL.md`（英文主）+ `docs/zh/PROJECT_PROPOSAL.md`（中文）：
   官方提案模板每一栏的可粘贴内容包（背景/目标/可度量目标表、四项能力说明、
   系统架构、数据、方法、评估、计划、风险）。
@@ -47,6 +53,17 @@
 - CI：格式 → 分层依赖 → 配置契约 → 单元测试 → 冒烟训练 → 依赖一致性。
 
 ### 变更
+- 公开仓库说明改用项目相对路径，不再展示机器专属盘符或目录；根目录 `exp.pt`
+  作为演示权重随仓库发布，NDJSON 数据导出清单仍保留在本地。历史提案中的真实姓名、
+  学号改为占位信息，`deliverables/repo/` 的旧副本不再放行进 Git。
+- **默认训练数据集改为 PSKUS**：`configs/config.yaml` 与 `AppConfig()` 现在默认选择
+  `pskuss` 和其标签空间；旧 Kaggle 单帧基线的实验配置已显式指定 `kaggle`。
+  如果自定义实验以前依赖默认 Kaggle 数据集，请显式添加 `dataset` 段或叠加
+  `configs/data/kaggle.yaml`。详见 [RFC-0006](docs/ARCHITECTURE.md#rfc-0006-make-pskus-the-default-dataset-for-live-yolo-classification)。
+- **BREAKING 配置版本 2**：时序头要求 `train.mode=clip` 且 `infer.mode=clip/hybrid`；训练不接受
+  `hybrid`（它是推理融合模式）。`model.temporal.stride` 现在同时控制训练、验证和推理的窗口。
+  验证 Macro-F1 按实际推理路径（窗口平均、TTA、概率平滑）选 checkpoint。自定义配置需将
+  `schema_version` 更新为 2。详见 [RFC-0005](docs/ARCHITECTURE.md#rfc-0005-align-temporal-windows-and-checkpoint-selection-with-inference)。
 - **文档语言策略变更**：英文成为主版本（课程提交与评分使用），中文从"唯一版本"改为"镜像"。
   原 `CONTRIBUTING.md` 与 `docs/{ARCHITECTURE,PROTOCOL,CONFIG,DATA,RULES_CARD}.md`
   已移动到 `docs/zh/` 下，英文版本占用原路径。**历史链接需要更新**：
@@ -64,8 +81,20 @@
 - 所有模型（含单帧模型）统一接受 `(B, T, 3, H, W)` 输入并输出 `(B, T, C)`。
 
 ### 修复
+- 合成数据生成的 manifest 现在把 `image_path` 写成相对 `frames_dir` 的路径；
+  旧版含重复 `frames/` 前缀的本地产物在训练时会自动重建，避免冒烟训练首批读取失败。
+- PSKUS 数据准备叠加配置已改为当前 YOLO 逐帧主线，与训练配置统一使用 5 fps、224 像素、
+  JPEG 质量 85 和相同标签空间；移除旧 GRU、clip、fp16/CUDA 参数，避免准备与训练口径不一致。
+- README 区分 macOS 本地推理安装与 Linux CUDA 云端训练安装，避免 macOS 直接使用含 CUDA 的环境文件。
+- 时序训练：同一视频同一轮的所有帧现在共享随机增强参数，避免独立裁剪、翻转和调色造成模型输入中的假闪烁。
+- 修复标签空间名称归一化错误：新增的 `metc_public` 标签空间以前会因下划线被删除而无法加载，现能被数据准备、配置校验与跨域评估正确解析。
+- 修复 `class_weights: balanced` 对训练集中缺失类别赋予过大权重的问题；未出现类别现在权重为 0，并明确记录缺失类别。
 - 视频写盘：`write_video` 在缺少 ffmpeg 后端时回退写出 GIF，保证"无编码器环境也能生成可解码的测试视频"。
 - 训练：`TemporalClassifier` 的 `backbone_kwargs['pretrained']` 之前会被静默丢弃并回退为 `True`，导致离线环境尝试联网下载权重而失败。
+- METC：按公开的 0..6 movement code 增加唯一标签映射和七类 `metc_public` 标签空间，保留旧 `metc` 通道顺序；新增同名 JSON 与视频适配及 external 评估读取。
+- 训练与评估：真实数据缺失时不再回退到合成样本；checkpoint 结构和关键配置严格校验；时序窗口覆盖尾帧，fp16 梯度累积尾批仍经 GradScaler 更新。
+- 数据准备：抽帧标签按原始时间戳对齐，manifest 保留原视频帧号；修复视频时间单位、均匀限帧、预置 split 保护、帧文件自然排序和源视频分组。
+- 路径与权重：`data/` 下的配置路径遵循 `HANDWASH_DATA_ROOT`；doctor 不下载 YOLO 权重；根目录 `models/` 忽略规则不再遮蔽 `src/handwash/models/`。
 
 ---
 
@@ -73,6 +102,8 @@
 
 | 受影响的实验 | 需要做什么 |
 | --- | --- |
+| E2、E3-C/D、E4 等时序模型实验 | **重新训练并评估**：训练窗口从不重叠改为配置步长滑窗，且验证 Macro-F1 使用实际推理输出 |
+| 逐帧实验 E1、E3-A/B | 模型训练不受窗口改动影响；若需 schema 2 的 `config_hash`，使用原 checkpoint 重新评估 |
 | 任何用过非 `True` 的 `normalize` 取值生成混淆矩阵的记录 | 重新生成图（指标 JSON 不受影响） |
 | 在 `AppConfig()` 上直接加过 `datasets` 段的临时脚本 | 可以删掉那段补丁 |
 | 任何时序模型实验（`train.mode=clip/hybrid`） | **建议重跑**：`pretrained` 修复后骨干权重来源不同 |

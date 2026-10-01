@@ -1,5 +1,5 @@
 # ============================================================================
-# 实验配置：冒烟测试（30 秒内跑完，只验证代码链路）
+# 实验配置：冒烟测试（运行时间取决于 CPU，只验证代码链路）
 # ----------------------------------------------------------------------------
 # 用法：make train-smoke
 #       python -m handwash.cli train config=configs/experiments/smoke.yaml
@@ -22,6 +22,7 @@ dataset:
   name: synthetic
   root: data/interim/synthetic
   label_space: synthetic   # 6 类，与合成数据一致
+  include_non_wash: false
 
 split:
   train: 0.6
@@ -38,7 +39,7 @@ model:
   normalize: imagenet
   dropout: 0.0
   temporal:
-    kind: mean_pool
+    kind: none
 
 train:
   mode: frame

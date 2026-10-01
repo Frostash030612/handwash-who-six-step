@@ -1,0 +1,43 @@
+# 当前主线：高质量 PSKUS 数据在云端训练 YOLO 逐帧分类；本地摄像头实时推理。
+# 训练：python -m handwash.cli train config=configs/experiments/live_yolo_frame.yaml
+# 部署：python -m handwash.cli camera config=configs/experiments/live_yolo_frame.yaml
+# 云端 CUDA 可覆盖 runtime.device=cuda train.precision=fp16；
+# 部署机使用相同模型配置，runtime.device=auto 即可。
+
+runtime:
+  run_name: live_yolo_frame
+  device: auto
+
+dataset:
+  name: pskuss
+  root: data/raw/pskuss/extracted
+  label_space: pskuss
+  include_non_wash: true
+  prep:
+    fps: 5.0
+    frame_step: 1
+    resize_hw: [224, 224]
+    image_ext: jpg
+    jpeg_quality: 85
+    min_frames_per_clip: 10
+
+model:
+  name: yolo26n-cls
+  arch: yolo26n-cls
+  pretrained: auto
+  image_size: 224
+  normalize: zero_one
+  temporal:
+    kind: none
+
+train:
+  mode: frame
+  epochs: 30
+  batch_size: 32
+  precision: fp32
+  class_weights: balanced
+
+infer:
+  mode: frame
+  temporal_apply: false
+  smooth_window: 9

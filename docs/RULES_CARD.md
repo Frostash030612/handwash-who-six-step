@@ -55,7 +55,7 @@ configs/config.yaml
 | 3 | Tunable parameters go into `configs/`; no magic numbers in code |
 | 4 | Update `pyproject.toml` **and** `environment.yml` for any new dependency |
 | 5 | `core` must not import torch; `io` must not import models (layered dependencies) |
-| 6 | Data, weights, and outputs stay out of Git |
+| 6 | Keep data, training weights, and outputs out of Git; root `exp.pt` is the demo exception |
 | 7 | Add a new workflow to both `Makefile` and `scripts/` |
 | 8 | No `print` (except in the CLI), no `sys.exit` (in library code) |
 | 9 | Raise `HandwashError` subclasses with a message stating field / expected / actual |
@@ -99,7 +99,7 @@ Skipping the pre-commit install is fine, but the PR must include the `make check
 - [ ] I ran the smallest affected workflow (paste command and result)
 - [ ] If I changed models/data, the experiment is recorded in docs/EXPERIMENTS.md (with config_hash)
 - [ ] If historical results are affected, I listed the "experiments that must be re-run"
-- [ ] `git status` is clean, and no data/weights/outputs were committed
+- [ ] No data, training weights, or outputs were committed; root `exp.pt` is the only weight exception
 ```
 
 ---

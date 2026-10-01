@@ -256,7 +256,7 @@ def build_transforms(
         模型配置（提供 ``image_size`` 与 ``normalize``）。
     mode:
         ``"train"`` 启用增强；``"eval"`` / ``"infer"`` 只做 resize + 归一化。
-        **评估与推理必须传 eval**，否则指标不可比。
+        **评估传 eval、推理传 infer**，两者都只做相同的 resize + normalize。
     seed:
         增强随机源种子。训练时用 ``runtime.seed + epoch`` 之类的值即可复现。
     """

@@ -2,6 +2,10 @@
 
 # Data Collaboration Without Uploading Anything
 
+> The 2 fps sharing estimate below describes an older compact data package. The current
+> live YOLO frame classifier uses 5 fps, 224 px, JPEG quality 85 in
+> `configs/data/pskuss.yaml` and `configs/experiments/live_yolo_frame.yaml`.
+
 The datasets are 2–17 GB. They must never enter Git, and Git LFS is not a workable substitute
 (see §5 for the arithmetic). This document describes how four people collaborate on the same data
 without anyone hosting it.
@@ -57,7 +61,7 @@ different sharing needs:
 | Layer | Size | Where it lives | Why |
 | --- | --- | --- | --- |
 | **1. Raw source** | 2–17 GB | **The public source** (Zenodo), pinned by URL + md5 in `data/raw/SOURCES.json` (committed) | Public, immutable, verifiable. Re-downloading is always possible, so nobody needs a copy in Git |
-| **2. Processed frames + manifest** | 1–3 GB | **A shared medium** (§3): OneDrive / SharePoint / lab NAS / peer-to-peer | Too big for Git, too expensive to regenerate on every machine |
+| **2. Processed frames + manifest** | Depends on sampling rate; about 6.4 GB at the current 5 fps setting | **A shared medium** (§3): OneDrive / SharePoint / lab NAS / peer-to-peer | Too big for Git, too expensive to regenerate on every machine |
 | **3. Splits, configs, metrics** | a few MB | **Git** | This is what makes results comparable. It must be versioned and reviewable |
 
 **Layer 3 is the one that actually matters for academic reproducibility.** Two runs are comparable
@@ -83,8 +87,8 @@ and they are much smaller:
 | Extraction setting | Full PSKUS frame set | Note |
 | --- | --- | --- |
 | 5 fps, 256 px, q92 | ~10.4 GB | larger than you would expect — see the note below |
-| 5 fps, 224 px, q85 | ~6.4 GB | the previous default |
-| **2 fps, 224 px, q85** | **~2.8 GB** | **the setting this project uses** |
+| **5 fps, 224 px, q85** | **~6.4 GB** | **current live YOLO profile** |
+| 2 fps, 224 px, q85 | ~2.8 GB | older compact sharing profile |
 | 1 fps, 224 px, q85 | ~1.4 GB | too coarse for per-step duration checks |
 
 > **Surprise worth knowing:** PSKUS source video is only **320×240**, so extracting frames does
@@ -182,10 +186,9 @@ every location searched and every package that does exist.
 > runs on the default dataset. `bootstrap_dataset.py` prints the correct command for you.
 
 **Why the archive carries the split too.** The package contains `frames/`, `manifest.csv`,
-`split_report.json` **and** `SOURCES.json`. Because `manifest.csv` stores paths *relative to the
-dataset root* (`frames/<clip_id>/00003.jpg`), unpacking it reproduces the canonical split without
-anyone regenerating it — so all four members evaluate on an identical test set. That is exactly
-what makes the reported numbers comparable.
+`clip_splits.json`, `split_report.json` **and** `SOURCES.json`. The manifest stores paths relative
+to `frames_dir`; `clip_splits.json` freezes the source-video assignment for any later frame rebuild.
+Unpacking therefore preserves one canonical test set for all four members.
 
 > **Do not run `prepare_data.py` again after unpacking.** Re-extracting would resample frames and
 > can produce a different split, which silently makes your results incomparable. Unpack, train.
@@ -204,6 +207,7 @@ machines, requires no new tooling, and Sync-on-demand means each member only pul
   processed/
     pskus/frames/          extracted frames (the expensive-to-regenerate part)
     pskus/manifest.csv
+    pskus/clip_splits.json
     pskus/split_report.json
   checkpoints/             best.pt per experiment, so anyone can evaluate any model
   outputs/                 resolved_config.yaml + metrics.json per run
@@ -233,7 +237,7 @@ a "remote" that can be a shared drive, an S3-compatible bucket, or even a plain 
 ```bash
 pip install dvc
 dvc init
-dvc remote add -d storage "E:/handwash-dvc"     # or an S3/R2/OneDrive-synced path
+dvc remote add -d storage "<shared-storage-location>"  # replace with your storage location
 dvc add data/processed/pskuss
 git add data/processed/pskuss.dvc && git commit -m "data: version PSKUS processed set"
 dvc push
@@ -313,14 +317,13 @@ It is the wrong tool for a 17 GB public dataset that already has a permanent hom
 ## 6. What each member does (concrete)
 
 ```powershell
-# 0) One-time: tell the code where your data lives (nothing goes inside the repo)
-$env:HANDWASH_DATA_ROOT = "D:\handwash-data"
+# 0) Data is stored under data/ by default; set HANDWASH_DATA_ROOT only if you moved it
 
 # 1) See what is available and what you already have verified
-python scripts/download_data.py --dataset pskus --list
+python scripts/download_data.py --dataset pskuss --list
 
 # 2) Download only your assigned shards (resumable, md5-verified)
-python scripts/download_data.py --dataset pskus --files DataSet1.zip,DataSet4.zip
+python scripts/download_data.py --dataset pskuss --files DataSet1.zip,DataSet4.zip
 
 # 3) Also grab the small ones (they cheaply complete the picture)
 python scripts/download_data.py --dataset metc          # 1.98 GB
@@ -330,7 +333,7 @@ python scripts/download_data.py --dataset kaggle        # ~300 MB
 python scripts/prepare_data.py --config configs/data/pskuss.yaml
 
 # 5) Publish the MANIFEST + SPLIT to Git (small, and this is the part that matters)
-git add data/processed/pskuss/manifest.csv data/processed/pskuss/split_report.json
+git add data/processed/pskuss/manifest.csv data/processed/pskuss/clip_splits.json data/processed/pskuss/split_report.json
 git commit -m "data: PSKUS subset manifest and video-level split"
 ```
 

@@ -53,7 +53,7 @@ configs/config.yaml
 | 3 | 可调参数写进 `configs/`，代码里不留魔数 |
 | 4 | 新依赖同时改 `pyproject.toml` **和** `environment.yml` |
 | 5 | `core` 不 import torch；`io` 不 import models（分层依赖） |
-| 6 | 数据、权重、输出不进 Git |
+| 6 | 数据、训练权重、输出不进 Git；根目录 `exp.pt` 是演示例外 |
 | 7 | 新工作流同时加进 `Makefile` 与 `scripts/` |
 | 8 | 不用 `print`（CLI 除外），不用 `sys.exit`（库代码） |
 | 9 | 抛 `HandwashError` 子类，消息写清"哪个字段/期望/实际" |
@@ -94,7 +94,7 @@ make check                               # 全：与 CI 完全一致
 - [ ] 跑过受影响的最小流程（贴命令与结果）
 - [ ] 若改了模型/数据，已把实验记进 docs/EXPERIMENTS.md（含 config_hash）
 - [ ] 若影响历史结果，已列出"需要重跑的实验"
-- [ ] `git status` 干净，没有提交数据/权重/输出
+- [ ] 没有提交数据、训练权重或输出；根目录 `exp.pt` 是唯一权重例外
 ```
 
 ---

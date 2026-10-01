@@ -2,15 +2,18 @@
 
 # WHO Six-Step Hand Hygiene: Action Recognition and Completeness Assessment
 
-> **Revised model plan (2026-10-01, pending implementation)**: [Model framework and implementation steps](docs/zh/MODEL_FRAMEWORK.md) starts with MobileNetV2 + a simple TCN, followed by an action timeline, code-based statistics, and grounded Q&A. PE and MS-TCN++ remain upgrade candidates; language assistance and local video review are optional, subject to validation. YOLO/GRU remain comparisons. This documentation update does not change code or default configurations; the sections below retain the original project plan.
+> **Current delivery plan (Chinese):** [step-by-step implementation plan](docs/IMPLEMENTATION_PLAN.zh-CN.md)
+> covers dataset quality, cloud YOLO classification training, and local live camera inference.
+> Earlier GRU/TCN and PE-based designs remain optional research experiments.
 
-> Video-based recognition of the WHO six-step hand-washing procedure. The system predicts
-> which step is being performed in each frame and then checks for **missed steps,
-> out-of-order steps, and steps that are too short**.
+> A live YOLO image classifier predicts the current hand-washing action from each camera
+> frame. The prediction stream then checks for **missed steps, out-of-order steps, and
+> steps that are too short**.
 > The project performs **compliance analysis only — it makes no medical diagnosis.**
 
-- **Primary model**: YOLO26n-cls (Ultralytics classification model) + a GRU/TCN temporal head
-- **Baselines**: MobileNetV2 (matching the open-source baseline), YOLOv8n-cls
+- **Primary model**: YOLO classification, trained on cleaned data in the cloud and run locally frame by frame
+- **Live display**: past-frame probability averaging for stability; final six-step rules use the recorded prediction timeline
+- **Optional experiments**: MobileNetV2, GRU/TCN and PE-based temporal segmentation
 - **Data**: PSKUS (main), METC (cross-scenario), Kaggle (rapid prototype), self-recorded clips (final validation)
 
 ---
@@ -18,7 +21,7 @@
 ## Table of contents
 
 1. [Five-minute setup](#1-five-minute-setup)
-2. [Three commands you can run right now](#2-three-commands-you-can-run-right-now)
+2. [From data to live camera](#2-from-data-to-live-camera)
 3. [What is in the project](#3-what-is-in-the-project)
 4. [Read this before changing any code](#4-read-this-before-changing-any-code)
 5. [FAQ](#5-faq)
@@ -28,39 +31,75 @@
 
 ## 1. Five-minute setup
 
+On **macOS (local inference)**, run from the repository directory:
+
 ```bash
-git clone <repo-url> && cd "Group Project PRS"
-
-conda env create -f environment.yml     # Python 3.12 + PyTorch + dependencies
+conda create -n handwash python=3.11 -y
 conda activate handwash
-pip install -e ".[all]"                 # install this repo into the env (editable mode)
-python -m pre_commit install            # install the pre-commit hooks
+python -m pip install -e ".[torch,yolo,video]"
+python -m handwash.cli doctor
+```
 
-python scripts/doctor.py                # self-check: deps, config, data, GPU, model weights
+`environment.yml` includes NVIDIA CUDA dependencies for a compatible Linux training machine;
+do not use it directly on macOS. On a Linux cloud machine with a compatible CUDA setup:
+
+If `python --version` still reports Python 2 after activating conda, run the commands below
+with `"$CONDA_PREFIX/bin/python"` instead of `python`.
+
+```bash
+conda env create -f environment.yml
+conda activate handwash
+python -m pip install -e ".[all]"
+python -m handwash.cli doctor
 ```
 
 Once `doctor` is all green (a non-blocking WARN or two is fine), your environment is ready.
-**On Windows** you can instead run `pwsh scripts/setup_windows.ps1`, which performs all of the above.
+**On Windows**, see `pwsh scripts/setup_windows.ps1`.
 
 > No conda? Install Miniconda from <https://docs.conda.io/en/latest/miniconda.html>.
 > Prefer not to use conda? `python -m venv .venv` + `pip install -e ".[all]"` works too,
 > but record that choice in `docs/EXPERIMENTS.md` and remember that `environment.yml`
 > remains the team baseline.
 
-## 2. Three commands you can run right now
+## 2. From data to live camera
+
+### Try the bundled exp.pt camera demo
+
+The repository includes `exp.pt`, an early seven-class Ultralytics classifier for trying the
+camera page. The early NDJSON export is excluded; obtain the final dataset from its public
+source below. To launch the demo:
 
 ```bash
-# 1. 30-second smoke test: no dataset needed, verifies the data -> model -> metrics path
-python scripts/train_model.py --config configs/experiments/smoke.yaml
-
-# 2. Assess one video and print the WHO completeness report (missed / out-of-order / too short)
-python scripts/run_assess.py --video data/external/self_recorded/full/demo.mp4
-
-# 3. Run a real training pipeline on the small Kaggle dataset (download first, see docs/DATA.md)
-python scripts/prepare_data.py  --config configs/data/kaggle.yaml
-python scripts/train_model.py   --config configs/experiments/exp01_baseline_frame.yaml
-python scripts/evaluate_model.py
+python scripts/run_camera.py --demo-exp
 ```
+
+Open `http://127.0.0.1:8765/`, select a camera, and start recognition. The page marks this
+as a demo; its report is saved under `outputs/exp_demo/camera/` and is not a final result.
+Before publishing, use `git add .` and inspect `git status --short`. Only the root demo weight
+`exp.pt` is included; do not upload the NDJSON export, training weights, `deliverables/`, or
+`outputs/`. `.gitignore` does not remove files already present in Git history.
+
+### Final dataset and cloud training
+
+```bash
+# 1. Raw data is not bundled. Download PSKUS, then clean and audit the videos/labels.
+python scripts/download_data.py --dataset pskuss --all --extract
+# For a pipeline trial only, use --files DataSet4.zip --extract instead.
+# 2. Create the source-video-grouped frame manifest.
+python scripts/prepare_data.py config=configs/data/pskuss.yaml --inspect
+python scripts/prepare_data.py config=configs/data/pskuss.yaml
+
+# 3. On the cloud training machine, train the frame classifier and evaluate it.
+python scripts/train_model.py config=configs/experiments/live_yolo_frame.yaml --evaluate
+
+# 4. Copy the project's best.pt and matching config to the deployment computer.
+# 5. Connect a USB camera and open http://127.0.0.1:8765/ in a local browser.
+python scripts/run_camera.py config=configs/experiments/live_yolo_frame.yaml \
+  --checkpoint path/to/best.pt
+```
+
+The camera page needs a trained project-format checkpoint. The code is present; model quality
+and target-computer latency require validation on the final dataset and hardware.
 
 Everything is written under `outputs/<run_name>/`:
 
@@ -71,6 +110,7 @@ models/best.pt                best checkpoint, selected by validation Macro-F1
 eval/eval_*.json              metrics per split
 eval/confusion_matrix_*.png   confusion matrices
 assess/<clip>.md              the completeness report (paste-ready)
+camera/<session>/             live predictions and final report
 ```
 
 ## 3. What is in the project
@@ -80,8 +120,9 @@ src/handwash/
   core/       contract layer: label space, data contracts, config, metrics, WHO rules
   io/         video decoding, manifest, source-video-safe splitting
   data/       datasets, preprocessing and augmentation, synthetic data (for smoke tests)
-  models/     YOLO26n-cls adapter, MobileNetV2/ResNet baselines, GRU/TCN temporal heads
-  pipelines/  the five workflows: prepare / train / evaluate / infer / assess
+  models/     YOLO classification adapter; experimental baselines and temporal heads
+  pipelines/  prepare / train / evaluate / infer / assess / live
+  camera_app.py + static/   local HTTP service and camera web page
   cli.py      command-line entry point (handwash <subcommand>)
 scripts/      thin wrapper scripts + structure guard + one-shot Windows setup
 configs/      config.yaml + data/ + models/ + experiments/
@@ -96,7 +137,11 @@ The difference between the commands people confuse most:
 | `prepare_data.py` | scan -> **split by source video** -> extract frames -> build manifest | after obtaining new data |
 | `train_model.py` | train and save a checkpoint | after changing a model or config |
 | `evaluate_model.py` | compute metrics on val/test/external | after training |
+| `handwash infer` | video -> per-frame action predictions | inspect frame-level model output |
 | `run_assess.py` | video -> **missed / out-of-order / duration** report | demos and final validation |
+| `handwash camera` | USB camera -> live YOLO classification -> final report | local demonstration after cloud training |
+
+Example: `python -m handwash.cli infer --video demo.mp4 --checkpoint outputs/run/models/best.pt`.
 
 ## 4. Read this before changing any code
 
@@ -128,9 +173,10 @@ python -m pre_commit run --all-files
 <details>
 <summary><b>Training says "using synthetic data"?</b></summary>
 
-The real manifest does not exist, so the code fell back to synthetic data to verify the pipeline.
-**Metrics from synthetic data must never go into the report.**
-Run `prepare_data.py` first; see `docs/DATA.md`.
+The config explicitly selects `dataset.name: synthetic` for a smoke run. Missing real-data
+manifests cause an error; they do not trigger a synthetic fallback.
+**Metrics from synthetic data must never go into the report.** For real training, run
+`prepare_data.py` first; see `docs/DATA.md`.
 </details>
 
 <details>
@@ -172,16 +218,17 @@ Set `runtime.num_workers: 0`. Put it in `configs/local.yaml` rather than editing
 <details>
 <summary><b>Do I need to commit data or model weights?</b></summary>
 
-**No, and you must not.** `data/`, `models/`, and `outputs/` are already in `.gitignore`.
-See `docs/DATA.md` for how to obtain the datasets; checkpoints are shared through
-`outputs/<run>/models/` or a shared drive.
+Do not commit data or training weights. The root `exp.pt` is the sole demo exception.
+`data/`, `models/`, `outputs/`, and other `*.pt` files are ignored. See `docs/DATA.md` for
+dataset sources; provide a trained project checkpoint with `--checkpoint` for the final workflow.
 </details>
 
 ## 6. Documentation index
 
 | Document | Contents |
 | --- | --- |
-| [`docs/PROJECT_PLAN_4_WEEK.md`](docs/PROJECT_PLAN_4_WEEK.md) | **Four-week team plan (4 members)**: roles, week-by-week tasks, grading traceability, risks |
+| [`docs/IMPLEMENTATION_PLAN.zh-CN.md`](docs/IMPLEMENTATION_PLAN.zh-CN.md) | **Current step-by-step delivery plan**: cleaned data → cloud training → local camera web app |
+| [`docs/PROJECT_PLAN_4_WEEK.md`](docs/PROJECT_PLAN_4_WEEK.md) | Archived course schedule and grading requirements |
 | [`docs/PROJECT_PROPOSAL.md`](docs/PROJECT_PROPOSAL.md) | **Proposal content pack** — ready-to-paste text for every template field (due 30 Sep) |
 | [`docs/RULES_CARD.md`](docs/RULES_CARD.md) | **One-page cheat sheet** — read this before changing code |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | **Modification rules (required reading)**: Iron Rules, change levels, commit and PR flow |

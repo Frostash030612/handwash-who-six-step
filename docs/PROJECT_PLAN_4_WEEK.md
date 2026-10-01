@@ -2,6 +2,11 @@
 
 # Four-Week Team Plan (4 members) — PRS Practice Module
 
+**Archived course schedule:** the current product and task order are in the
+[YOLO live classification plan](IMPLEMENTATION_PLAN.zh-CN.md). The dates, roles and submission
+rules below remain historical course planning context. GRU/TCN ablations are optional research
+and are not gates for the camera product.
+
 Derived from the official brief, kept in this repo as
 [`docs/PRS-Practice-Module-brief.pdf`](PRS-Practice-Module-brief.pdf) (NUS-ISS, © 2026 National
 University of Singapore — internal course material, not for redistribution).
@@ -110,13 +115,13 @@ Shared ownership means nobody owns it. Each workstream has exactly one owner; ot
 
 | Role | Owner | Owns | Primary modules / files | Graded item it feeds |
 | --- | --- | --- | --- | --- |
-| **R1 — Data & Evaluation Lead** | **Shen Ziyi** (A0350940J) | datasets, splits, metrics, evaluation protocol, statistical claims | `src/handwash/io/`, `src/handwash/data/`, `scripts/prepare_data.py`, `docs/DATA.md`, `docs/EXPERIMENTS.md` | Final system, final report (performance) |
-| **R2 — Model & Training Lead** | **Wang Lepeng** (A0357864L) | frame classifier, training pipeline, baselines, hyper-parameters | `src/handwash/models/`, `src/handwash/pipelines/train.py`, `configs/models/`, `configs/experiments/` | Final system, final report (design) |
-| **R3 — Temporal & Assessment Lead** | **Zhu Jianyu** (A0353769L) | temporal fusion, completeness rules, cross-scenario robustness | `src/handwash/models/temporal.py`, `src/handwash/core/protocol.py`, `configs/config.yaml` (`assess`) | Final system (the differentiator) |
-| **R4 — Product, Demo & Delivery Lead** | **Xu Wenzhe** (A0328771W) | proposal, runnable demo, video, slides, report integration, ZIP, peer review logistics | `docs/PROJECT_PROPOSAL.md`, `scripts/run_assess.py`, `deliverables/` | **Proposal, first presentation**, final presentation, final report, peer review |
+| **R1 — Data & Evaluation Lead** | **Member 1** | datasets, splits, metrics, evaluation protocol, statistical claims | `src/handwash/io/`, `src/handwash/data/`, `scripts/prepare_data.py`, `docs/DATA.md`, `docs/EXPERIMENTS.md` | Final system, final report (performance) |
+| **R2 — Model & Training Lead** | **Member 2** | frame classifier, training pipeline, baselines, hyper-parameters | `src/handwash/models/`, `src/handwash/pipelines/train.py`, `configs/models/`, `configs/experiments/` | Final system, final report (design) |
+| **R3 — Temporal & Assessment Lead** | **Member 3** | temporal fusion, completeness rules, live-inference service, cross-scenario robustness | `src/handwash/models/temporal.py`, `src/handwash/core/protocol.py`, `configs/config.yaml` (`assess`) | Final system (the differentiator) |
+| **R4 — Product, Demo & Delivery Lead** | **Member 4** | proposal, external-camera web page, runnable demo, video, slides, report integration, ZIP, peer review logistics | `docs/PROJECT_PROPOSAL.md`, `scripts/run_assess.py`, `deliverables/` | **Proposal, first presentation**, final presentation, final report, peer review |
 
-Group ID (Canvas): **43**. Watch the proposal deadline: **30 Sep 2026** — see
-[`PROJECT_PROPOSAL.md`](PROJECT_PROPOSAL.md), which already contains the filled proposal content.
+Group ID (Canvas): fill in locally. Watch the proposal deadline: **30 Sep 2026** — see
+[`PROJECT_PROPOSAL.md`](PROJECT_PROPOSAL.md), which contains public placeholders.
 
 > **Suggested assignment — confirm or swap it at the kick-off meeting.** It is aligned with what
 > each person would touch anyway, and it front-loads the critical path: R1 owns the foundations
@@ -150,7 +155,7 @@ everyone can run `make check` green.
 | # | Task | Owner | Deliverable (evidence) |
 | --- | --- | --- | --- |
 | 1.1 | **Kick-off (45 min): confirm or swap the §2 role assignment, agree the 3-of-4 aspect story** | all | §2 table confirmed |
-| 1.2 | Confirm the Canvas group ID (**43**) and that all 4 members are enrolled | [R4] | Canvas group screenshot |
+| 1.2 | Confirm the Canvas group ID and that all 4 members are enrolled | [R4] | Canvas group screenshot |
 | 1.3 | **Draft the proposal into `docs/Project_Proposal_Template.docx`** — see `docs/PROJECT_PROPOSAL.md` for ready-to-paste content | [R4] + all | `deliverables/project_proposal.pdf` |
 | 1.4 | **Submit the proposal to Canvas — deadline 30 Sep. Do not leave this to the 30th** | [R4] | submission receipt |
 | 1.5 | Download the small Kaggle dataset; run `prepare_data.py --inspect`; verify label mapping | [R1] | `data/processed/kaggle/split_report.json` |
@@ -183,9 +188,9 @@ hospital data.
 | 2.1 | Rehearse the presentation twice; time it; agree who speaks to which slide | all | rehearsal notes |
 | 2.2 | **Deliver the first presentation — 6 Oct, 09:00–18:00, Zoom** (5%) | [R4] lead | slides + attendance |
 | 2.3 | Capture supervisor feedback verbatim and turn it into tasks | [R4] | feedback note in `docs/EXPERIMENTS.md` |
-| 2.4 | Prepare the PSKUS subset: split by source video, extract frames, rebuild manifest | [R1] | `split_report.json` showing train/val/test clip counts |
-| 2.5 | Leakage audit: run the guard checks, confirm no source video crosses splits | [R1] | audit note in `docs/EXPERIMENTS.md` |
-| 2.6 | Train the primary model (`exp02`: YOLO26n-cls + GRU); log all curves | [R2] | `outputs/e2_*/models/best.pt` + `history.json` |
+| 2.4 | Clean the PSKUS subset, check labels and timestamps, split by source video, then extract frames | [R1] | versioned manifest, sample-audit sheet, split report |
+| 2.5 | Audit duplicates and leakage; freeze train/val/test before cloud training | [R1] | dataset version and audit note in `docs/EXPERIMENTS.md` |
+| 2.6 | Train a frame baseline in the cloud; train `exp02` only after the dataset gate passes | [R2] | baseline checkpoint, `outputs/e2_*/models/best.pt` when ready, training history |
 | 2.7 | Baseline matrix: MobileNetV2 (frame) and YOLOv8n-cls (frame) on the same split | [R2] | 3 comparable rows in the experiment log |
 | 2.8 | Integrate the temporal head with the trained checkpoint (freeze backbone → train head) | [R3] | `outputs/e2_temporal/` |
 | 2.9 | Wire `assess` end-to-end on a real clip: report JSON + Markdown | [R3] | `outputs/*/assess/<clip>.md` |
@@ -214,8 +219,9 @@ hospital data.
 | 3.6 | Error analysis: pick 5 failure cases, classify each as visual (occlusion/similar action) or procedural (order/speed) | [R2] | `deliverables/error_analysis.md` |
 | 3.7 | Self-recorded validation set: 4–6 clips per member covering correct / missing / swapped / too-short | all | clips + `docs/SELF_RECORDING.md` table |
 | 3.8 | Ground-truth comparison: model verdict vs human verdict, completeness + order accuracy | [R4] | `assess_vs_ground_truth.csv` |
-| 3.9 | Assemble the demo so a stranger can run it from the README in under 5 minutes | [R4] | demo run script + `docs/DEMO.md` |
+| 3.9 | Verify the selected cloud checkpoint on local video, then build the live-inference service | [R3] | local video report + live session interface |
 | 3.10 | Draft the report: tools/techniques, system design, performance, findings | [R4] + all | `deliverables/report_draft_v1.pdf` |
+| 3.11 | Build the external-camera web page and connect it to the live service | [R4] | camera preview, step progress and final report in a browser |
 
 **Week-3 exit criteria**
 - [ ] The report's central table (the ablation) is complete and reproducible
@@ -235,7 +241,7 @@ start of Week 4.**
 | # | Task | Owner | Deliverable (evidence) |
 | --- | --- | --- | --- |
 | 4.1 | **Feature freeze** at Monday sync; only bug fixes afterwards | all | decision recorded in experiment log |
-| 4.2 | Freeze the runnable system: one command installs, one command runs the demo | [R4] | verified on a **clean machine / fresh env** |
+| 4.2 | Freeze the runnable system: connect an external camera, start the service and complete one browser demo | [R4] | verified on a **clean machine / fresh env** |
 | 4.3 | Package datasets + code + model files into `deliverables/` | [R1] | dataset README + download instructions |
 | 4.4 | Final report: all sections written, figures finalised, references complete | [R4] + all | `deliverables/final_report.pdf` (draft-final) |
 | 4.5 | Each member drafts their **1–2 page individual report** | all | 4 drafts |

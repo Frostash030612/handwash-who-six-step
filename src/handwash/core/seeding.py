@@ -59,7 +59,32 @@ def seed_everything(seed: int = DEFAULT_SEED, *, deterministic: bool = True) -> 
 
 def worker_init_fn(worker_id: int) -> None:
     """DataLoader 的 worker 种子初始化：保证多进程加载也是确定的。"""
+    try:
+        from torch.utils.data import get_worker_info
+
+        info = get_worker_info()
+    except ImportError:  # pragma: no cover - torch is optional for core utilities
+        info = None
     base = int(os.environ.get("PYTHONHASHSEED", str(DEFAULT_SEED)))
-    seed = base + worker_id
-    np.random.seed(seed)
+    seed = int(info.seed if info is not None else base + worker_id)
+    np_seed = seed % (2**32)
+    np.random.seed(np_seed)
     random.seed(seed)
+
+    # Project transforms keep a NumPy Generator rather than relying on global
+    # NumPy state. Reseed those generators per worker as well; otherwise forked
+    # workers inherit identical augmentation streams.
+    if info is not None:
+        shared_generators: dict[int, np.random.Generator] = {}
+
+        def reseed(transform) -> None:
+            generator = getattr(transform, "rng", None)
+            if isinstance(generator, np.random.Generator):
+                key = id(generator)
+                if key not in shared_generators:
+                    shared_generators[key] = np.random.default_rng(seed)
+                transform.rng = shared_generators[key]
+            for child in getattr(transform, "steps", ()):
+                reseed(child)
+
+        reseed(getattr(info.dataset, "transform", None))

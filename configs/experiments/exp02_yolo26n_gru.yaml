@@ -4,17 +4,23 @@
 # 目的：本项目主方案。YOLO26n-cls 负责逐帧动作分类，GRU 利用前后帧关系。
 #
 # 运行：
-#     python -m handwash.cli train config=configs/config.yaml model.arch=yolo26n-cls \
-#         train.mode=clip runtime.run_name=e2_yolo26_gru
+#     python -m handwash.cli train config=configs/experiments/exp02_yolo26n_gru.yaml
 #
 # 若 yolo26 权重不可用（先跑 handwash doctor 确认），做两步：
-#     1) 用现成权重跑通：model.pretrained=yolo11n-cls.pt
-#     2) 在报告里说明"因权重可用性问题，改用 X 权重，方法完全一致"
-#        —— 这是诚实且可接受的处理方式，不要悄悄换掉不说。
+#     1) 把 model.arch 和 model.pretrained 一起改为 yolon-cls / auto，再训练；
+#     2) 评估时加载同一配置，并在报告里说明实际使用 YOLO11n。
+# 不要只改 pretrained 文件路径：不同 YOLO 架构的层形状不兼容。
 # ============================================================================
 
 runtime:
   run_name: e2_yolo26n_gru
+  device: cuda               # fp16 训练需要 CUDA；无 CUDA 时可覆盖为 fp32 + cpu/mps
+
+dataset:
+  name: pskuss
+  root: data/raw/pskuss/extracted
+  label_space: pskuss
+  include_non_wash: true
 
 model:
   arch: yolo26n-cls

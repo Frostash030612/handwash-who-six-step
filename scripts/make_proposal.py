@@ -13,29 +13,28 @@
 
     # 英文正式提案（官方提交格式）：填上 Canvas 分组编号与四个人的姓名学号
     python scripts/make_proposal.py --lang en \
-        --group-id "43" \
+        --group-id "0" \
         --members "Full Name:A0000000X" "Full Name:A0000000Y" \
                   "Full Name:A0000000Z" "Full Name:A0000000W"
 
     # 中文正式提案（姓名沿用学籍登记拼写，避免臆造汉字姓名）
     python scripts/make_proposal.py --lang zh \
-        --group-id "43" --members "Full Name:A0000000X" ...
+        --group-id "0" --members "Full Name:A0000000X" ...
 
     # Markdown 版本（便于评审与 diff），以及与 DOCX 完全同源的内容
     python scripts/make_proposal.py --lang zh --format md
 
-    # 可入 Git 的脱敏副本（学号 A0123456X -> A012****X），写到 deliverables/repo/
+    # 本地审阅用脱敏副本（学号 A0123456X -> A012****X），写到 deliverables/repo/
     python scripts/make_proposal.py --lang zh --mask-ids
 
 生成物（默认）:
     deliverables/project_proposal_{en,zh}.docx  ← 完整学号，用 Word 导出 PDF 交 Canvas
     deliverables/project_proposal_{en,zh}.md    ← 完整学号，组内评审
-    deliverables/repo/project_proposal_*.{docx,md}  ← --mask-ids 产物，学号已脱敏，可进 Git
+    deliverables/repo/project_proposal_*.{docx,md}  ← --mask-ids 产物，仅本地保留
 
 为什么要有脱敏副本:
     `deliverables/` 被 .gitignore 整体排除，原因是提交件含姓名与学号。
-    但组内需要在仓库里看到提案，所以额外产出 `repo/` 下的脱敏版：
-    保留可辨识度（一眼知道是哪位组员），但无法还原成完整学号。
+    `repo/` 下的脱敏版仅供本地审阅；它可能仍含姓名或文档元数据，不适合公开上传。
     **`repo/` 里的副本不能直接交 Canvas** —— 交作业请用没有 `repo/` 的那一层。
 
 设计约束（CONTRIBUTING.md R3）
@@ -503,7 +502,7 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "示例：\n"
-            "  python scripts/make_proposal.py --lang en --group-id 43 \\\n"
+            "  python scripts/make_proposal.py --lang en --group-id 0 \\\n"
             "      --members 'Full Name:A0000000X' 'Full Name:A0000000Y'\n"
             "\n成员格式为 姓名:学号；只写姓名也可以（学号留占位，稍后在 Word 里补）。"
         ),

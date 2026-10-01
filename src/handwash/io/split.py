@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import random
+import math
 from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -92,7 +93,7 @@ def split_clips(
     for name in _SPLIT_NAMES:
         if name not in ratios:
             raise ManifestError(f"划分比例缺少 {name}：{ratios}")
-        if ratios[name] < 0:
+        if not math.isfinite(float(ratios[name])) or ratios[name] < 0:
             raise ManifestError(f"划分比例不能为负：{name}={ratios[name]}")
     total_ratio = sum(ratios[n] for n in _SPLIT_NAMES)
     if abs(total_ratio - 1.0) > 1e-6:
@@ -106,6 +107,12 @@ def split_clips(
     duplicates = {k: v for k, v in groups.items() if len({c.split for c in v}) > 1}
     if duplicates:
         raise DataLeakageError([c.clip_id for group in duplicates.values() for c in group])
+    active_splits = [name for name in _SPLIT_NAMES if ratios[name] > 0]
+    if len(groups) < len(active_splits):
+        raise ManifestError(
+            f"只有 {len(groups)} 个独立分组，无法为所有非零比例 split（{active_splits}）各分配至少一组",
+            hint="增加独立视频数，或把不需要的 split 比例设为 0。",
+        )
 
     # --- 2) 分层：先按"主标签"把组分类，再在每层内分配 ---------------------
     rng = random.Random(seed)
@@ -124,15 +131,9 @@ def split_clips(
     assignment: dict[str, Split] = {}
     for _, keys in sorted(strata.items()):
         n = len(keys)
-        n_train = _largest_remainder(ratios["train"], n)
-        n_val = _largest_remainder(ratios["val"], n)
-        # 小样本保护：每个非空 split 至少分到 1 个组（否则 val 为空无法早停）
-        if n >= 3:
-            n_train = max(1, min(n_train, n - 2))
-            n_val = max(1, min(n_val, n - n_train - 1))
-        else:
-            n_train = max(1, n_train)
-            n_val = max(0, min(n_val, n - n_train))
+        counts = _allocate_groups(n, ratios)
+        n_train = counts["train"]
+        n_val = counts["val"]
         for i, key in enumerate(keys):
             if i < n_train:
                 assignment[key] = "train"
@@ -140,6 +141,22 @@ def split_clips(
                 assignment[key] = "val"
             else:
                 assignment[key] = "test"
+
+    # Independent rounding inside many small strata can otherwise leave a
+    # globally requested split empty (for example, five one-video classes).
+    # Repair only the globally missing split, preserving each source clip.
+    counts_by_split = Counter(assignment.values())
+    for missing in active_splits:
+        if counts_by_split[missing] > 0:
+            continue
+        donor = max(active_splits, key=lambda name: (counts_by_split[name], -_SPLIT_NAMES.index(name)))
+        if counts_by_split[donor] <= 1:
+            raise ManifestError(f"无法为 split={missing} 分配独立分组")
+        donor_keys = sorted(key for key, assigned in assignment.items() if assigned == donor)
+        moved = donor_keys[-1]
+        assignment[moved] = missing  # type: ignore[assignment]
+        counts_by_split[donor] -= 1
+        counts_by_split[missing] += 1
 
     result: dict[Split, list[ClipRecord]] = {"train": [], "val": [], "test": []}
     for key, members in groups.items():
@@ -176,11 +193,16 @@ def _stratum_of(members: Sequence[ClipRecord], stratify_by: str) -> str:
     )
 
 
-def _largest_remainder(ratio: float, n: int) -> int:
-    """按比例取整数名额（向下取整；余数由调用方的小样本保护处理）。"""
-    if n <= 0:
-        return 0
-    return max(0, min(n, int(round(ratio * n))))
+def _allocate_groups(n: int, ratios: Mapping[str, float]) -> dict[str, int]:
+    """Largest-remainder apportionment that always assigns every group once."""
+    names = list(_SPLIT_NAMES)
+    raw = {name: n * float(ratios[name]) for name in names}
+    counts = {name: math.floor(raw[name]) for name in names}
+    remaining = n - sum(counts.values())
+    priority = sorted(names, key=lambda name: (-(raw[name] - counts[name]), names.index(name)))
+    for name in priority[:remaining]:
+        counts[name] += 1
+    return counts
 
 
 def assign_frames(

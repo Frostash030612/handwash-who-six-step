@@ -1,124 +1,132 @@
-"""模型基类：统一 ``(B, T, C)`` 输出契约。
-
-新模型只需要继承 ``BaseClassifier`` 并实现 ``_forward_logits``，
-其余（形状校验、冻结/解冻、参数量统计、设备迁移）由基类提供。
-"""
+"""图像分类骨干与逐帧时序头的统一接口。"""
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from typing import Any
 
 import torch
 from torch import nn
 
-from handwash.errors import ModelError
-from handwash.logging import get_logger
 
-__all__ = ["BaseClassifier", "check_logits_shape"]
+class CausalResidualBlock(nn.Module):
+    """只读取当前和过去特征的一维时序卷积块。"""
 
-log = get_logger(__name__)
-
-
-def check_logits_shape(logits: torch.Tensor, num_classes: int, *, where: str) -> torch.Tensor:
-    """强制校验输出形状为 ``(B, T, C)``。
-
-    宁可在这里报错，也不要在 loss 里因为广播规则悄悄算出错误结果。
-    """
-    if logits.ndim != 3:
-        raise ModelError(
-            f"{where} 输出的 logits 必须是 (B, T, C) 三维张量，实际 shape={tuple(logits.shape)}",
-            hint="单帧模型请先 unsqueeze(1)，即 (B, C) -> (B, 1, C)。",
-        )
-    if logits.shape[-1] != num_classes:
-        raise ModelError(
-            f"{where} 输出的类别数 {logits.shape[-1]} 与标签空间 {num_classes} 不一致",
-            hint="检查 model.num_classes 是否由标签空间推导（不要手写数字）。",
-        )
-    return logits
-
-
-class BaseClassifier(nn.Module, ABC):
-    """所有帧级 / 序列级分类器的基类。"""
-
-    #: 子类应覆盖，用于日志与报告
-    arch_name: str = "base"
-
-    def __init__(self, num_classes: int, *, dropout: float = 0.0) -> None:
+    def __init__(self, channels: int, kernel_size: int, dilation: int, dropout: float) -> None:
         super().__init__()
-        if num_classes < 2:
-            raise ModelError(f"num_classes 至少为 2，实际 {num_classes}")
-        if not 0.0 <= dropout < 1.0:
-            raise ModelError(f"dropout 必须在 [0, 1)，实际 {dropout}")
-        self._num_classes = int(num_classes)
-        self.dropout_p = float(dropout)
-
-    # --- 契约 -------------------------------------------------------------
-    @property
-    def num_classes(self) -> int:
-        return self._num_classes
-
-    @property
-    @abstractmethod
-    def feature_dim(self) -> int:
-        """``embed`` 输出的特征维度 D。时序头需要它来构造。"""
-
-    @abstractmethod
-    def _forward_logits(self, x: torch.Tensor) -> torch.Tensor:
-        """子类实现：返回 ``(B, T, C)``。"""
-
-    def logits(self, x: torch.Tensor) -> torch.Tensor:
-        """统一入口：带形状校验的 logits。"""
-        out = self._forward_logits(x)
-        return check_logits_shape(out, self._num_classes, where=f"{self.arch_name}.logits")
-
-    def embed(self, x: torch.Tensor) -> torch.Tensor:
-        """返回 ``(B, T, D)`` 特征。默认实现：复用 ``logits`` 之前的特征不可得，
-        因此子类**应当**覆写本方法；未覆写时抛错而不是悄悄返回 logits。
-        """
-        raise ModelError(
-            f"{self.arch_name} 未实现 embed()，无法作为时序模型的骨干",
-            hint="如需两级训练（帧模型 + GRU/TCN），请在该模型里实现 embed()。",
-        )
+        self.padding = (kernel_size - 1) * dilation
+        self.conv = nn.Conv1d(channels, channels, kernel_size, dilation=dilation)
+        # LayerNorm is applied per time step below; BatchNorm1d would aggregate
+        # across the temporal axis and leak future-frame statistics into a causal head.
+        self.norm = nn.LayerNorm(channels)
+        self.dropout = nn.Dropout(dropout)
+        self.activation = nn.GELU()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """``forward`` 直接返回 logits —— 保证 ``torch.compile`` / 导出友好。"""
-        return self.logits(x)
+        y = self.conv(nn.functional.pad(x, (self.padding, 0)))
+        y = self.norm(y.transpose(1, 2)).transpose(1, 2)
+        return x + self.dropout(self.activation(y))
 
-    # --- 训练期工具 -------------------------------------------------------
-    def predict_proba(self, x: torch.Tensor) -> torch.Tensor:
-        """softmax 概率，形状 ``(B, T, C)``。"""
-        return torch.softmax(self.logits(x), dim=-1)
 
-    def predict(self, x: torch.Tensor) -> torch.Tensor:
-        """argmax 类别下标，形状 ``(B, T)``。"""
-        return self.logits(x).argmax(dim=-1)
+class BaseClassifier(nn.Module):
+    """接受 ``(B,C,H,W)`` 或 ``(B,T,C,H,W)``，统一输出 ``(B,T,K)``。"""
 
-    def freeze_backbone(self, freeze: bool = True) -> None:
-        """冻结/解冻骨干（骨干由子类通过 ``backbone_modules()`` 声明）。"""
-        for module in self.backbone_modules():
-            for param in module.parameters():
-                param.requires_grad = not freeze
-        log.info("%s 骨干已%s", self.arch_name, "冻结" if freeze else "解冻")
+    def __init__(
+        self,
+        *,
+        num_classes: int,
+        feature_dim: int,
+        temporal: Any,
+        dropout: float = 0.2,
+        arch_name: str = "classifier",
+    ) -> None:
+        super().__init__()
+        self.num_classes = int(num_classes)
+        self.feature_dim = int(feature_dim)
+        self.arch_name = arch_name
+        self.temporal_kind = str(temporal.kind)
+        self.classifier = nn.Linear(self.feature_dim, self.num_classes)
+        self.dropout = nn.Dropout(dropout)
+        self.temporal_projection: nn.Module | None = None
+        self.temporal_head: nn.Module | None = None
 
-    def backbone_modules(self) -> list[nn.Module]:
-        """默认把除分类头之外的全部子模块视为骨干；子类可覆写精确指定。"""
-        head_names = {"head", "classifier", "fc"}
-        return [m for name, m in self.named_children() if name not in head_names]
+        if self.temporal_kind == "mean_pool":
+            self.temporal_projection = nn.Sequential(
+                nn.Linear(self.feature_dim * 2, self.feature_dim),
+                nn.GELU(),
+                nn.Dropout(dropout),
+            )
+        elif self.temporal_kind == "gru":
+            self.temporal_head = nn.GRU(
+                input_size=self.feature_dim,
+                hidden_size=int(temporal.hidden_size),
+                num_layers=int(temporal.num_layers),
+                batch_first=True,
+                bidirectional=bool(temporal.bidirectional),
+                dropout=float(temporal.dropout) if int(temporal.num_layers) > 1 else 0.0,
+            )
+            out_dim = int(temporal.hidden_size) * (2 if temporal.bidirectional else 1)
+            self.temporal_classifier = nn.Linear(out_dim, self.num_classes)
+        elif self.temporal_kind == "tcn":
+            dilations = tuple(int(d) for d in temporal.dilations) or (1,)
+            self.temporal_head = nn.Sequential(
+                *[
+                    CausalResidualBlock(
+                        self.feature_dim,
+                        int(temporal.kernel_size),
+                        dilation,
+                        float(temporal.dropout),
+                    )
+                    for dilation in dilations
+                ]
+            )
+            self.temporal_classifier = nn.Conv1d(self.feature_dim, self.num_classes, kernel_size=1)
 
-    def num_parameters(self, *, trainable_only: bool = False) -> int:
-        params = self.parameters()
-        if trainable_only:
-            return int(sum(p.numel() for p in params if p.requires_grad))
-        return int(sum(p.numel() for p in params))
+    def _encode_frames(self, images: torch.Tensor) -> torch.Tensor:
+        """子类实现：输入 ``(N,3,H,W)``，返回 ``(N,D)`` 特征。"""
+        raise NotImplementedError
 
-    def describe(self) -> dict[str, Any]:
-        """写进实验日志的模型摘要（报告里要给出参数量）。"""
+    def embed(self, images: torch.Tensor) -> torch.Tensor:
+        """返回 ``(B,T,D)`` 的逐帧视觉特征。"""
+        if images.ndim == 4:
+            images = images.unsqueeze(1)
+        if images.ndim != 5:
+            raise ValueError(f"输入应为 (B,C,H,W) 或 (B,T,C,H,W)，实际 {tuple(images.shape)}")
+        batch, steps, channels, height, width = images.shape
+        features = self._encode_frames(images.reshape(batch * steps, channels, height, width))
+        return features.reshape(batch, steps, -1)
+
+    def logits(self, images: torch.Tensor) -> torch.Tensor:
+        """计算逐时间点 logits，输出形状固定为 ``(B,T,K)``。"""
+        features = self.embed(images)
+        if self.temporal_kind == "none":
+            output = features
+        elif self.temporal_kind == "mean_pool":
+            counts = torch.arange(1, features.shape[1] + 1, device=features.device, dtype=features.dtype)
+            context = features.cumsum(dim=1) / counts.view(1, -1, 1)
+            output = self.temporal_projection(torch.cat((features, context), dim=-1))
+        elif self.temporal_kind == "gru":
+            output, _ = self.temporal_head(features)
+        elif self.temporal_kind == "tcn":
+            output = self.temporal_head(features.transpose(1, 2)).transpose(1, 2)
+        else:  # 配置层会提前校验；此处防止绕过配置工厂。
+            raise ValueError(f"不支持的时序类型：{self.temporal_kind}")
+
+        if self.temporal_kind in ("gru", "tcn"):
+            if self.temporal_kind == "tcn":
+                return self.temporal_classifier(self.dropout(output).transpose(1, 2)).transpose(1, 2)
+            return self.temporal_classifier(self.dropout(output))
+        return self.classifier(self.dropout(output))
+
+    def forward(self, images: torch.Tensor) -> torch.Tensor:
+        return self.logits(images)
+
+    def describe(self) -> dict[str, int | str]:
+        total = sum(parameter.numel() for parameter in self.parameters())
+        trainable = sum(parameter.numel() for parameter in self.parameters() if parameter.requires_grad)
         return {
             "arch": self.arch_name,
-            "num_classes": self._num_classes,
+            "num_classes": self.num_classes,
             "feature_dim": self.feature_dim,
-            "dropout": self.dropout_p,
-            "params_total": self.num_parameters(),
-            "params_trainable": self.num_parameters(trainable_only=True),
+            "params_total": total,
+            "params_trainable": trainable,
         }

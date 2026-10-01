@@ -21,11 +21,8 @@
    - `configs/config.yaml`：`split.guard_leakage: true`。
 
 2. **数据不进 Git。** `data/`、`models/`、`outputs/` 都已在 `.gitignore`。
-   数据放在本地或共享盘，用 `HANDWASH_DATA_ROOT` 环境变量指向外部位置：
-   ```bash
-   set HANDWASH_DATA_ROOT=E:\datasets\handwash     # Windows
-   export HANDWASH_DATA_ROOT=/mnt/data/handwash    # Linux/macOS
-   ```
+   默认数据目录是项目内的 `data/`；若数据放在别处，将 `HANDWASH_DATA_ROOT`
+   设置为自己选择的数据目录即可，配置中的 `data/raw/...` 会随之映射。
 
 3. **标签映射只改一处。** 数据集原始标签名 → 规范 `Step` 的映射**只允许**
    写在 `src/handwash/core/labels.py` 的 `_DATASET_ALIASES`。
@@ -144,15 +141,21 @@ datasets:
 
 ```
 ① 用 PSKUS 训练 → outputs/e4_pskuss_train/models/best.pt
-② 准备 METC 的帧（configs/data/metc.yaml）
+② 准备 METC 的 manifest 和抽样帧（configs/data/metc.yaml）
 ③ 用**同一个** checkpoint 在 METC 上评估：
-     python -m handwash.cli evaluate --checkpoint <上面的 best.pt> --splits external
+     python -m handwash.cli evaluate config=configs/experiments/exp04_cross_domain.yaml \\
+       --checkpoint <上面的 best.pt> --splits test external
 ```
 
 **不要**用 METC 训练再在 METC 上测试 —— 那就不是跨场景实验了。
 报告里应给出三组数字：PSKUS test（同场景）、METC（跨场景）、自采视频（真实使用）。
 
 **配置**：`configs/data/metc.yaml`
+
+该适配器读取同名视频与逐帧 JSON，并把 METC 全部放入 `external`。跨域实验通过
+`eval.extra_datasets: [metc]` 读取 METC 自己的 manifest 和帧目录，同时保留 PSKUS
+checkpoint 的标签空间。旧 E4 时序实验使用 2 fps；当前逐帧实时分类主线使用 5 fps，
+跨场景比较时间戳时应使用相同的抽帧率。
 
 ---
 
@@ -173,7 +176,7 @@ data/raw/kaggle/
 **说明**：`Step7_water` / `not_washing` 在框架里归入 `other`，而 `kaggle`
 标签空间只有六步，因此这些样本不会被计入六分类训练（见 `core/labels.py`）。
 
-**配置**：`configs/data/kaggle.yaml`（默认 `dataset.name`，用于一键冒烟）
+**配置**：`configs/data/kaggle.yaml`（可选快速原型；当前默认数据集是 PSKUS）
 
 ---
 
@@ -221,7 +224,7 @@ data/raw/kaggle/
 | 准确率 > 0.98 | 极可能数据泄漏 | 见上；另外检查是否把 test 放进了 train |
 
 **抽帧参数建议**：`fps: 5.0` 对动作级任务足够（30fps 的视频每 6 帧取 1 帧），
-存储可降到约 1/6；`resize_hw: [256, 256]` 落盘、模型再裁到 224。
+存储可降到约 1/6；当前 PSKUS 配置以 `resize_hw: [224, 224]` 落盘。
 
 ---
 

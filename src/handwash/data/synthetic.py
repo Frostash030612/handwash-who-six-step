@@ -3,7 +3,7 @@
 两个用途
 --------
 1. **冒烟训练**（``make train-smoke`` / ``configs/experiments/smoke.yaml``）：
-   30 秒内验证"数据 → 模型 → 指标 → 报告"链路没有断。
+   无需真实数据即可验证"数据 → 模型 → 指标 → 报告"链路没有断。
 2. **单元测试**：给 ``pipelines`` 提供完全确定、无需网络的输入。
 
 设计要点
@@ -243,8 +243,9 @@ def write_synthetic_dataset(
             for _ in range(frames_per_step):
                 local = np.random.default_rng([seed, clip_index, frame_index])
                 image = render_step_frame(step, size=image_size, rng=local)
-                rel = Path("frames") / clip_id / f"{frame_index:05d}.jpg"
-                save_frame(image, base / rel, quality=90)
+                # manifest.image_path 与真实数据保持同一契约：相对 frames_dir。
+                rel = Path(clip_id) / f"{frame_index:05d}.jpg"
+                save_frame(image, image_root / rel, quality=90)
                 frames.append(
                     FrameRecord(
                         clip_id=clip_id,

@@ -2,6 +2,27 @@
 
 # Architecture (ARCHITECTURE)
 
+## Current product path
+
+The product is a live YOLO **image classifier**. A cleaned, video-grouped dataset is used
+to train a frame model in the cloud. The deployment computer loads the matching project
+checkpoint and config. Its local browser captures a USB camera, sends sampled JPEG frames
+to the local service, and displays the current action and six-step progress.
+
+```
+cleaned videos/labels -> cloud train/evaluate -> project best.pt + matching config
+                                              -> local camera_app.py
+USB camera -> browser -> sampled JPEG -> pipelines/live.py -> YOLO frame logits
+                                            -> past-only display averaging
+                                            -> core.protocol final report -> browser
+```
+
+The camera service uses only frames already captured. A dropped-frame gap is marked unknown
+on the report timeline so missing video does not count as time spent performing an action.
+The existing GRU/TCN and PE plans are optional research paths, not required for the live
+product. The older offline flow below remains available for dataset preparation, model
+validation and recorded-video analysis.
+
 This document explains **why the layers are drawn this way**, and **why the interfaces in
 `core/` cannot be changed on a whim**. Read it before you read the code — it saves a great
 deal of "why is this function here?" confusion.
@@ -14,7 +35,7 @@ deal of "why is this function here?" confusion.
                     ┌──────────────────────────────────────────────┐
    L4  Entry &      │  cli.py  cli_doctor.py  scripts/*.py         │
        orchestration│  pipelines/: prepare train evaluate          │
-                    │              infer  assess  common           │
+                    │              infer assess live common        │
                     └───────────────────┬──────────────────────────┘
                                         │ may import every layer below
                     ┌───────────────────▼──────────────────────────┐
@@ -200,6 +221,56 @@ Append a record below (newest entry on top), then link it from the PR.
 ```
 
 ### Accepted RFCs
+
+#### RFC-0006: Make PSKUS the default dataset for live YOLO classification
+- Date: 2026-10-01    Author: project owner request    Status: accepted
+- Current state: the base YAML selected the Kaggle prototype dataset while the intended
+  product trains a YOLO frame classifier on a cleaned PSKUS dataset. Plain `handwash train`
+  could therefore train on the wrong source after data preparation.
+- Change: default `DataConfig`, dataset profile root, and base YAML now select `pskuss`,
+  its label space, and non-wash categories; `DataPrepConfig` defaults match the base
+  YAML's 224-pixel frames and JPEG quality 85. The historical Kaggle frame experiment
+  explicitly selects Kaggle so its meaning stays stable.
+- Impact: commands and custom experiment overlays that relied on the implicit Kaggle
+  default now select PSKUS. This changes training data and output channels.
+- Migration: explicitly select `dataset.name: kaggle`, `dataset.label_space: kaggle`,
+  `dataset.root: data/raw/kaggle`, and `dataset.include_non_wash: false`, or apply
+  `configs/data/kaggle.yaml` when running the old baseline. Existing checkpoints
+  remain tied to their recorded resolved configuration.
+- Approvals: explicit project-owner instruction in this workspace session.
+
+#### RFC-0005: Align temporal windows and checkpoint selection with inference
+- Date: 2026-10-01    Author: project owner request    Status: accepted
+- Current state: clip training used non-overlapping windows while inference used a separate
+  hard-coded overlapping schedule; `model.temporal.stride` did not affect either training or
+  evaluation. Validation selected checkpoints from raw window outputs even when evaluation
+  used TTA, overlapping-window averaging, or probability smoothing. `train.mode=hybrid` also
+  silently behaved like clip training although no joint hybrid objective existed. Random
+  augmentation was sampled independently for every frame in a clip, introducing artificial
+  frame-to-frame flicker.
+- Change: share one configured window/stride schedule across clip training, validation, and
+  inference; aggregate validation probabilities per source frame and apply configured
+  inference policy before checkpoint selection; require temporal heads to train with clips
+  and infer with clip/hybrid; reject unsupported hybrid training. Share augmentation randomness
+  across frames from the same clip within an epoch. Increment config schema to 2.
+- Impact: temporal model training and validation scores change. Re-run temporal experiments
+  E2, E3-C/D, and E4 before comparing them with prior results. Frame-only E1 and E3-A/B
+  architectures are unchanged, but re-evaluate if their config hashes must reflect schema 2.
+- Migration: update custom configs to `schema_version: 2`; set temporal heads to
+  `train.mode=clip` and `infer.mode=clip` or `hybrid`; keep `1 <= stride <= window`.
+- Approvals: explicit project-owner instruction in this workspace session.
+
+#### RFC-0004: Model the published METC label space accurately
+- Date: 2026-10-01    Author: project owner request    Status: accepted
+- Current state: the legacy `metc` namespace included nine channels, while the published
+  Zenodo subset uses movement codes 0..6 only (0=other, 1..6=WHO steps).
+- Change: add numeric aliases without changing legacy channel order; append `metc_public`
+  with the published seven-class order; add JSON/video preparation and external evaluation.
+- Impact: legacy `metc` checkpoints retain their channel order. New METC manifests use seven
+  labels. Any earlier METC metrics made with assumed labels must be regenerated.
+- Migration: use `label_space: metc_public` for new METC preparation; cross-domain evaluation
+  reads canonical labels using the source checkpoint's label space.
+- Approvals: explicit project-owner instruction in this workspace session.
 
 #### RFC-0001: Unify model output as `(B, T, C)`
 - Date: project initialization    Status: accepted (initial design of this framework)

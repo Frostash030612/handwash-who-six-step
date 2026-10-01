@@ -109,6 +109,13 @@ is_complete    := |{六步中 detected 的}| >= 6 - assess.missing_tolerance
 某一步在行动序列中出现多次 → `severity="info"`。
 `assess.allow_repeats: true` 时不再报告。
 
+### 4.5 可选的水龙头事件检查
+
+`assess.require_faucet_events: true` 时，平滑后的序列必须同时出现 `faucet_on` 和
+`faucet_off`；缺少任一事件会生成一条警告。这些补充警告**不改变** `is_complete` 和
+`overall_score`，两者仍只描述 WHO 六个搓洗步骤。模型标签空间必须包含这两个事件类别。
+PSKUS 没有 `faucet_on` 标注，因此对应配置必须关闭该选项。
+
 ---
 
 ## 5. 综合得分（overall_score，0—1）

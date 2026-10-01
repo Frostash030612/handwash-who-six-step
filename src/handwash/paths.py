@@ -122,8 +122,13 @@ def resolve_relative(value: str | os.PathLike[str], *, root: Path | None = None)
     path = Path(str(value)).expanduser()
     if path.is_absolute():
         return path
-    base = PROJECT_ROOT if root is None else Path(root)
-    return base / path
+    if root is not None:
+        return Path(root) / path
+    # Paths under data/ follow HANDWASH_DATA_ROOT, as documented. Outputs and
+    # configuration files remain relative to the repository root.
+    if path.parts and path.parts[0] == "data":
+        return data_root().joinpath(*path.parts[1:])
+    return PROJECT_ROOT / path
 
 
 def checkpoint_path(out_dir: str | Path, name: str = BEST_CHECKPOINT_NAME) -> Path:

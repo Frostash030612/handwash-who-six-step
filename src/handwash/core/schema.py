@@ -321,6 +321,7 @@ class EvalResult:
     confusion_matrix: tuple[tuple[int, ...], ...]
     labels: tuple[str, ...]
     latency_ms_per_clip: float | None = None
+    confidence_intervals: Mapping[str, Any] | None = None
     schema_version: int = SCHEMA_VERSION
 
     def to_dict(self) -> dict[str, Any]:
@@ -336,6 +337,9 @@ class EvalResult:
             "confusion_matrix": [list(row) for row in self.confusion_matrix],
             "labels": list(self.labels),
             "latency_ms_per_clip": self.latency_ms_per_clip,
+            "confidence_intervals": (
+                dict(self.confidence_intervals) if self.confidence_intervals is not None else None
+            ),
         }
 
     @classmethod
@@ -353,6 +357,11 @@ class EvalResult:
             latency_ms_per_clip=(
                 float(payload["latency_ms_per_clip"])
                 if payload.get("latency_ms_per_clip") is not None
+                else None
+            ),
+            confidence_intervals=(
+                dict(payload["confidence_intervals"])
+                if payload.get("confidence_intervals") is not None
                 else None
             ),
             schema_version=int(payload.get("schema_version", SCHEMA_VERSION)),

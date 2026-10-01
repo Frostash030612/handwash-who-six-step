@@ -15,22 +15,22 @@
 常用命令::
 
     # 看有什么、多大、哪些已经下好校验通过
-    python scripts/download_data.py --dataset pskus --list
+    python scripts/download_data.py --dataset pskuss --list
 
     # 只下小分片，先验证整条流水线（约 1 GB）
-    python scripts/download_data.py --dataset pskus --files DataSet4.zip,DataSet3.zip
+    python scripts/download_data.py --dataset pskuss --files DataSet4.zip,DataSet3.zip
 
     # 按体积均衡分给 4 个人：第 1 个人跑 1/4，第 2 个人跑 2/4 ……
-    python scripts/download_data.py --dataset pskus --share 1/4
+    python scripts/download_data.py --dataset pskuss --share 1/4
 
     # 全量（约 17 GB，挂机跑）
-    python scripts/download_data.py --dataset pskus --all
+    python scripts/download_data.py --dataset pskuss --all
 
     # 校验已有的文件（不下东西，只核对 md5）
-    python scripts/download_data.py --dataset pskus --verify-only
+    python scripts/download_data.py --dataset pskuss --verify-only
 
     # 解压已下好的分片
-    python scripts/download_data.py --dataset pskus --extract
+    python scripts/download_data.py --dataset pskuss --extract
 
     # 看磁盘占用与剩余空间
     python scripts/download_data.py --status
@@ -711,16 +711,15 @@ def main(argv: list[str] | None = None) -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "四个人的推荐用法（PSKUS 17 GB，分片分摊）：\n"
-            "  第 1 人：python scripts/download_data.py --dataset pskus --share 1/4 --extract\n"
-            "  第 2 人：python scripts/download_data.py --dataset pskus --share 2/4 --extract\n"
-            "  第 3 人：python scripts/download_data.py --dataset pskus --share 3/4 --extract\n"
-            "  第 4 人：python scripts/download_data.py --dataset pskus --share 4/4 --extract\n"
+            "  第 1 人：python scripts/download_data.py --dataset pskuss --share 1/4 --extract\n"
+            "  第 2 人：python scripts/download_data.py --dataset pskuss --share 2/4 --extract\n"
+            "  第 3 人：python scripts/download_data.py --dataset pskuss --share 3/4 --extract\n"
+            "  第 4 人：python scripts/download_data.py --dataset pskuss --share 4/4 --extract\n"
             "\n"
             "METC 只有 1.98 GB，建议每人都下全量：\n"
             "  python scripts/download_data.py --dataset metc --all --extract\n"
             "\n"
-            "数据放哪由 HANDWASH_DATA_ROOT 决定，可以完全放在仓库外：\n"
-            '  $env:HANDWASH_DATA_ROOT = "D:\\handwash-data"\n'
+            "默认数据目录是项目内的 data/；若放在别处，可设置 HANDWASH_DATA_ROOT。\n"
         ),
     )
     parser.add_argument("--dataset", "-d", help=f"数据集名，可选：{all_dataset_names()}")

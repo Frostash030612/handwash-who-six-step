@@ -15,23 +15,6 @@
 退出码 0 表示通过；非 0 表示存在违规（CI 与 pre-commit 都依赖这一点）。
 """
 
-#!/usr/bin/env python
-"""分层依赖体检（`make archcheck` / pre-commit 钩子）。
-
-它守护的是 CONTRIBUTING.md 里最容易被违反的几条规则：
-    R5  core 不得 import torch / ultralytics / cv2
-        io 不得 import torch；io 不得 import models / pipelines
-    R16 业务代码不得出现硬编码目录字面量（应走 handwash.paths）
-    R8  库代码不得用 print / sys.exit 输出（CLI 与 doctor 除外）
-
-用法::
-
-    python scripts/check_structure.py            # 检查全部
-    python scripts/check_structure.py --verbose  # 打印通过项
-
-退出码 0 表示通过；非 0 表示存在违规（CI 与 pre-commit 都依赖这一点）。
-"""
-
 import argparse
 import ast
 import re

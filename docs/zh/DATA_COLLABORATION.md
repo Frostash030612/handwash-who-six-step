@@ -2,6 +2,10 @@
 
 # 不上传 GitHub 也能多人协作取用数据
 
+> 下文 2 fps 的体积估算属于旧的压缩共享方案。当前动态 YOLO 分类主线在
+> `configs/data/pskuss.yaml` 与 `configs/experiments/live_yolo_frame.yaml` 中统一使用
+> 5 fps、224 像素、JPEG 质量 85。
+
 数据集有 2–17 GB，绝不能进 Git，而 Git LFS 也顶不住（§5 有算式）。
 本文说明四个人怎么在**没有任何人托管数据**的前提下，协作使用同一份数据。
 
@@ -54,7 +58,7 @@ DataSet8.zip   4475.3 MB
 | 层 | 体积 | 放哪 | 为什么 |
 | --- | --- | --- | --- |
 | **1. 原始源** | 2–17 GB | **公开来源**（Zenodo），把 URL + md5 记进 `data/raw/SOURCES.json`（提交进 Git） | 公开、不可变、可校验。随时能重下，所以谁都不需要在 Git 里留副本 |
-| **2. 抽帧结果 + manifest** | 1–3 GB | **共享介质**（§3）：OneDrive / 实验室 NAS / 点对点 | Git 放不下，但每台机器重新生成一次太贵 |
+| **2. 抽帧结果 + manifest** | 视抽帧率而定；当前 5 fps 估算约 6.4 GB | **共享介质**（§3）：OneDrive / 实验室 NAS / 点对点 | Git 放不下，但每台机器重新生成一次太贵 |
 | **3. 划分、配置、指标** | 几 MB | **Git** | 这才是让结果可比的东西，必须版本化、可评审 |
 
 **第 3 层才是学术可复现的关键。** 两次实验可比，靠的是相同的 `config_hash`、固定种子、
@@ -76,8 +80,8 @@ DataSet8.zip   4475.3 MB
 | 抽帧配置 | PSKUS 全集体积 | 说明 |
 | --- | --- | --- |
 | 5 fps, 256 px, q92 | 约 10.4 GB | 比预想的大 —— 见下方提示 |
-| 5 fps, 224 px, q85 | 约 6.4 GB | 之前的默认值 |
-| **2 fps, 224 px, q85** | **约 2.8 GB** | **本项目现在采用** |
+| **5 fps, 224 px, q85** | **约 6.4 GB** | **当前实时 YOLO 配置** |
+| 2 fps, 224 px, q85 | 约 2.8 GB | 旧的压缩共享方案 |
 | 1 fps, 224 px, q85 | 约 1.4 GB | 太粗，做不了"某步时长不足"的细粒度判定 |
 
 > **一个反直觉的实测发现：** PSKUS 原视频分辨率只有 **320×240**，
@@ -174,11 +178,10 @@ python scripts/train_model.py config=configs/experiments/exp02_yolo26n_gru.yaml 
 > `dataset.name`。把数据配置放前面会被覆盖，训练就会静默地跑在默认数据集上。
 > `bootstrap_dataset.py` 会把正确顺序的命令直接打印给你。
 
-**为什么包里要连划分一起带。** 包里含 `frames/`、`manifest.csv`、`split_report.json`
-和 `SOURCES.json`。因为 `manifest.csv` 存的是**相对 `frames_dir`** 的路径
-（`<clip_id>/00003.jpg`），解包后就直接复现了那份权威划分，
-**没有任何人需要重新生成它**，因此四个人评估用的是完全相同的测试集。
-这正是让数字可比的关键。
+**为什么包里要连划分一起带。** 包里含 `frames/`、`manifest.csv`、`clip_splits.json`、
+`split_report.json` 和 `SOURCES.json`。manifest 保存相对 `frames_dir` 的图像路径；
+`clip_splits.json` 冻结原始视频的归属，之后若重抽帧仍会沿用同一份划分。
+解包后四个人使用同一测试集，结果才能比较。
 
 > **解包之后不要再跑 `prepare_data.py`。** 重新抽帧会重新采样，可能得到不同的划分，
 > 那你的结果就会在不知不觉中变得不可比。解包，然后训练。
@@ -197,6 +200,7 @@ python scripts/train_model.py config=configs/experiments/exp02_yolo26n_gru.yaml 
   processed/
     pskus/frames/          抽出来的帧（这才是真正省时间的部分）
     pskus/manifest.csv
+    pskus/clip_splits.json
     pskus/split_report.json
   checkpoints/             每次实验的 best.pt，让别人也能评估任何模型
   outputs/                 每次运行的 resolved_config.yaml + metrics.json
@@ -226,7 +230,7 @@ DVC 用内容哈希给数据版本化，Git 里只留很小的指针文件，真
 ```bash
 pip install dvc
 dvc init
-dvc remote add -d storage "E:/handwash-dvc"     # 或指向某个 S3/R2/OneDrive 同步目录
+dvc remote add -d storage "<shared-storage-location>"  # 替换成你自己的存储位置
 dvc add data/processed/pskuss
 git add data/processed/pskuss.dvc && git commit -m "data: 固化 PSKUS 处理集版本"
 dvc push
@@ -302,14 +306,13 @@ LFS **适合**小的、可从源码派生的二进制：几 MB 的模型权重�
 ## 6. 每个成员具体做什么
 
 ```powershell
-# 0) 一次性：告诉代码你的数据放在哪（仓库里一个字节都不用有）
-$env:HANDWASH_DATA_ROOT = "D:\handwash-data"
+# 0) 默认数据目录是 data/；只有搬到别处时才设置 HANDWASH_DATA_ROOT
 
 # 1) 看有哪些文件、哪些已经校验通过
-python scripts/download_data.py --dataset pskus --list
+python scripts/download_data.py --dataset pskuss --list
 
 # 2) 只下分给你的分片（断点续传 + md5 校验）
-python scripts/download_data.py --dataset pskus --files DataSet1.zip,DataSet4.zip
+python scripts/download_data.py --dataset pskuss --files DataSet1.zip,DataSet4.zip
 
 # 3) 顺手把小的也下了（很便宜地补齐全貌）
 python scripts/download_data.py --dataset metc          # 1.98 GB
@@ -319,7 +322,7 @@ python scripts/download_data.py --dataset kaggle        # 约 300 MB
 python scripts/prepare_data.py --config configs/data/pskuss.yaml
 
 # 5) 把 MANIFEST + 划分提交进 Git（很小，而且这才是关键协作契约）
-git add data/processed/pskuss/manifest.csv data/processed/pskuss/split_report.json
+git add data/processed/pskuss/manifest.csv data/processed/pskuss/clip_splits.json data/processed/pskuss/split_report.json
 git commit -m "data: PSKUS 子集 manifest 与视频级划分"
 ```
 

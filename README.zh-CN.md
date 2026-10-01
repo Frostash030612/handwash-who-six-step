@@ -2,13 +2,16 @@
 
 # 六步洗手动作识别与完整性评估
 
-> **模型实施方案（2026-10-01修订，待实现）**：[模型框架与实施步骤](docs/zh/MODEL_FRAMEWORK.md)——先用MobileNetV2＋简单TCN生成动作时间线，再由代码统计并接入问答。PE、MS-TCN++为升级候选，语言辅助与B局部复核按实测收益决定；YOLO、GRU保留对照。本次未修改代码和默认配置，下文保留原工程计划。
+> **当前实施主计划**：[数据清洗、云端 YOLO 分类训练与本地摄像头网页](docs/IMPLEMENTATION_PLAN.zh-CN.md)。
+> 早期 GRU/TCN 与 PE 时序模型方案保留为可选研究实验。
 
-> 基于视频的 WHO 六步洗手法动作识别系统：逐帧判断正在做哪一步，
-> 并检查**漏步、顺序异常、动作时长不足**。项目不做疾病诊断，只做动作规范性分析。
+> 外接摄像头持续采集画面，YOLO 图像分类器逐帧识别正在做的动作；
+> 连续预测再用于检查**漏步、顺序异常、动作时长不足**。
+> 项目不做疾病诊断，只做动作规范性分析。
 
-- **主模型**：YOLO26n-cls（Ultralytics 分类模型）+ GRU/TCN 时序模块
-- **基线**：MobileNetV2（对照开源基线）、YOLOv8n-cls
+- **主模型**：在云端用清洗后的数据训练 YOLO 分类模型，部署电脑逐帧实时推理
+- **实时展示**：仅用已到达帧的概率平均稳定显示；结束后按预测时间线判断六步
+- **可选实验**：MobileNetV2、GRU/TCN 与 PE 时序分段
 - **数据**：PSKUS（主）、METC（跨场景）、Kaggle（快速原型）、组员自采视频（最终验证）
 
 ---
@@ -16,7 +19,7 @@
 ## 目录
 
 1. [五分钟上手](#1-五分钟上手)
-2. [现在就能跑的三条命令](#2-现在就能跑的三条命令)
+2. [从数据到实时摄像头](#2-从数据到实时摄像头)
 3. [项目中有什么](#3-项目中有什么)
 4. [改代码之前必须读](#4-改代码之前必须读)
 5. [常见问题](#5-常见问题)
@@ -26,38 +29,75 @@
 
 ## 1. 五分钟上手
 
+在 **macOS（本机推理）** 上，从项目目录运行：
+
 ```bash
-git clone <repo-url> && cd "Group Project PRS"
-
-conda env create -f environment.yml     # Python 3.12 + PyTorch + 依赖
+conda create -n handwash python=3.11 -y
 conda activate handwash
-pip install -e ".[all]"                 # 把本仓库装进环境（可编辑模式）
-python -m pre_commit install            # 装提交前钩子
+python -m pip install -e ".[torch,yolo,video]"
+python -m handwash.cli doctor
+```
 
-python -m handwash.cli doctor           # 自检：依赖、配置、数据、GPU、模型权重
+`environment.yml` 含 NVIDIA CUDA 依赖，适用于相应的 Linux 训练机，不要直接用于 macOS。
+如果终端里的 `python --version` 仍显示 Python 2，说明系统 Python 排在 conda 环境之前；
+把下文命令的 `python` 改成 `"$CONDA_PREFIX/bin/python"`。
+在配有相应 CUDA 环境的云端 Linux 训练机，可以使用：
+
+```bash
+conda env create -f environment.yml
+conda activate handwash
+python -m pip install -e ".[all]"
+python -m handwash.cli doctor
 ```
 
 `doctor` 全绿（或只剩不阻塞的 WARN）就算环境就绪。
-**Windows 用户**也可以直接跑 `pwsh scripts/setup_windows.ps1`，它把上面几步做完。
+**Windows 用户**可参考 `pwsh scripts/setup_windows.ps1`。
 
 > 没有 conda？装 Miniconda 即可（<https://docs.conda.io/en/latest/miniconda.html>）。
 > 不想用 conda？可以 `python -m venv .venv` + `pip install -e ".[all]"`，
 > 但请把结果记进 `docs/EXPERIMENTS.md`，并注意 `environment.yml` 仍是团队基准。
 
-## 2. 现在就能跑的三条命令
+## 2. 从数据到实时摄像头
+
+### 直接体验 exp.pt 演示
+
+根目录的 `exp.pt` 是早期七类 Ultralytics 分类模型，随 GitHub 仓库提供，
+用于直接体验摄像头网页。用于早期测试的 NDJSON 导出清单不随仓库发布；
+正式数据请按下文从公开来源获取。
+无需下载正式数据即可体验摄像头网页：
 
 ```bash
-# ① 30 秒冒烟：不需要任何数据集，验证"数据→模型→指标"链路
-make train-smoke
-
-# ② 对一段视频做完整性评估，输出中文报告（漏步 / 乱序 / 时长）
-python -m handwash.cli assess --video data/external/self_recorded/full/demo.mp4
-
-# ③ 在 Kaggle 小数据上跑通真实训练（需先下载数据，见 docs/DATA.md）
-python -m handwash.cli prepare config=configs/data/kaggle.yaml
-python -m handwash.cli train  config=configs/experiments/exp01_baseline_frame.yaml
-python -m handwash.cli evaluate
+python scripts/run_camera.py --demo-exp
 ```
+
+打开 `http://127.0.0.1:8765/`，连接并选择外接摄像头，然后点击“开始识别”。
+页面会标明“演示”，结果保存在 `outputs/exp_demo/camera/`。这个模型的类别顺序已单独核对；
+演示报告不能当作正式准确率或最终实验结果。
+公开上传前用 `git add .` 和 `git status --short` 核对待提交文件；
+只允许根目录的演示权重 `exp.pt` 入库，NDJSON 导出清单、训练权重、
+`deliverables/` 和 `outputs/` 不应上传。`.gitignore` 不会清除已经提交的历史文件。
+
+### 正式数据与云端训练
+
+```bash
+# ① 仓库不附带原始数据；下载并解压 PSKUS，再清洗、人工核对原视频/标注
+python scripts/download_data.py --dataset pskuss --all --extract
+# 只想先验证流程，可改用 --files DataSet4.zip --extract；该子集不能作为正式结果
+# ② 按原始视频分组生成 manifest
+python scripts/prepare_data.py config=configs/data/pskuss.yaml --inspect
+python scripts/prepare_data.py config=configs/data/pskuss.yaml
+
+# ③ 在云端训练逐帧 YOLO 分类模型并评估
+python scripts/train_model.py config=configs/experiments/live_yolo_frame.yaml --evaluate
+
+# ④ 把项目格式的 best.pt 与对应配置复制到部署电脑，连接外接摄像头
+# ⑤ 启动网页，浏览器打开 http://127.0.0.1:8765/
+python scripts/run_camera.py config=configs/experiments/live_yolo_frame.yaml \
+  --checkpoint path/to/best.pt
+```
+
+摄像头页面需要已训练的项目格式 checkpoint。代码入口已经具备；
+模型效果和目标电脑上的延迟仍须用正式数据与设备验收。
 
 产物全部落在 `outputs/<run_name>/`，其中：
 
@@ -68,6 +108,7 @@ models/best.pt           按验证集 Macro-F1 选出的最佳权重
 eval/eval_*.json         各 split 的指标
 eval/confusion_matrix_*.png    混淆矩阵
 assess/<clip>.md         中文完整性报告（可直接贴进作业）
+camera/<session>/        实时会话的逐帧预测与最终报告
 ```
 
 ## 3. 项目中有什么
@@ -77,8 +118,9 @@ src/handwash/
   core/       契约层：标签空间、数据结构、配置、指标、WHO 完整性规则
   io/         视频解码、manifest、按原始视频-safe 划分
   data/       数据集、预处理与增强、合成数据（冒烟用）
-  models/     YOLO26n-cls 适配器、MobileNetV2/ResNet 基线、GRU/TCN 时序头
-  pipelines/  prepare / train / evaluate / infer / assess 五个流程
+  models/     YOLO 分类适配器；实验用的其他骨干与时序头
+  pipelines/  prepare / train / evaluate / infer / assess / live
+  camera_app.py + static/   本机网页服务与摄像头页面
   cli.py      命令行入口（handwash <子命令>）
 scripts/      薄封装脚本 + 结构体检 + Windows 一键初始化
 configs/      config.yaml + data/ + models/ + experiments/
@@ -93,7 +135,11 @@ tests/        与源码分层对应的单元测试
 | `handwash prepare` | 扫描 → **按视频划分** → 抽帧 → 生成 manifest | 拿到新数据后 |
 | `handwash train` | 训练并保存 checkpoint | 改模型/配置后 |
 | `handwash evaluate` | 在 val/test/external 上算指标 | 训练后 |
+| `handwash infer` | 单段视频 → 逐帧动作预测 | 检查模型逐帧输出 |
 | `handwash assess` | 视频 → **漏步/乱序/时长**报告 | 演示与最终验证 |
+| `handwash camera` | 外接摄像头 → 实时 YOLO 分类 → 最终报告 | 云端训练后在本机演示 |
+
+示例：`python -m handwash.cli infer --video demo.mp4 --checkpoint outputs/run/models/best.pt`。
 
 ## 4. 改代码之前必须读
 
@@ -122,8 +168,9 @@ python -m pre_commit run --all-files
 <details>
 <summary><b>训练时提示"本次使用合成数据"？</b></summary>
 
-说明真实 manifest 不存在，代码自动回退到合成数据以验证链路。
-**合成数据的指标不能写进报告。** 先跑 `handwash prepare`，见 `docs/DATA.md`。
+说明配置显式选择了 `dataset.name: synthetic` 做冒烟训练。真实数据的 manifest 缺失时
+会报错，不会自动改用合成数据。**合成数据的指标不能写进报告。**
+真实训练前先跑 `handwash prepare`，见 `docs/DATA.md`。
 </details>
 
 <details>
@@ -159,15 +206,17 @@ python -m pre_commit run --all-files
 <details>
 <summary><b>我需要提交数据或权重吗？</b></summary>
 
-**不需要也不允许。** `data/`、`models/`、`outputs/` 已在 `.gitignore` 中。
-数据获取方式见 `docs/DATA.md`；权重通过 `outputs/<run>/models/` 或共享盘传递。
+**数据和训练权重不提交；根目录的 `exp.pt` 是唯一演示例外。**
+`data/`、`models/`、`outputs/` 和其他 `*.pt` 已在 `.gitignore` 中。
+数据获取方式见 `docs/DATA.md`；正式模型仍需训练后通过 `--checkpoint` 指定。
 </details>
 
 ## 6. 文档索引
 
 | 文档 | 内容 |
 | --- | --- |
-| [`docs/PROJECT_PLAN_4_WEEK.md`](docs/zh/PROJECT_PLAN_4_WEEK.md) | **四周团队计划（4 人）**：角色分工、逐周任务、计分追溯、风险清单 |
+| [`docs/IMPLEMENTATION_PLAN.zh-CN.md`](docs/IMPLEMENTATION_PLAN.zh-CN.md) | **逐步实施主计划**：数据清洗 → 云端训练 → 本地摄像头网页 |
+| [`docs/PROJECT_PLAN_4_WEEK.md`](docs/zh/PROJECT_PLAN_4_WEEK.md) | 旧课程排期与提交要求存档 |
 | [`docs/PROJECT_PROPOSAL.md`](docs/zh/PROJECT_PROPOSAL.md) | **提案内容包**：模板每一栏的可粘贴文案（截止 9/30） |
 | [`docs/RULES_CARD.md`](docs/RULES_CARD.md) | **一页速查卡**：改代码前先看这一页 |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | **修改规则（必读）**：铁律、分级、提交与 PR 流程 |

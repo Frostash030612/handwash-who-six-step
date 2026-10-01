@@ -16,8 +16,8 @@ runtime:
   run_name: my_local_run
 
 dataset:
-  # 数据集放在外置硬盘时，直接指向绝对路径
-  root: E:/datasets/handwash/kaggle
+  # 默认使用仓库相对路径；外部数据目录可通过 HANDWASH_DATA_ROOT 指定
+  root: data/raw/kaggle
 
 train:
   batch_size: 16        # 显存不足时调小

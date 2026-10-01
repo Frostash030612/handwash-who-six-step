@@ -25,12 +25,6 @@ data/
 ## 两条硬规则
 
 1. **先划分、后抽帧**：划分单位是原始视频，不是帧。反了会造成数据泄漏。
-2. **数据不进 Git**：放在本地或共享盘即可；数据在别处时设置
-   `HANDWASH_DATA_ROOT` 环境变量指向它。
-
-```bash
-# Windows (PowerShell)
-$env:HANDWASH_DATA_ROOT = "E:\datasets\handwash"
-# Linux / macOS
-export HANDWASH_DATA_ROOT=/mnt/data/handwash
-```
+2. **数据不进 Git**：默认使用项目下的 `data/`。数据在别处时，设置
+   `HANDWASH_DATA_ROOT` 环境变量指向自己选择的数据目录；配置里的
+   `data/raw/...` 会自动映射到该目录。

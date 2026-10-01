@@ -40,7 +40,7 @@ make train-smoke                       # 6) 30 秒跑通"数据→模型→指�
 | **R3** | 一切可调参数写进 `configs/`，代码里不允许出现魔数 | 结果要能复现、要能对比 | CI 的 archcheck + review |
 | **R4** | 新增依赖必须同时改 `pyproject.toml` 和 `environment.yml` | 否则别人装不上、跑出不同结果 | review |
 | **R5** | 遵守分层依赖：`core` 不许 import `torch`，`io` 不许 import `models` | 契约层可单测、可复用；改了模型不影响数据 | `scripts/check_structure.py` |
-| **R6** | 数据、权重、输出一律不进 Git（`data/` `models/` `outputs/` 已忽略） | 仓库会被 20GB 数据撑爆 | `.gitignore` + pre-commit 大文件检查 |
+| **R6** | 数据、训练权重、输出不进 Git；根目录 `exp.pt` 是演示例外 | 仓库会被 20GB 数据撑爆 | `.gitignore` + pre-commit 大文件检查 |
 | **R7** | 新工作流必须同时加到 `Makefile` 和 CLI，命名一致 | 组员不用记两套命令 | review |
 | **R8** | 不用 `print` 输出运行信息，不用 `sys.exit` 抛错 | 日志要能统一收集、错误要能统一处理 | archcheck |
 | **R9** | 抛 `HandwashError` 子类，消息里说清"哪个文件/字段/期望/实际" | 报错信息就是最好的文档 | review |
@@ -243,7 +243,7 @@ python -m pytest -m "not integration and not slow and not gpu"
 - [ ] 我在本机跑过受影响的最小流程（贴命令与结果：____）
 - [ ] 若改了模型/数据，已记录实验到 docs/EXPERIMENTS.md（含 config_hash）
 - [ ] 若影响历史结果，已在 PR 里列出"需要重跑的实验"
-- [ ] 没有提交数据/权重/输出（`git status` 干净）
+- [ ] 没有提交数据、训练权重或输出；根目录 `exp.pt` 是唯一权重例外
 ```
 
 ---

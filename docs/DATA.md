@@ -23,12 +23,9 @@ how the split is done, and the three pitfalls that are easiest to fall into.
    - `configs/config.yaml`: `split.guard_leakage: true`.
 
 2. **Data does not go into Git.** `data/`, `models/`, and `outputs/` are all already in
-   `.gitignore`. Keep the data on a local or shared drive and point the
-   `HANDWASH_DATA_ROOT` environment variable at the external location:
-   ```bash
-   set HANDWASH_DATA_ROOT=E:\datasets\handwash     # Windows
-   export HANDWASH_DATA_ROOT=/mnt/data/handwash    # Linux/macOS
-   ```
+   `.gitignore`. The default data directory is the repository's `data/`. If your data is
+   elsewhere, set `HANDWASH_DATA_ROOT` to the directory you chose; paths in the configuration
+   under `data/raw/...` will follow that setting.
 
 3. **The label mapping is changed in exactly one place.** The mapping from a dataset's raw
    label names to the canonical `Step` **may only** be written in `_DATASET_ALIASES` in
@@ -153,16 +150,21 @@ visually — the model failing on it is then an explainable finding rather than 
 
 ```
 ① Train on PSKUS → outputs/e4_pskuss_train/models/best.pt
-② Prepare the METC frames (configs/data/metc.yaml)
+② Prepare the METC manifest and sampled frames (configs/data/metc.yaml)
 ③ Evaluate on METC with the **same** checkpoint:
-     python -m handwash.cli evaluate --checkpoint <the best.pt from above> --splits external
+     python -m handwash.cli evaluate config=configs/experiments/exp04_cross_domain.yaml \\
+       --checkpoint <the best.pt from above> --splits test external
 ```
 
 **Do not** train on METC and then test on METC — that is no longer a cross-scenario experiment.
 The report should give three sets of numbers: PSKUS test (same scenario), METC
 (cross-scenario), and self-recorded video (real use).
 
-**Config**: `configs/data/metc.yaml`
+**Config**: `configs/data/metc.yaml`. Its adapter reads each video with its same-stem JSON;
+the METC manifest places every clip in `external`. The evaluation experiment lists `metc`
+under `eval.extra_datasets`, so it loads METC's manifest and frame directory while keeping
+the PSKUS checkpoint's label space. The older temporal E4 experiment used 2 fps; for the
+current live frame classifier, use the 5 fps preparation profile when comparing timestamps.
 
 ---
 
@@ -184,8 +186,7 @@ data/raw/kaggle/
 `kaggle` label space contains only the six steps, so those samples are not counted in
 six-class training (see `core/labels.py`).
 
-**Config**: `configs/data/kaggle.yaml` (the default `dataset.name`, used for the one-command
-smoke test)
+**Config**: `configs/data/kaggle.yaml` (optional rapid prototype; the default dataset is PSKUS).
 
 ---
 
@@ -242,7 +243,7 @@ either.
 
 **Frame-extraction parameter recommendations**: an extraction rate of 5 fps (`fps: 5.0`) is
 enough for action-level tasks (on a 30fps video that means 1 frame in every 6), and storage
-drops to roughly 1/6; write `resize_hw: [256, 256]` to disk and let the model crop to 224.
+drops to roughly 1/6; the current PSKUS profile writes `resize_hw: [224, 224]` to disk.
 
 ---
 

@@ -1,72 +1,18 @@
-# ============================================================================
-# 数据集叠加配置：PSKUS 医院洗手数据集（主数据集）
-# ----------------------------------------------------------------------------
-# 链接：https://zenodo.org/records/4537209
-# 规模：3185 段视频，约 18.4 GB，逐帧标注，真实医院环境。
-# 论文：https://doi.org/10.3390/data6040038
-#
-# 【建议】不要一次下全量。先下载其中一个子集（例如 300—500 段）跑通，
-#         确认流程无误后再补全 —— 18.4GB 的抽帧会占掉几十 GB 磁盘。
-#
-# 期望目录结构：
-#     data/raw/pskuss/<label_name>/<video>.mp4      目录名即标签
-#     或 data/raw/pskuss/<clip_id>.csv              每段视频一个逐帧标注 csv
-# （若你下载到的结构不同，只需改 src/handwash/pipelines/prepare.py 的适配器，
-#   并同步更新 docs/DATA.md。）
-# ============================================================================
+# 当前主线的 PSKUS 数据准备配置。叠加在 configs/config.yaml 上使用：
+#   python scripts/prepare_data.py config=configs/data/pskuss.yaml --inspect
+#   python scripts/prepare_data.py config=configs/data/pskuss.yaml
+# 与 configs/experiments/live_yolo_frame.yaml 使用相同的抽帧率、图像尺寸和标签空间。
+# 原始数据应解压到 data/raw/pskuss/extracted/DataSet*/。
 
 dataset:
   name: pskuss
   root: data/raw/pskuss/extracted
-  label_space: pskuss        # 10 类：六步 + faucet_on/off + washing_hands + other
+  label_space: pskuss
   include_non_wash: true
   prep:
-    # 【实测数据，别随手改】
-    # PSKUS：3,185 段 / 139,881 秒（38.9 小时）/ 原生 30 fps / 平均每段 43.9 秒；
-    # 原视频分辨率只有 320x240，所以"抽帧"并不天然变小，fps 才是决定体积的关键。
-    #
-    # 全集抽帧体积（实测每帧字节数 × 真实总时长，含下面 train=300/eval=150 的截断）：
-    #   5 fps + 256px + q92 -> 约 10.4 GB
-    #   5 fps + 224px + q85 -> 约  6.4 GB
-    #   2 fps + 224px + q85 -> 约  2.8 GB   ← 采用：网盘传输友好，每步仍有 10-30 帧
-    #   1 fps + 224px + q85 -> 约  1.4 GB
-    #
-    # 抽帧结果要打包上传网盘给全组复用，fps 的选择直接决定传输成本。
-    # 用 `python scripts/pack_processed_data.py --dataset pskuss --report` 随时核对。
-    fps: 2.0
+    fps: 5.0
     frame_step: 1
-    resize_hw: [224, 224]   # 256 -> 224 让全集从 10.4 GB 降到 6.4 GB
-    jpeg_quality: 85        # q85 比 q92 小 40%，肉眼看不出差别
-    min_frames_per_clip: 15
-
-runtime:
-  num_workers: 6
-
-split:
-  # 医院数据同一名参与者可能录了多段视频，用 video 级别划分；
-  # 若标注里有 participant 字段，改成 participant 更严格（防同一人跨集）
-  group_key: original_video
-  max_frames_per_clip_train: 300
-  max_frames_per_clip_eval: 150
-
-model:
-  arch: yolo26n-cls
-  normalize: zero_one
-  temporal:
-    kind: gru
-    hidden_size: 128
-    window: 16
-
-train:
-  mode: clip                 # 用上时序信息，对应研究问题 3
-  batch_size: 16
-  epochs: 30
-  lr: 0.0002
-  class_weights: balanced    # 医院数据各类别帧数差异大
-  precision: fp16
-
-assess:
-  min_total_duration_s: 40.0
-  reference_total_duration_s: 50.0
-  duration_check: ratio
-  require_faucet_events: true   # 医院数据包含开关水龙头，可要求检出
+    resize_hw: [224, 224]
+    image_ext: jpg
+    jpeg_quality: 85
+    min_frames_per_clip: 10

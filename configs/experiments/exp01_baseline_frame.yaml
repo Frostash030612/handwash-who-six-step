@@ -5,16 +5,20 @@
 # 对应论文基线：https://github.com/edi-riga/handwash（MobileNetV2）
 #
 # 运行：
-#     python -m handwash.cli prepare config=configs/config.yaml
-#     python -m handwash.cli train config=configs/config.yaml \
-#         train.mode=frame model.arch=mobilenet_v2 model.normalize=imagenet \
-#         runtime.run_name=e1_mobilenet_frame
+#     python -m handwash.cli prepare config=configs/experiments/exp01_baseline_frame.yaml
+#     python -m handwash.cli train config=configs/experiments/exp01_baseline_frame.yaml
 #
 # 报告里必须写明：数据集 = Kaggle，划分按原始视频，seed = 42，增强开关见 augment。
 # ============================================================================
 
 runtime:
   run_name: e1_mobilenet_frame
+
+dataset:
+  name: kaggle
+  root: data/raw/kaggle
+  label_space: kaggle
+  include_non_wash: false
 
 model:
   name: mobilenet_v2
@@ -30,5 +34,5 @@ train:
   epochs: 25
   batch_size: 64
   lr: 0.0005
-  precision: fp16
+  precision: fp32            # 可在 CPU / Apple Silicon / CUDA 上运行
   class_weights: none

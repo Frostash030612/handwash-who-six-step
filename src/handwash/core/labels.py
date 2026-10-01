@@ -208,6 +208,21 @@ _DATASET_ALIASES: Final[Mapping[str, Mapping[str, Step]]] = {
     },
     # METC（Zenodo 5808789）：帧级标签，命名略有差异
     "metc": {
+        # Zenodo METC subset: published movement codes are 0=other, 1..6=WHO steps.
+        "0": Step.OTHER,
+        "1": Step.STEP_1,
+        "2": Step.STEP_2,
+        "3": Step.STEP_3,
+        "4": Step.STEP_4,
+        "5": Step.STEP_5,
+        "6": Step.STEP_6,
+        "movement_0": Step.OTHER,
+        "movement_1": Step.STEP_1,
+        "movement_2": Step.STEP_2,
+        "movement_3": Step.STEP_3,
+        "movement_4": Step.STEP_4,
+        "movement_5": Step.STEP_5,
+        "movement_6": Step.STEP_6,
         "step_1": Step.STEP_1,
         "step_2": Step.STEP_2,
         "step_3": Step.STEP_3,
@@ -216,6 +231,29 @@ _DATASET_ALIASES: Final[Mapping[str, Mapping[str, Step]]] = {
         "step_6": Step.STEP_6,
         "faucet_on": Step.FAUCET_ON,
         "faucet_off": Step.FAUCET_OFF,
+        "other": Step.OTHER,
+    },
+    "metc_public": {
+        "0": Step.OTHER,
+        "1": Step.STEP_1,
+        "2": Step.STEP_2,
+        "3": Step.STEP_3,
+        "4": Step.STEP_4,
+        "5": Step.STEP_5,
+        "6": Step.STEP_6,
+        "movement_0": Step.OTHER,
+        "movement_1": Step.STEP_1,
+        "movement_2": Step.STEP_2,
+        "movement_3": Step.STEP_3,
+        "movement_4": Step.STEP_4,
+        "movement_5": Step.STEP_5,
+        "movement_6": Step.STEP_6,
+        "step_1": Step.STEP_1,
+        "step_2": Step.STEP_2,
+        "step_3": Step.STEP_3,
+        "step_4": Step.STEP_4,
+        "step_5": Step.STEP_5,
+        "step_6": Step.STEP_6,
         "other": Step.OTHER,
     },
     # Kaggle realtimear/hand-wash-dataset：目录名形如 "Step1_water"
@@ -460,14 +498,19 @@ LABEL_SPACES: Final[Mapping[str, LabelSpace]] = {
             Step.OTHER,
         ),
     ),
+    # Exact published METC label set: six WHO movements plus other (no faucet events).
+    # Appended so existing label-space indices/checkpoints retain their meaning.
+    "metc_public": LabelSpace("metc_public", (*CANONICAL_STEPS, Step.OTHER)),
 }
 
 
 def get_label_space(name: str) -> LabelSpace:
     """按名字取标签空间（大小写不敏感）。"""
-    key = _normalize(name).replace(" ", "")
-    if key in LABEL_SPACES:
-        return LABEL_SPACES[key]
+    normalized = _normalize(name)
+    candidates = (normalized.replace(" ", ""), normalized.replace(" ", "_"))
+    for key in candidates:
+        if key in LABEL_SPACES:
+            return LABEL_SPACES[key]
     raise ConfigError(
         f"未定义的标签空间：{name!r}",
         hint=f"可用：{sorted(LABEL_SPACES)}；新增请改 core/labels.py 并升 config 的 schema_version。",

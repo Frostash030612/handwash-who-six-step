@@ -9,17 +9,6 @@
 报告里需要的三组数字（同场景 / 跨场景 / 自采）建议分三次调用后汇总。
 """
 
-#!/usr/bin/env python
-"""评估脚本：内部测试 + 跨场景测试，并打印对比表。
-
-用法::
-
-    python scripts/evaluate_model.py --checkpoint outputs/e2/models/best.pt
-    python scripts/evaluate_model.py --checkpoint outputs/e2/models/best.pt --splits test external
-
-报告里需要的三组数字（同场景 / 跨场景 / 自采）建议分三次调用后汇总。
-"""
-
 import sys
 from pathlib import Path
 

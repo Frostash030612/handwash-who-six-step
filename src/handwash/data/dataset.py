@@ -20,6 +20,7 @@
 
 from __future__ import annotations
 
+import zlib
 from collections import Counter
 from collections.abc import Sequence
 from pathlib import Path
@@ -76,6 +77,7 @@ class FrameManifestDataset(_TorchDataset):  # type: ignore[misc, valid-type]
         image_root: str | Path,
         label_space: LabelSpace,
         transform=None,
+        synchronized_augment_seed: int | None = None,
     ) -> None:
         if not records:
             raise ManifestError("数据集为空：请检查该 split 的 manifest 是否生成成功")
@@ -83,6 +85,8 @@ class FrameManifestDataset(_TorchDataset):  # type: ignore[misc, valid-type]
         self.image_root = Path(image_root)
         self.label_space = label_space
         self.transform = transform
+        self.synchronized_augment_seed = synchronized_augment_seed
+        self.epoch = 0
         # 预先算好下标，避免每个 batch 都做字典查找
         self._indices = [label_space.to_index(rec.label) for rec in self.records]
 
@@ -108,6 +112,8 @@ class FrameManifestDataset(_TorchDataset):  # type: ignore[misc, valid-type]
             ) from exc
 
         if self.transform is not None:
+            if self.synchronized_augment_seed is not None:
+                self._reset_transform_rng(rec.clip_id)
             image = self.transform(image)
         tensor = torch.as_tensor(np.ascontiguousarray(image), dtype=torch.float32)
         return {
@@ -116,6 +122,31 @@ class FrameManifestDataset(_TorchDataset):  # type: ignore[misc, valid-type]
             "clip_id": rec.clip_id,
             "frame_index": int(rec.frame_index),
         }
+
+    def set_epoch(self, epoch: int) -> None:
+        """Update deterministic clip augmentation before the next loader pass."""
+        if epoch < 0:
+            raise ValueError(f"epoch 必须为非负整数，实际 {epoch}")
+        self.epoch = int(epoch)
+
+    def _reset_transform_rng(self, clip_id: str) -> None:
+        if self.transform is None or self.synchronized_augment_seed is None:
+            return
+        clip_seed = zlib.crc32(clip_id.encode("utf-8"))
+        seed = int(
+            np.random.SeedSequence(
+                [self.synchronized_augment_seed, self.epoch, clip_seed]
+            ).generate_state(1)[0]
+        )
+        generator = np.random.default_rng(seed)
+
+        def reset(node) -> None:
+            if hasattr(node, "rng"):
+                node.rng = generator
+            for child in getattr(node, "steps", ()):
+                reset(child)
+
+        reset(self.transform)
 
     def _resolve_image_path(self, raw: str) -> Path:
         candidate = Path(raw)
@@ -170,6 +201,8 @@ def build_dataset(
     *,
     split: Split | str = "train",
     image_root: str | Path | None = None,
+    label_space_name: str | None = None,
+    synchronize_clip_augment: bool = False,
 ) -> FrameManifestDataset:
     """工厂：按配置构造某个 split 的数据集。
 
@@ -184,9 +217,17 @@ def build_dataset(
         augment=rc.train.augment,
         seed=rc.runtime.seed + (0 if mode == "train" else 10_000),
     )
-    space = get_label_space(rc.label_space)
+    space = get_label_space(label_space_name or rc.label_space)
     root = Path(image_root) if image_root is not None else _image_root_from(rc)
-    dataset = FrameManifestDataset(records, image_root=root, label_space=space, transform=transform)
+    dataset = FrameManifestDataset(
+        records,
+        image_root=root,
+        label_space=space,
+        transform=transform,
+        synchronized_augment_seed=(
+            rc.runtime.seed if mode == "train" and synchronize_clip_augment else None
+        ),
+    )
     log.info(
         "数据集已构建：split=%s，%d 帧 / %d 段视频，%d 类",
         split,

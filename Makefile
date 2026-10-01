@@ -17,6 +17,7 @@ SHELL := /bin/bash
 PY    := python
 PKG   := src/handwash
 CONFIG ?= configs/config.yaml
+CAMERA_CONFIG ?= configs/experiments/live_yolo_frame.yaml
 
 .DEFAULT_GOAL := help
 
@@ -139,6 +140,10 @@ evaluate:  ## 评估某个 checkpoint（默认取 <out_dir>/models/best.pt）
 .PHONY: infer
 infer:  ## 对单段视频做逐帧推理（VIDEO=<路径>）
 	$(PY) scripts/run_inference.py --config $(CONFIG) --video $(VIDEO)
+
+.PHONY: camera
+camera:  ## 外接摄像头实时分类网页（默认使用 live_yolo_frame 配置）
+	$(PY) scripts/run_camera.py config=$(CAMERA_CONFIG)
 
 .PHONY: assess
 assess:  ## 对单段视频做 WHO 完整性评估（VIDEO=<路径>）

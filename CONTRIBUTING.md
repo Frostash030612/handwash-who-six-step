@@ -44,7 +44,7 @@ of `handwash doctor` first**; do not guess and start editing code.
 | **R3** | Every tunable parameter goes into `configs/`; no magic numbers in code | Results must be reproducible and comparable | CI archcheck + review |
 | **R4** | A new dependency must be added to `pyproject.toml` and `environment.yml` together | Otherwise others cannot install it, or get different results | review |
 | **R5** | Respect layered dependencies: `core` must not import `torch`, `io` must not import `models` | The contract layer stays unit-testable and reusable; a model change does not disturb the data | `scripts/check_structure.py` |
-| **R6** | Data, weights, and outputs never enter Git (`data/` `models/` `outputs/` are ignored) | A 20GB dataset would blow up the repository | `.gitignore` + pre-commit large-file check |
+| **R6** | Keep data, training weights, and outputs out of Git; root `exp.pt` is the demo exception | A 20GB dataset would blow up the repository | `.gitignore` + pre-commit large-file check |
 | **R7** | A new workflow must be added to both the `Makefile` and the CLI, with matching names | Team members should not have to remember two sets of commands | review |
 | **R8** | Do not print runtime information with `print`; do not raise errors with `sys.exit` | Logs must be collectable in one place, errors must be handled in one place | archcheck |
 | **R9** | Raise a `HandwashError` subclass, and state in the message which file/field/expected/actual | A good error message is the best documentation | review |
@@ -253,7 +253,7 @@ python -m pytest -m "not integration and not slow and not gpu"
 - [ ] I ran the smallest affected workflow locally (paste commands and results: ____)
 - [ ] If I changed a model or data, I recorded the experiment in docs/EXPERIMENTS.md (in Chinese, with config_hash)
 - [ ] If historical results are affected, I listed the "experiments that need re-running" in the PR
-- [ ] I did not commit data/weights/outputs (the `git status` is clean)
+- [ ] I committed no data, training weights, or outputs; root `exp.pt` is the only weight exception
 ```
 
 ---

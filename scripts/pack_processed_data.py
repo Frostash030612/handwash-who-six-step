@@ -50,13 +50,16 @@ import argparse
 import hashlib
 import json
 import os
+import re
+import stat
 import shutil
 import sys
 import tarfile
+import tempfile
 import time
 import zipfile
 from datetime import date
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -64,11 +67,12 @@ if __package__ in (None, ""):
 from _bootstrap import PROJECT_ROOT  # noqa: E402,F401
 
 #: 打进包里的相对路径白名单（相对数据集根目录）。
-#: 只包含"别人拿到就能直接训练"的东西：帧图像、manifest、划分报告。
+#: 包含可直接训练并能复现原始划分的产物：帧图像、manifest、划分契约与报告。
 #: 刻意**不**包含原始视频与 zip —— 那些从公开来源下载更省流量。
 INCLUDE_PATTERNS: tuple[str, ...] = (
     "frames",            # 抽帧结果（目录）
     "manifest.csv",
+    "clip_splits.json",  # stage=frames 重跑时复用同一份视频级划分
     "split_report.json",
     "SOURCES.json",      # 来源与校验清单：让队友能证明拿到的是同一份数据
     "README.md",
@@ -76,6 +80,14 @@ INCLUDE_PATTERNS: tuple[str, ...] = (
 
 #: 打包时跳过的临时/中间文件
 SKIP_NAMES = {".DS_Store", "Thumbs.db", "desktop.ini"}
+_DATASET_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+
+
+def validate_dataset_name(dataset: str) -> str:
+    """Keep dataset names as one portable path component."""
+    if not _DATASET_NAME_RE.fullmatch(dataset):
+        raise SystemExit(f"非法数据集名称：{dataset!r}（仅允许字母、数字、点、下划线和连字符）")
+    return dataset
 
 
 def data_root() -> Path:
@@ -88,6 +100,7 @@ def data_root() -> Path:
 
 def processed_dir(dataset: str) -> Path:
     """抽帧结果的落地目录：``<data_root>/processed/<dataset>``。"""
+    validate_dataset_name(dataset)
     return data_root() / "processed" / dataset
 
 
@@ -123,7 +136,7 @@ def collect_entries(dataset: str) -> tuple[Path, list[Path]]:
             )
     if not entries:
         raise SystemExit(
-            f"{root} 下没有可打包的内容（期望 frames/、manifest.csv、split_report.json）。\n"
+            f"{root} 下没有可打包的内容（期望 frames/、manifest.csv、clip_splits.json、split_report.json）。\n"
             "确认抽帧是否成功完成。"
         )
     return root, entries
@@ -249,18 +262,38 @@ def build(dataset: str, *, out_dir: Path, fmt: str) -> int:
 
 
 def _expected_sha256(archive: Path) -> str:
-    """从同名 .sha256 文件读取期望值；没有则返回空串。"""
+    """从匹配当前包的 checksum sidecar 或 package metadata 读取期望值。"""
     checksum_file = archive.with_suffix(archive.suffix + ".sha256")
     if checksum_file.exists():
-        text = checksum_file.read_text(encoding="utf-8").strip()
-        return text.split()[0] if text else ""
+        line = checksum_file.read_text(encoding="utf-8").strip()
+        digest, separator, referenced_name = line.partition("  ")
+        if not separator:
+            fields = line.split(maxsplit=1)
+            digest = fields[0] if fields else ""
+            referenced_name = fields[1] if len(fields) > 1 else ""
+        if not re.fullmatch(r"[0-9a-fA-F]{64}", digest):
+            raise SystemExit(f"SHA-256 sidecar 格式无效：{checksum_file}")
+        if referenced_name and referenced_name.lstrip("*") != archive.name:
+            raise SystemExit(
+                f"SHA-256 sidecar 指向 {referenced_name!r}，与当前压缩包 {archive.name!r} 不匹配"
+            )
+        return digest.lower()
     # 也接受同目录下的 <dataset>_package.json
     meta = archive.parent / f"{archive.name.split('_frames_')[0]}_package.json"
     if meta.exists():
         try:
-            return json.loads(meta.read_text(encoding="utf-8")).get("sha256", "")
-        except json.JSONDecodeError:
+            payload = json.loads(meta.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            raise SystemExit(f"package metadata 无法读取：{meta}（{exc}）") from exc
+        if not isinstance(payload, dict):
+            raise SystemExit(f"package metadata 顶层必须是 JSON 对象：{meta}")
+        # 多次打包会更新同一个 metadata 文件；旧压缩包不能误用新包的 hash。
+        if payload.get("archive") != archive.name:
             return ""
+        digest = payload.get("sha256", "")
+        if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", digest):
+            raise SystemExit(f"package metadata 中的 SHA-256 无效：{meta}")
+        return digest.lower()
     return ""
 
 
@@ -268,7 +301,7 @@ def resolve_archive(raw: str | Path) -> Path:
     """把一个"包参数"解析成真实路径。
 
     允许三种写法，减少队友敲错路径的概率（这是实际协作里最容易出问题的一步）：
-        * 完整路径：``D:/下载/pskuss_frames_2026-09-22.zip``
+        * 绝对路径：传入压缩包在当前机器上的实际位置
         * 相对路径：``data/packages/pskuss_frames_2026-09-22.zip``
         * **裸文件名**：``pskuss_frames_2026-09-22.zip``
           -> 自动在 ``<data_root>/packages/`` 与当前目录下查找
@@ -348,40 +381,57 @@ def verify(dataset: str, archive: Path) -> int:
 def unpack(dataset: str, archive: Path, *, into: Path | None = None) -> int:
     """解包到 ``<data_root>/processed/<dataset>/``（已存在同名文件时覆盖）。
 
-    刻意**先解到临时目录再合并**，避免解到一半失败留下半套数据
-    —— 半套数据比没有数据更危险，因为它会让训练静默地只用了部分样本。
+    刻意**先解到临时目录再合并**。解包校验可用的 SHA-256 sidecar，拒绝
+    路径越界、符号链接和特殊文件；合并时也拒绝目标目录中的链接。
     """
     archive = resolve_archive(archive)
     if not archive.exists():
         raise SystemExit(f"找不到包：{archive}")
-    target = into or processed_dir(dataset)
-    staging = target.parent / f".{dataset}_unpacking"
-    if staging.exists():
-        shutil.rmtree(staging)
-    staging.mkdir(parents=True, exist_ok=True)
+    target = (into or processed_dir(dataset)).expanduser().resolve()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f".{dataset}_unpacking_", dir=target.parent))
 
     print(f"解包 {archive.name} -> {target}")
     started = time.time()
-    if archive.suffix == ".zip":
-        with zipfile.ZipFile(archive) as handle:
-            handle.extractall(staging)
+    expected = _expected_sha256(archive)
+    if expected:
+        actual = _sha256(archive)
+        if actual != expected:
+            shutil.rmtree(staging, ignore_errors=True)
+            raise SystemExit(f"包校验失败：期望 {expected}，实际 {actual}；未解包。")
+        print("SHA-256 校验通过。")
     else:
-        with tarfile.open(archive) as handle:
-            handle.extractall(staging)
+        print("⚠️ 未找到 SHA-256 sidecar；继续解包前请先手工核对发布者提供的校验值。")
+    try:
+        _extract_archive_safely(archive, staging)
+    except Exception:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
     print(f"解包完成，用时 {(time.time()-started)/60:.1f} 分钟")
 
     # 合并到目标目录
     target.mkdir(parents=True, exist_ok=True)
     moved = 0
-    for path in sorted(staging.rglob("*")):
-        if not path.is_file():
-            continue
-        rel = path.relative_to(staging)
-        destination = target / rel
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        path.replace(destination)
-        moved += 1
-    shutil.rmtree(staging, ignore_errors=True)
+    try:
+        for path in sorted(staging.rglob("*")):
+            if not path.is_file():
+                continue
+            rel = path.relative_to(staging)
+            destination = target / rel
+            parent = target
+            for component in rel.parts[:-1]:
+                parent = parent / component
+                if parent.is_symlink():
+                    raise ValueError(f"目標目錄包含符号链接，拒绝写入：{parent}")
+                parent.mkdir(exist_ok=True)
+                if not parent.is_dir():
+                    raise ValueError(f"目标路径的父项不是目录：{parent}")
+            if destination.is_symlink():
+                raise ValueError(f"目标文件是符号链接，拒绝覆盖：{destination}")
+            path.replace(destination)
+            moved += 1
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
     print(f"已合并 {moved:,} 个文件到 {target}")
 
     manifest = target / "manifest.csv"
@@ -397,6 +447,78 @@ def unpack(dataset: str, archive: Path, *, into: Path | None = None) -> int:
     print(f"  python scripts/train_model.py --config configs/experiments/exp02_yolo26n_gru.yaml")
     print("  （dataset.root 需要在 configs/data/ 里指向抽帧目录，或用 HANDWASH_DATA_ROOT）")
     return 0
+
+
+def _archive_destination(staging: Path, raw_name: str, seen: set[str]) -> Path:
+    """Validate a portable relative member path before writing it to disk."""
+    if not raw_name or "\\" in raw_name or raw_name.startswith("/"):
+        raise ValueError(f"压缩包内路径不是安全的相对 POSIX 路径：{raw_name!r}")
+    member = PurePosixPath(raw_name)
+    parts = member.parts
+    windows_reserved = {"CON", "PRN", "AUX", "NUL"} | {
+        f"{prefix}{number}" for prefix in ("COM", "LPT") for number in range(1, 10)
+    }
+    invalid_component = any(
+        ":" in part
+        or "\x00" in part
+        or part.endswith((".", " "))
+        or part.rstrip(" .").split(".", 1)[0].upper() in windows_reserved
+        for part in parts
+    )
+    if (
+        not parts
+        or any(part in ("", ".", "..") for part in parts)
+        or invalid_component
+        or parts[0] not in {"frames", "manifest.csv", "clip_splits.json", "split_report.json", "SOURCES.json", "README.md"}
+    ):
+        raise ValueError(f"压缩包内路径超出数据包白名单：{raw_name!r}")
+    normalized = member.as_posix().casefold()
+    if normalized in seen:
+        raise ValueError(f"压缩包包含重复或仅大小写不同的路径：{raw_name!r}")
+    seen.add(normalized)
+    destination = staging.joinpath(*parts)
+    if not destination.resolve().is_relative_to(staging.resolve()):
+        raise ValueError(f"压缩包内路径试图越出解包目录：{raw_name!r}")
+    return destination
+
+
+def _extract_archive_safely(archive: Path, staging: Path) -> None:
+    """Extract only regular files/directories from the package allowlist."""
+    seen: set[str] = set()
+    if archive.suffix.lower() == ".zip":
+        with zipfile.ZipFile(archive) as handle:
+            for info in handle.infolist():
+                destination = _archive_destination(staging, info.filename.rstrip("/"), seen)
+                mode = (info.external_attr >> 16) & 0xFFFF
+                file_type = stat.S_IFMT(mode)
+                if (
+                    stat.S_ISLNK(mode)
+                    or file_type not in (0, stat.S_IFREG, stat.S_IFDIR)
+                    or (file_type == stat.S_IFDIR and not info.is_dir())
+                ):
+                    raise ValueError(f"ZIP 包含不允许的链接或特殊文件：{info.filename!r}")
+                if info.is_dir():
+                    destination.mkdir(parents=True, exist_ok=True)
+                else:
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    with handle.open(info) as source, destination.open("xb") as output:
+                        shutil.copyfileobj(source, output)
+        return
+
+    with tarfile.open(archive) as handle:
+        for member in handle.getmembers():
+            destination = _archive_destination(staging, member.name.rstrip("/"), seen)
+            if member.isdir():
+                destination.mkdir(parents=True, exist_ok=True)
+                continue
+            if not member.isfile():
+                raise ValueError(f"TAR 包含不允许的链接或特殊文件：{member.name!r}")
+            source = handle.extractfile(member)
+            if source is None:
+                raise ValueError(f"无法读取压缩包成员：{member.name!r}")
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            with source, destination.open("xb") as output:
+                shutil.copyfileobj(source, output)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -432,6 +554,7 @@ def main(argv: list[str] | None = None) -> int:
         help="**仅用于 --unpack**：解包目标目录（默认 <data_root>/processed/<dataset>）",
     )
     args = parser.parse_args(argv)
+    validate_dataset_name(args.dataset)
 
     out_dir = Path(args.out_dir) if args.out_dir else data_root() / "packages"
 

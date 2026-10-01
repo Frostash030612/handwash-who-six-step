@@ -6,20 +6,8 @@
 
 用法::
 
-    python scripts/train_model.py --config configs/experiments/exp02_yolo26n_gru.yaml
-    python scripts/train_model.py --config configs/experiments/smoke.yaml --evaluate
-"""
-
-#!/usr/bin/env python
-"""训练脚本：包一层 ``pipelines.train``，用于多步组合（准备数据 -> 训练 -> 评估）。
-
-与 ``handwash train`` 的区别：本脚本可以在一次调用里加上自动评估，
-适合"睡前挂机、早上看结果"的场景。
-
-用法::
-
-    python scripts/train_model.py --config configs/experiments/exp02_yolo26n_gru.yaml
-    python scripts/train_model.py --config configs/experiments/smoke.yaml --evaluate
+    python scripts/train_model.py config=configs/experiments/live_yolo_frame.yaml
+    python scripts/train_model.py config=configs/experiments/smoke.yaml --evaluate
 """
 
 import sys
@@ -42,7 +30,7 @@ def main() -> int:
     parser = build_config_parser(__doc__ or "")
     parser.add_argument("--epochs", type=int, default=None, help="覆盖 train.epochs")
     parser.add_argument("--evaluate", action="store_true", help="训练结束后自动评估")
-    parser.add_argument("--no-synthetic", action="store_true", help="禁止回退到合成数据")
+    parser.add_argument("--no-synthetic", action="store_true", help="禁止使用显式配置的合成数据")
 
     plain, override_items = split_argv(sys.argv[1:])
     args, unknown = parser.parse_known_args(plain)
@@ -54,7 +42,7 @@ def main() -> int:
 
     from handwash.pipelines.train import train
 
-    result = train(rc, max_epochs=args.epochs)
+    result = train(rc, max_epochs=args.epochs, allow_synthetic=not args.no_synthetic)
 
     print("\n" + "=" * 66)
     print(f"训练完成：best val macro-F1 = {result.best_metric:.4f}")

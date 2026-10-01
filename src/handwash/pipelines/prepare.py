@@ -23,15 +23,20 @@
 
 from __future__ import annotations
 
+import bisect
+import json
+import math
+import re
 from collections import defaultdict
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 from handwash.core.config import ResolvedConfig
-from handwash.core.labels import Step, get_label_space
+from handwash.core.labels import NON_WASH_STEPS, Step, get_label_space
 from handwash.core.schema import ClipRecord, FrameRecord, Split
-from handwash.errors import DatasetNotFoundError, DataError
+from handwash.errors import ConfigError, DatasetNotFoundError, DataError
 from handwash.io.manifest import write_manifest
 from handwash.io.split import assert_no_leakage, assign_frames, split_clips, split_report
 from handwash.io.utils import write_json
@@ -56,6 +61,7 @@ SOURCE_NAMES: tuple[str, ...] = ("kaggle", "pskuss", "metc", "jurmala", "selfrec
 #: 未登记的数据集走 ``_records_from_video_dirs`` 通用兜底。
 _SOURCE_ADAPTERS: dict[str, str] = {
     "pskuss": "_records_from_pskuss",
+    "metc": "_records_from_metc",
 }
 
 
@@ -87,9 +93,7 @@ def _discover_source(rc: ResolvedConfig) -> tuple[str, Path]:
     spec = rc.dataset_spec()
     name = str(rc.dataset.name).strip().lower()
     raw_root = spec.get("root") or rc.dataset.root
-    root = Path(str(raw_root))
-    if not root.is_absolute():
-        root = PROJECT_ROOT / root
+    root = resolve_relative(Path(str(raw_root)).expanduser())
     if name != "synthetic" and not root.exists():
         raise DatasetNotFoundError(
             name, expected_at=root
@@ -123,7 +127,10 @@ def _records_from_frames_dir(rc: ResolvedConfig, root: Path) -> tuple[list[Frame
             continue
         frames.extend(_records_from_label_dir(rc, label_dir, "train", space, clips))
 
-    clip_records = [_clip_from_frames(clip_id, recs) for clip_id, recs in sorted(clips.items())]
+    clip_records = [
+        _clip_from_frames(clip_id, recs, fps=rc.dataset.prep.fps)
+        for clip_id, recs in sorted(clips.items())
+    ]
     return frames, clip_records
 
 
@@ -132,15 +139,48 @@ def _records_from_label_dir(rc, label_dir: Path, split: str, space, clips) -> li
     from handwash.io.utils import IMAGE_EXTENSIONS, list_files
 
     by_label = space.canonicalize(label_dir.name)
+    if by_label not in space:
+        if by_label in NON_WASH_STEPS and not rc.dataset.include_non_wash:
+            log.info("按配置排除辅助类别目录：%s", label_dir)
+            return []
+        raise DataError(
+            f"标签 {by_label.value!r} 不在当前标签空间 {space.name!r} 中",
+            hint="调整 dataset.label_space / include_non_wash，确保数据标签可被模型表示。",
+        )
     out: list[FrameRecord] = []
     videos = [p for p in sorted(label_dir.iterdir()) if p.is_dir()]
     if videos:
         for video_dir in videos:
-            images = list_files(video_dir, extensions=IMAGE_EXTENSIONS)
-            out.extend(_frames_from_images(rc, video_dir.name, video_dir, images, by_label, split))
+            images = sorted(list_files(video_dir, extensions=IMAGE_EXTENSIONS), key=_natural_sort_key)
+            clip_id = f"{label_dir.name}/{video_dir.name}"
+            out.extend(_frames_from_images(rc, clip_id, video_dir, images, by_label, split))
     else:
         images = list_files(label_dir, extensions=IMAGE_EXTENSIONS)
-        out.extend(_frames_from_images(rc, label_dir.name, label_dir, images, by_label, split))
+        # A flat image folder contains independent images unless filenames share
+        # an explicit source-video frame suffix (for example clip_f00123.jpg).
+        for image in images:
+            prefix_match = re.match(r"^frame[_-]?(\d+)[_-](.+)$", image.stem, flags=re.IGNORECASE)
+            suffix_match = re.match(r"^(.*?)[_-]f(?:rame)?[_-]?(\d+)$", image.stem, flags=re.IGNORECASE)
+            if prefix_match:
+                clip_id = f"source/{prefix_match.group(2)}"
+                frame_index = int(prefix_match.group(1))
+            elif suffix_match:
+                clip_id = f"source/{suffix_match.group(1)}"
+                frame_index = int(suffix_match.group(2))
+            else:
+                clip_id = f"{label_dir.name}/{image.name}"
+                frame_index = 0
+            out.append(
+                FrameRecord(
+                    clip_id=clip_id,
+                    frame_index=frame_index,
+                    image_path=str(image.resolve()),
+                    label=by_label,
+                    dataset=str(rc.dataset.name),
+                    split=split,  # type: ignore[arg-type]
+                    timestamp_s=None,
+                )
+            )
     for rec in out:
         clips[rec.clip_id].append(rec)
     return out
@@ -148,12 +188,12 @@ def _records_from_label_dir(rc, label_dir: Path, split: str, space, clips) -> li
 
 def _frames_from_images(rc, clip_id: str, video_dir: Path, images: Sequence[Path], label, split: str):
     out: list[FrameRecord] = []
-    for index, image in enumerate(sorted(images)):
+    for index, image in enumerate(sorted(images, key=_natural_sort_key)):
         out.append(
             FrameRecord(
                 clip_id=f"{clip_id}",
                 frame_index=index,
-                image_path=str(image.relative_to(_project_root())).replace("\\", "/"),
+                image_path=str(image.resolve()),
                 label=label,
                 dataset=str(rc.dataset.name),
                 split=split,  # type: ignore[arg-type]
@@ -163,19 +203,40 @@ def _frames_from_images(rc, clip_id: str, video_dir: Path, images: Sequence[Path
     return out
 
 
-def _clip_from_frames(clip_id: str, recs: Sequence[FrameRecord]) -> ClipRecord:
+def _natural_sort_key(path: Path) -> tuple[tuple[int, object], ...]:
+    """Sort frame_2 before frame_10 while keeping deterministic path ordering."""
+    parts: list[tuple[int, object]] = []
+    for token in re.split(r"(\d+)", path.as_posix().lower()):
+        if token.isdigit():
+            parts.append((1, int(token)))
+        else:
+            parts.append((0, token))
+    return tuple(parts)
+
+
+def _clip_from_frames(clip_id: str, recs: Sequence[FrameRecord], *, fps: float) -> ClipRecord:
     ordered = sorted(recs, key=lambda r: r.frame_index)
-    fps = 5.0
+    if len({record.frame_index for record in ordered}) != len(ordered):
+        raise DataError(
+            f"图像 clip={clip_id} 中 frame_index 重复",
+            hint="检查多类别目录中是否重复保存了同一源视频帧，或修正帧号解析规则。",
+        )
+    splits = {record.split for record in ordered}
+    if len(splits) != 1:
+        raise DataError(
+            f"同一图像 clip={clip_id} 出现在多个预置 split：{sorted(splits)}",
+            hint="按原视频分组的数据不能同时出现在 train/val/test；请修正预置目录。",
+        )
     return ClipRecord(
         clip_id=clip_id,
         dataset=ordered[0].dataset,
         split=ordered[0].split,
-        video_path=ordered[0].video_path,
+        video_path=clip_id,
         frame_count=len(ordered),
         fps=fps,
         duration_s=len(ordered) / fps,
         label_sequence=tuple(r.label for r in ordered),
-        metadata={},
+        metadata={"label_timestamps_s": tuple(record.timestamp_s for record in ordered)},
     )
 
 
@@ -226,11 +287,14 @@ def _records_from_pskuss(rc: ResolvedConfig, root: Path) -> tuple[list[FrameReco
             continue
 
         # 每个视频在若干标注者目录里各有一份 csv；按优先级取第一个存在的
-        for video in sorted(videos_dir.glob("*.mp4")):
-            clip_id = video.stem  # 例如 2020-06-26_21-26-56_camera104
+        from handwash.io.utils import list_videos
+
+        for video in list_videos(videos_dir):
+            clip_id = f"{dataset_dir.name}/{video.stem}"
+            annotation_stem = video.stem
             annotation: Path | None = None
             for annotator in annotators:
-                candidate = ann_root / annotator / f"{clip_id}.csv"
+                candidate = ann_root / annotator / f"{annotation_stem}.csv"
                 if candidate.exists():
                     annotation = candidate
                     break
@@ -256,28 +320,35 @@ def _records_from_pskuss(rc: ResolvedConfig, root: Path) -> tuple[list[FrameReco
                     FrameRecord(
                         clip_id=clip_id,
                         frame_index=index,
-                        image_path=str(video.relative_to(_project_root())).replace("\\", "/"),
+                        image_path=_portable_path(video),
                         label=label,
                         dataset=str(rc.dataset.name),
                         split="train",  # 占位：真实 split 由划分阶段写入
-                        timestamp_s=_frame_time_to_seconds(row.get("frame_time", ""), index, rc),
+                        timestamp_s=_frame_time_to_seconds(row.get("frame_time", "")),
                     )
                 )
 
             frames.extend(clip_frames)
+            valid_times = [rec.timestamp_s for rec in clip_frames if rec.timestamp_s is not None]
+            clip_duration = (
+                max(valid_times) - min(valid_times)
+                if len(valid_times) >= 2
+                else len(clip_frames) / rc.dataset.prep.fps
+            )
             clips.append(
                 ClipRecord(
                     clip_id=clip_id,
                     dataset=str(rc.dataset.name),
                     split="train",
-                    video_path=str(video.relative_to(_project_root())).replace("\\", "/"),
+                    video_path=_portable_path(video),
                     frame_count=len(clip_frames),
                     fps=rc.dataset.prep.fps,
-                    duration_s=len(clip_frames) / rc.dataset.prep.fps,
+                    duration_s=clip_duration,
                     label_sequence=tuple(labels),
                     metadata={
                         "pskuss_dataset": dataset_dir.name,
-                        "annotation": str(annotation.relative_to(_project_root())).replace("\\", "/"),
+                        "annotation": _portable_path(annotation),
+                        "label_timestamps_s": tuple(rec.timestamp_s for rec in clip_frames),
                     },
                 )
             )
@@ -299,12 +370,179 @@ def _records_from_pskuss(rc: ResolvedConfig, root: Path) -> tuple[list[FrameReco
     return frames, clips
 
 
-def _frame_time_to_seconds(raw: str, index: int, rc: ResolvedConfig) -> float:
-    """把 PSKUS 的 ``frame_time``（毫秒）换算成秒；解析失败则按抽帧率估算。"""
+def _frame_time_to_seconds(raw: str) -> float | None:
+    """把 PSKUS 的 ``frame_time``（毫秒）换算成秒；解析失败返回 None。"""
     try:
-        return float(str(raw).strip()) / 1000.0
+        value = float(str(raw).strip()) / 1000.0
+        return value if math.isfinite(value) and value >= 0 else None
     except (TypeError, ValueError):
-        return index / rc.dataset.prep.fps
+        return None
+
+
+def _records_from_metc(rc: ResolvedConfig, root: Path) -> tuple[list[FrameRecord], list[ClipRecord]]:
+    """Read Zenodo METC videos and their same-stem, per-frame JSON annotations.
+
+    The published subset uses movement codes 0..6 (0=other, 1..6=WHO steps).
+    Its labels contain no separate faucet events.
+    """
+    from handwash.io.utils import VIDEO_EXTENSIONS
+
+    space = get_label_space(rc.label_space)
+    videos_by_stem: dict[str, list[Path]] = defaultdict(list)
+    for path in root.rglob("*"):
+        if path.is_file() and path.suffix.lower() in VIDEO_EXTENSIONS:
+            videos_by_stem[path.stem].append(path)
+    annotations = sorted(root.rglob("*.json"))
+    if not annotations:
+        raise DataError(
+            f"METC 数据目录 {root} 中没有 JSON 标注",
+            hint="解压 Zenodo 的 Interface_number_1..3.zip；每段视频需要同名 JSON 标注。",
+        )
+
+    frames: list[FrameRecord] = []
+    clips: list[ClipRecord] = []
+    missing_video = 0
+    for annotation in annotations:
+        candidates = videos_by_stem.get(annotation.stem, [])
+        if not candidates:
+            missing_video += 1
+            continue
+        ann_parts = annotation.parent.relative_to(root).parts
+        ranked = sorted(
+            candidates,
+            key=lambda video: sum(
+                1
+                for left, right in zip(ann_parts, video.parent.relative_to(root).parts)
+                if left == right
+            ),
+            reverse=True,
+        )
+        if len(ranked) > 1:
+            best_score = sum(
+                1
+                for left, right in zip(ann_parts, ranked[0].parent.relative_to(root).parts)
+                if left == right
+            )
+            next_score = sum(
+                1
+                for left, right in zip(ann_parts, ranked[1].parent.relative_to(root).parts)
+                if left == right
+            )
+            if best_score == next_score:
+                raise DataError(
+                    f"METC 标注 {annotation} 对应多个同名视频：{ranked[:2]}",
+                    hint="请检查解压目录中是否存在重名视频/标注。",
+                )
+        video = ranked[0]
+        try:
+            payload = json.loads(annotation.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise DataError(f"无法读取 METC 标注文件：{annotation}", hint=str(exc)) from exc
+
+        raw_labels: Any = payload
+        if isinstance(payload, dict):
+            raw_labels = next(
+                (payload[key] for key in ("labels", "movement_codes", "annotations", "frames") if key in payload),
+                None,
+            )
+        if isinstance(raw_labels, dict):
+            def sort_key(item: tuple[str, Any]) -> tuple[int, str]:
+                try:
+                    return (0, f"{int(item[0]):012d}")
+                except ValueError:
+                    return (1, item[0])
+
+            raw_labels = [value for _, value in sorted(raw_labels.items(), key=sort_key)]
+        if not isinstance(raw_labels, list) or not raw_labels:
+            raise DataError(
+                f"METC 标注格式无效：{annotation}",
+                hint="期望顶层 labels/frames 为非空逐帧列表或按帧号索引的对象。",
+            )
+
+        sequence: list[Step] = []
+        timestamps: list[float | None] = []
+        for index, item in enumerate(raw_labels):
+            value = item
+            timestamp: float | None = None
+            if isinstance(item, dict):
+                value = next(
+                    (item[key] for key in ("movement_code", "label", "code", "movement", "class") if key in item),
+                    None,
+                )
+                raw_time = next(
+                    (item[key] for key in ("timestamp_s", "timestamp", "time", "frame_time") if key in item),
+                    None,
+                )
+                if raw_time not in (None, ""):
+                    raw_time_text = str(raw_time).strip()
+                    is_milliseconds = raw_time_text.lower().endswith("ms")
+                    numeric_time = raw_time_text[:-2].strip() if is_milliseconds else raw_time_text
+                    try:
+                        timestamp = float(numeric_time)
+                    except ValueError as exc:
+                        raise DataError(
+                            f"METC 标注时间戳无法解析：{raw_time!r}（{annotation}，第 {index + 1} 条）",
+                            hint="时间戳必须是数字秒数，或以 ms 结尾的毫秒数。",
+                        ) from exc
+                    if is_milliseconds:
+                        timestamp /= 1000.0
+                if timestamp is not None and (not math.isfinite(timestamp) or timestamp < 0):
+                    raise DataError(
+                        f"METC 标注时间戳无效：{raw_time!r}（{annotation}，第 {index + 1} 条）",
+                        hint="时间戳必须是非负有限秒数，或以 ms 结尾的毫秒数。",
+                    )
+            try:
+                label = space.canonicalize(value)
+            except Exception as exc:  # noqa: BLE001 - fail rather than silently poison labels
+                raise DataError(
+                    f"METC 标签无法映射：{value!r}（{annotation}，第 {index + 1} 条）",
+                    hint="公开标签应为 0..6；核对 METC JSON schema 与 dataset.label_space。",
+                ) from exc
+            sequence.append(label)
+            timestamps.append(timestamp)
+
+        clip_id = video.relative_to(root).with_suffix("").as_posix()
+        fps = float(rc.dataset.prep.fps)
+        valid_timestamps = [stamp for stamp in timestamps if stamp is not None]
+        if len(valid_timestamps) >= 2:
+            clip_duration = max(valid_timestamps) - min(valid_timestamps)
+        else:
+            clip_duration = len(sequence) / fps
+        placeholder = [
+            FrameRecord(
+                clip_id=clip_id,
+                frame_index=index,
+                image_path=_portable_path(video),
+                label=label,
+                dataset=str(rc.dataset.name),
+                split="train",
+                timestamp_s=timestamps[index] if timestamps[index] is not None else index / fps,
+            )
+            for index, label in enumerate(sequence)
+        ]
+        frames.extend(placeholder)
+        clips.append(
+            ClipRecord(
+                clip_id=clip_id,
+                dataset=str(rc.dataset.name),
+                split="train",
+                video_path=_portable_path(video),
+                frame_count=len(sequence),
+                fps=fps,
+                duration_s=clip_duration,
+                label_sequence=tuple(sequence),
+                metadata={"annotation": _portable_path(annotation), "label_timestamps_s": tuple(timestamps)},
+            )
+        )
+
+    if missing_video:
+        log.warning("METC 有 %d 个 JSON 找不到同名视频，已跳过", missing_video)
+    if not clips:
+        raise DataError(
+            f"METC 没有解析出任何视频与标注配对（root={root}）",
+            hint="检查 Interface_number_* 下视频和 JSON 的文件 stem 是否一致。",
+        )
+    return frames, clips
 
 
 def _records_from_video_dirs(rc: ResolvedConfig, root: Path) -> tuple[list[FrameRecord], list[ClipRecord]]:
@@ -314,7 +552,7 @@ def _records_from_video_dirs(rc: ResolvedConfig, root: Path) -> tuple[list[Frame
     若某个数据集的结构与众不同，**在这里加一个专门的适配器函数**，
     并在 ``_SOURCE_FACTORIES`` 里注册，不要改主流程。
     """
-    from handwash.io.utils import read_csv
+    from handwash.io.utils import VIDEO_EXTENSIONS, list_videos, read_csv
 
     space = get_label_space(rc.label_space)
     frames: list[FrameRecord] = []
@@ -328,36 +566,79 @@ def _records_from_video_dirs(rc: ResolvedConfig, root: Path) -> tuple[list[Frame
             label = space.canonicalize(label_dir.name)
         except Exception:  # noqa: BLE001 - 不是标签目录就跳过
             continue
-        from handwash.io.utils import list_videos
-
+        if label not in space:
+            if label in NON_WASH_STEPS and not rc.dataset.include_non_wash:
+                log.info("按配置排除辅助类别目录：%s", label_dir)
+                continue
+            raise DataError(
+                f"标签 {label.value!r} 不在当前标签空间 {space.name!r} 中",
+                hint="调整 dataset.label_space / include_non_wash，确保数据标签可被模型表示。",
+            )
         for video in list_videos(label_dir):
-            clip_id = video.stem
+            clip_id = video.relative_to(root).with_suffix("").as_posix()
             recs = _placeholder_frames(rc, clip_id, video, label)
             frames.extend(recs)
             clips[clip_id].extend(recs)
             handled = True
 
     # 形式 2：每段视频一个 csv
-    for csv_path in sorted(root.glob("*.csv")):
+    for csv_path in sorted(root.rglob("*.csv")):
         rows = read_csv(csv_path)
         if not rows or "label" not in rows[0]:
             continue
-        clip_id = csv_path.stem
+        matches = [
+            path for path in root.rglob(f"{csv_path.stem}.*")
+            if path.is_file() and path.suffix.lower() in VIDEO_EXTENSIONS
+        ]
+        if not matches:
+            continue
+        if len(matches) > 1:
+            raise DataError(
+                f"标注 CSV {csv_path} 对应多个同名视频：{matches}",
+                hint="请移除歧义文件，或把标注放到能唯一匹配视频的目录结构中。",
+            )
+        video = matches[0]
+        clip_id = video.relative_to(root).with_suffix("").as_posix()
         recs: list[FrameRecord] = []
         for index, row in enumerate(rows):
             try:
                 label = space.canonicalize(row["label"])
-            except Exception:  # noqa: BLE001 - 无法识别的标签行跳过并计数
-                continue
+            except ConfigError as exc:
+                raise DataError(
+                    f"标注 CSV 标签无法映射：{row.get('label')!r}（{csv_path}，第 {index + 2} 行）",
+                    hint="在 core/labels.py 注册数据集标签别名，或修正标注文件；不要静默丢弃未识别标签。",
+                ) from exc
+            if label not in space:
+                if label in NON_WASH_STEPS and not rc.dataset.include_non_wash:
+                    continue
+                raise DataError(
+                    f"CSV 标签 {label.value!r} 不在当前标签空间 {space.name!r} 中：{csv_path}",
+                    hint="调整 dataset.label_space / include_non_wash，或修正标注。",
+                )
+            raw_timestamp = row.get("timestamp_s") or row.get("timestamp")
+            timestamp: float | None = None
+            if raw_timestamp not in (None, ""):
+                try:
+                    timestamp = float(raw_timestamp)
+                except (TypeError, ValueError) as exc:
+                    raise DataError(
+                        f"标注 CSV 时间戳无法解析：{raw_timestamp!r}（{csv_path}，第 {index + 2} 行）",
+                        hint="timestamp_s / timestamp 必须是秒单位的非负有限数字。",
+                    ) from exc
+                if not math.isfinite(timestamp) or timestamp < 0:
+                    raise DataError(
+                        f"标注 CSV 时间戳无效：{raw_timestamp!r}（{csv_path}，第 {index + 2} 行）",
+                        hint="timestamp_s / timestamp 必须是秒单位的非负有限数字。",
+                    )
             recs.append(
                 FrameRecord(
                     clip_id=clip_id,
                     frame_index=int(row.get("frame", index) or index),
-                    image_path="",  # 由抽帧阶段填充
+                    image_path=_portable_path(video),
                     label=label,
                     dataset=str(rc.dataset.name),
                     split="train",
-                    timestamp_s=float(row["timestamp"]) if row.get("timestamp") else None,
+                    timestamp_s=timestamp,
                 )
             )
         if recs:
@@ -377,7 +658,7 @@ def _records_from_video_dirs(rc: ResolvedConfig, root: Path) -> tuple[list[Frame
             clip_id=clip_id,
             dataset=str(rc.dataset.name),
             split="train",  # 占位：真实 split 由 split 阶段写入
-            video_path=str(recs[0].image_path or recs[0].clip_id),
+            video_path=next((record.image_path for record in recs if record.image_path), clip_id),
             frame_count=len(recs),
             fps=rc.dataset.prep.fps,
             duration_s=len(recs) / rc.dataset.prep.fps,
@@ -398,7 +679,7 @@ def _placeholder_frames(rc: ResolvedConfig, clip_id: str, video: Path, label) ->
         FrameRecord(
             clip_id=clip_id,
             frame_index=0,
-            image_path=str(video.relative_to(_project_root())).replace("\\", "/"),
+            image_path=_portable_path(video),
             label=label,
             dataset=str(rc.dataset.name),
             split="train",
@@ -411,6 +692,50 @@ def _project_root() -> Path:
     from handwash.paths import PROJECT_ROOT as root
 
     return root
+
+
+def _portable_path(path: Path) -> str:
+    """Keep repository files relocatable and external data paths usable."""
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(_project_root()).as_posix()
+    except ValueError:
+        return str(resolved)
+
+
+def _as_external_split(clips: Sequence[ClipRecord]) -> dict[Split, list[ClipRecord]]:
+    """Reserve every clip for external evaluation without random partitioning."""
+    return {
+        "train": [],
+        "val": [],
+        "test": [],
+        "external": [replace(clip, split="external") for clip in clips],
+    }
+
+
+def _label_for_sample(clip: ClipRecord, source_index: int, timestamp_s: float) -> Step | None:
+    """Map a decoded source frame to its nearest original per-frame annotation."""
+    sequence = clip.label_sequence
+    if not sequence:
+        return None
+    if len(sequence) == 1:
+        return sequence[0] if sequence[0] is not Step.UNKNOWN else None
+
+    raw_times = clip.metadata.get("label_timestamps_s", ())
+    if isinstance(raw_times, Sequence) and len(raw_times) == len(sequence):
+        indexed = sorted((float(value), index) for index, value in enumerate(raw_times) if value is not None)
+        if indexed:
+            timestamps = [item[0] for item in indexed]
+            position = bisect.bisect_left(timestamps, timestamp_s)
+            candidates = (max(0, position - 1), min(len(indexed) - 1, position))
+            nearest = min(candidates, key=lambda idx: abs(timestamps[idx] - timestamp_s))
+            label = sequence[indexed[nearest][1]]
+            return None if label is Step.UNKNOWN else label
+
+    if 0 <= source_index < len(sequence):
+        label = sequence[source_index]
+        return None if label is Step.UNKNOWN else label
+    return None
 
 
 def _resolve(relative: str | Path) -> Path:
@@ -434,12 +759,19 @@ def prepare(rc: ResolvedConfig, *, stage: str = "all") -> PrepareResult:
         raise DataError(f"未知的 stage：{stage!r}", hint=f"允许：{list(valid)}")
 
     name, root = _discover_source(rc)
+    if name == "synthetic" and stage != "all":
+        raise DataError(
+            "synthetic 数据集是临时生成的，必须一次运行 `--stage all`",
+            hint="若要按阶段处理真实数据，请改用 PSKUS、METC 或图像目录数据集。",
+        )
     spec = rc.dataset_spec()
+    external_only = bool(spec.get("external_only", False))
     out_root = resolve_relative(spec.get("processed_dir") or DATA_PROCESSED_DIRNAME)
     frames_root = resolve_relative(
         spec.get("frames_dir") or f"{DATA_PROCESSED_DIRNAME}/{rc.dataset.name}/frames"
     )
     manifest_path = resolve_relative(spec.get("manifest") or (out_root / "manifest.csv"))
+    split_contract_path = out_root / "clip_splits.json"
 
     log.info(
         "数据准备：dataset=%s，root=%s，stage=%s，label_space=%s",
@@ -448,18 +780,7 @@ def prepare(rc: ResolvedConfig, *, stage: str = "all") -> PrepareResult:
     ensure_dir(out_root)
 
     # --- 1) 取 clip 级清单 -------------------------------------------------
-    # 【分支优先级：注册的适配器 > 图像目录树启发式 > 通用视频兜底】
-    #
-    # 这里曾经把启发式放在适配器之前，导致一个很隐蔽的错误：
-    # `_looks_like_image_tree` 比较图像数与视频数，而 PSKUS 在抽帧**之前**是
-    # "一堆 mp4 + 标注 csv、一张图都没有"，于是 len(images)=0 > len(videos)=N 不成立……
-    # 但只要 root 下没有视频能被 recursive 扫到（例如视频在更深一层、或只扫到标注），
-    # 就会误判为图像树，于是走 `_records_from_frames_dir`：
-    # 它把 `DataSet4` 这样的**分片目录名**当成标签名去 canonicalize，
-    # 全部落到兜底的 other。结果 39 段视频的 manifest 里只有 other 一个标签，
-    # 六步动作识别直接失去监督信号 —— 而流程"看起来完全正常"。
-    adapter_name = _SOURCE_ADAPTERS.get(name)
-    use_adapter = adapter_name is not None and not _looks_like_image_tree(root)
+    presplit_images = False
     if name == "synthetic":
         from handwash.data.synthetic import write_synthetic_dataset
 
@@ -474,51 +795,117 @@ def prepare(rc: ResolvedConfig, *, stage: str = "all") -> PrepareResult:
         for clip in clips:
             split_map[clip.split].append(clip)  # type: ignore[index]
         prepared_frames = frames
-        label_source = None
-    elif name == "kaggle" or (not use_adapter and _looks_like_image_tree(root)):
+    elif name == "kaggle" or (name != "metc" and _looks_like_image_tree(root)):
         frames, clips = _records_from_frames_dir(rc, root)
-        split_map = split_clips(
-            clips,
-            ratios={"train": rc.split.train, "val": rc.split.val, "test": rc.split.test},
-            seed=rc.split.seed,
-            group_key=rc.split.group_key,
-            stratify_by=rc.split.stratify_by,
+        split_dirs = {"train", "val", "test", "external"}.intersection(
+            p.name.lower() for p in root.iterdir() if p.is_dir()
         )
+        if split_dirs:
+            presplit_images = True
+            split_map = {key: [] for key in ("train", "val", "test", "external")}
+            for clip in clips:
+                if clip.split not in split_dirs:
+                    raise DataError(
+                        f"圖像資料集已有 split 目錄，但 clip={clip.clip_id} 的 split={clip.split!r} 不匹配",
+                        hint="每張圖應位於 train/val/test/external/<label>/ 下，或刪除 split 目錄後由程序重新劃分。",
+                    )
+                split_map[clip.split].append(clip)  # type: ignore[index]
+        elif external_only:
+            split_map = _as_external_split(clips)
+        else:
+            split_map = split_clips(
+                clips,
+                ratios={"train": rc.split.train, "val": rc.split.val, "test": rc.split.test},
+                seed=rc.split.seed,
+                group_key=rc.split.group_key,
+                stratify_by=rc.split.stratify_by,
+            )
         prepared_frames = frames
-        label_source = None
     else:
         # 结构特殊的数据集走专门适配器；其余走通用兜底
+        adapter_name = _SOURCE_ADAPTERS.get(name)
         adapter = globals().get(adapter_name) if adapter_name else None
         if adapter is None:
             adapter = _records_from_video_dirs
         elif adapter_name:
             log.info("使用专门适配器：%s", adapter_name)
-        frames, clips = adapter(rc, root)
-        split_map = split_clips(
-            clips,
-            ratios={"train": rc.split.train, "val": rc.split.val, "test": rc.split.test},
-            seed=rc.split.seed,
-            group_key=rc.split.group_key,
-            stratify_by=rc.split.stratify_by,
-        )
-        # 适配器给出的 FrameRecord 是"抽帧前的逐帧标注"：image_path 指向**视频**，
-        # label/timestamp_s 才是真值。把它们按 clip 收好，抽帧时按原始帧号对齐取用。
-        # 不使用这些数据的话，抽帧阶段会只剩 `clip.label_sequence[0]` 一个标签，
-        # 整段视频被赋成同一个类（曾经就是这样丢掉全部六步标签的）。
-        label_source = _group_frame_labels(frames)
+        _, clips = adapter(rc, root)
+        if external_only:
+            split_map = _as_external_split(clips)
+        else:
+            split_map = split_clips(
+                clips,
+                ratios={"train": rc.split.train, "val": rc.split.val, "test": rc.split.test},
+                seed=rc.split.seed,
+                group_key=rc.split.group_key,
+                stratify_by=rc.split.stratify_by,
+            )
         prepared_frames = []
 
     if rc.split.guard_leakage:
         assert_no_leakage(split_map, group_key=rc.split.group_key)
 
+    current_clips = {
+        clip.clip_id: clip for clip_list in split_map.values() for clip in clip_list
+    }
+    listed_clip_count = sum(len(clip_list) for clip_list in split_map.values())
+    if len(current_clips) != listed_clip_count:
+        raise DataError("同一 clip_id 被重复分配到多个 split")
+    if stage == "frames" and split_contract_path.is_file():
+        from handwash.io.utils import read_json
+
+        payload = read_json(split_contract_path)
+        if not isinstance(payload, dict) or payload.get("dataset") != name:
+            raise DataError(
+                f"劃分文件資料集與目前資料集不匹配：{split_contract_path}",
+                hint="請對目前資料集重新執行 --stage split，再執行 --stage frames。",
+            )
+        saved_splits = payload.get("clip_splits", {})
+        if not isinstance(saved_splits, dict) or set(saved_splits) != set(current_clips):
+            raise DataError(
+                f"掃描到的 clip 與已保存的劃分不一致：{split_contract_path}",
+                hint="原始數據在 split 後發生變化；請重新執行 --stage split，再執行 --stage frames。",
+            )
+        if presplit_images:
+            mismatches = [
+                clip_id for clip_id, clip in current_clips.items()
+                if saved_splits[clip_id] != clip.split
+            ]
+            if mismatches:
+                raise DataError(
+                    f"預置 split 目錄與劃分文件不一致：{mismatches[:5]}",
+                    hint="確認原始 split 目錄未移動樣本；不要只改 manifest 的 split 欄位。",
+                )
+        else:
+            split_map = {key: [] for key in ("train", "val", "test", "external")}
+            for clip_id, clip in sorted(current_clips.items()):
+                target_split = saved_splits[clip_id]
+                if target_split not in split_map:
+                    raise DataError(f"劃分文件中的 split 非法：{target_split!r}（clip={clip_id}）")
+                split_map[target_split].append(replace(clip, split=target_split))
+    elif stage == "frames" and name != "synthetic" and not presplit_images:
+        raise DataError(
+            "frames 階段找不到已保存的 clip 劃分",
+            hint="先執行 `prepare_data.py --stage split`，或直接執行完整的 `--stage all`。",
+        )
+    elif stage in ("all", "split"):
+        write_json(
+            split_contract_path,
+            {
+                "dataset": name,
+                "config_hash": rc.config_hash,
+                "clip_splits": {
+                    clip.clip_id: split_name
+                    for split_name, clip_list in sorted(split_map.items())
+                    for clip in clip_list
+                },
+            },
+        )
+
     # --- 2) 抽帧（仅当需要时执行）-----------------------------------------
     if stage in ("all", "frames") and not prepared_frames:
         prepared_frames = _extract_and_register(
-            rc,
-            split_map,
-            frames_root=frames_root,
-            out_root=out_root,
-            label_source=label_source,
+            rc, split_map, frames_root=frames_root, out_root=out_root
         )
     elif stage in ("all", "frames") and prepared_frames and name != "synthetic":
         # 已有帧目录（如 Kaggle）：只把 split 写回记录
@@ -528,24 +915,43 @@ def prepare(rc: ResolvedConfig, *, stage: str = "all") -> PrepareResult:
         prepared_frames = _apply_split([], split_map) if stage == "scan" else prepared_frames
 
     report = split_report(split_map)
-    if prepared_frames:
-        write_manifest(manifest_path, prepared_frames)
+    manifest_frames = prepared_frames if stage in ("all", "frames") else []
+    if stage in ("all", "frames") and not manifest_frames:
+        raise DataError(
+            "準備階段沒有產生任何可用帧",
+            hint="檢查視頻能否解碼、標注能否映射，並確認資料目錄與 frames_dir 配置正確。",
+        )
+    if manifest_frames:
+        write_manifest(manifest_path, manifest_frames)
 
-    # 划分报告里同时给出"抽帧前"和"实际写入 manifest"的帧数。
-    # 两者常常不等，因为 split.max_frames_per_clip_* 会对长视频等间隔截断；
-    # 只报一个数字会让人以为 manifest 写坏了（真实踩过这个坑）。
+    # 区分原始标注/图像记录数与最终 manifest 采样数，避免把 annotation row
+    # 数误报成已解码帧数。
     actual_by_split: dict[str, int] = defaultdict(int)
-    for record in prepared_frames:
+    for record in manifest_frames:
         actual_by_split[record.split] += 1
+    actual_clips_by_split: dict[str, set[str]] = defaultdict(set)
+    for record in manifest_frames:
+        actual_clips_by_split[record.split].add(record.clip_id)
     for split_name, info in report.items():
         written = actual_by_split.get(split_name, 0)
-        info["num_frames_extracted"] = info["num_frames"]
+        clips_written = len(actual_clips_by_split.get(split_name, set()))
+        info["num_clips_in_manifest"] = clips_written
+        info["num_clips_skipped"] = max(0, int(info["num_clips"]) - clips_written)
+        info["num_frames_annotated"] = info["num_frames"]
         info["num_frames_in_manifest"] = written
         info["num_frames"] = written
-        if written and written != info["num_frames_extracted"]:
+        if written != info["num_frames_annotated"]:
             info["note"] = (
-                f"抽帧得到 {info['num_frames_extracted']} 帧，"
-                f"按 max_frames_per_clip 等间隔截断后写入 manifest {written} 帧"
+                f"源标注/图像记录 {info['num_frames_annotated']} 条，"
+                f"最终写入 manifest {written} 帧（受采样上限或无效标签影响）"
+            )
+        if info["num_clips_skipped"]:
+            log.warning(
+                "split=%s 有 %d/%d 段 clip 沒有可用帧，%d 条标注/图像记录最终未写入 manifest",
+                split_name,
+                info["num_clips_skipped"],
+                info["num_clips"],
+                max(0, int(info["num_frames_annotated"]) - written),
             )
 
     write_json(
@@ -557,17 +963,17 @@ def prepare(rc: ResolvedConfig, *, stage: str = "all") -> PrepareResult:
             "split": report,
             "config_hash": rc.config_hash,
             "notes": (
-                "num_frames_extracted 是抽帧产出的帧数；num_frames/num_frames_in_manifest "
-                "是实际写入 manifest 的帧数（受 split.max_frames_per_clip_* 限制）。"
+                "num_frames_annotated 是适配器扫描到的标注/图像记录数；"
+                "num_frames/num_frames_in_manifest 是最终登记的采样帧数。"
                 "训练与评估用的是后者。"
             ),
         },
     )
 
     result = PrepareResult(
-        manifest_path=manifest_path if prepared_frames else None,
+        manifest_path=manifest_path if manifest_frames else None,
         num_clips=sum(len(v) for v in split_map.values()),
-        num_frames=len(prepared_frames),
+        num_frames=len(manifest_frames),
         splits=report,
         stages_run=[stage],
     )
@@ -597,7 +1003,12 @@ def _apply_split(
             clip_split[clip.clip_id] = split_name  # type: ignore[assignment]
     out: list[FrameRecord] = []
     for rec in frames:
-        target = clip_split.get(rec.clip_id, "train")
+        target = clip_split.get(rec.clip_id)
+        if target is None:
+            raise DataError(
+                f"帧记录对应的 clip 没有 split：{rec.clip_id}",
+                hint="clip 清单与帧清单必须来自同一次 prepare。",
+            )
         out.append(
             FrameRecord(
                 clip_id=rec.clip_id,
@@ -612,37 +1023,14 @@ def _apply_split(
     return out
 
 
-def _group_frame_labels(
-    frames: Sequence[FrameRecord],
-) -> dict[str, list[FrameRecord]]:
-    """把适配器给出的逐帧标注按 clip 分组，并**按原始帧号排序**。
-
-    为什么要排序：抽帧时用 `indices` 里的原始帧号去索引这个列表，
-    所以列表下标必须等于原始帧号。PSKUS 的标注是一行一帧、顺序递增的，
-    排序后下标恰好就是帧号；若将来遇到缺行或乱序的标注，这里会暴露出来
-    （下标越界时抽帧逻辑会回退到 clip 级标签并记 warning，而不是静默取错标签）。
-    """
-    grouped: dict[str, list[FrameRecord]] = defaultdict(list)
-    for record in frames:
-        grouped[record.clip_id].append(record)
-    for records in grouped.values():
-        records.sort(key=lambda r: r.frame_index)
-    return dict(grouped)
-
-
 def _extract_and_register(
     rc: ResolvedConfig,
     split_map: dict[Split, list[ClipRecord]],
     *,
     frames_root: Path,
     out_root: Path,
-    label_source: dict[str, list[FrameRecord]] | None = None,
 ) -> list[FrameRecord]:
-    """按划分结果抽帧并登记（**先划分、后抽帧**）。
-
-    ``label_source``：clip_id -> 按原始帧号排序的逐帧标注（来自专门适配器）。
-    有它时，每一帧用**它自己的**标签与时间戳；没有时只能退化为整段一个标签。
-    """
+    """按划分结果抽帧并登记（**先划分、后抽帧**）。"""
     ensure_dir(frames_root)
     records: list[FrameRecord] = []
     caps = {
@@ -680,64 +1068,41 @@ def _extract_and_register(
                 )
                 continue
 
-            # 整段一个标签只是**兜底**（没有任何逐帧标注时才用）。
-            # 有 label_source 时必须逐帧取标签，否则整段视频被赋成同一个类 ——
-            # 六步动作识别会因此完全失去监督信号（曾经真实发生：
-            # 39 段视频的 manifest 里只剩 other 一个标签）。
-            fallback_label = clip.label_sequence[0] if clip.label_sequence else None
-            per_frame = label_source.get(clip.clip_id) if label_source else None
-            if label_source is not None and not per_frame:
-                log.warning(
-                    "适配器没有给出 %s 的逐帧标注，只能退化为整段一个标签（%s）",
-                    clip.clip_id, fallback_label,
-                )
-            misaligned = 0
-
-            for local_index, (original_index, stamp, frame) in enumerate(
-                zip(indices, stamps, frames, strict=True)
-            ):
+            for local_index, (source_index, stamp, frame) in enumerate(zip(indices, stamps, frames, strict=True)):
+                label = _label_for_sample(clip, source_index, stamp)
+                if label is None:
+                    continue
                 # 【关键】image_path 记录成**相对 frames_root** 的路径（`<clip_id>/00000.jpg`），
                 # 与 data/dataset.py 的 _image_root_from() 约定一致：那边把 image_root
                 # 解析为配置里的 frames_dir，再用 image_root / image_path 打开文件。
                 # 早期版本这里写成 `frames/<clip_id>/...`（相对数据集 root），
                 # 导致训练时报"帧图像不存在：<dataset.root>/frames/..."，
                 # 而实际帧落在 data/processed/<dataset>/frames/ 下。
-                relative = Path(clip.clip_id) / f"{local_index:05d}.jpg"
-                save_frame(frame, frames_root / clip.clip_id / f"{local_index:05d}.jpg",
-                           quality=rc.dataset.prep.jpeg_quality)
+                image_ext = rc.dataset.prep.image_ext.lower().lstrip(".")
+                relative = Path(clip.clip_id) / f"{local_index:05d}.{image_ext}"
+                from PIL import Image, ImageOps
 
-                # 逐帧标注里用**原始帧号**索引（列表已按 frame_index 排序）。
-                # 时间戳也用标注里的真实时间（PSKUS 是毫秒转秒），
-                # 比"采样序号 ÷ 采样帧率"更可靠：后者在原生帧率不能被采样帧率整除时
-                # 会有系统性偏差（例如原生 16fps 请求 5fps，stride=3，实际 5.333fps）。
-                label = fallback_label
-                timestamp = stamp
-                if per_frame is not None:
-                    if 0 <= original_index < len(per_frame):
-                        label = per_frame[original_index].label
-                        timestamp = per_frame[original_index].timestamp_s
-                    else:
-                        misaligned += 1
-
-                if label is None:
-                    label = Step.UNKNOWN
-
+                height, width = rc.dataset.prep.resize_hw
+                resized = ImageOps.contain(
+                    Image.fromarray(frame),
+                    (int(width), int(height)),
+                    method=Image.Resampling.BILINEAR,
+                )
+                save_frame(
+                    resized,
+                    frames_root / clip.clip_id / f"{local_index:05d}.{image_ext}",
+                    quality=rc.dataset.prep.jpeg_quality,
+                )
                 records.append(
                     FrameRecord(
                         clip_id=clip.clip_id,
-                        frame_index=local_index,
+                        frame_index=source_index,
                         image_path=str(relative).replace("\\", "/"),
                         label=label,
                         dataset=clip.dataset,
                         split=split_name,  # type: ignore[arg-type]
-                        timestamp_s=timestamp,
+                        timestamp_s=stamp,
                     )
-                )
-
-            if misaligned:
-                log.warning(
-                    "%s：%d 帧的原始帧号超出标注范围（标注 %d 行），这些帧回退到整段标签 %s",
-                    clip.clip_id, misaligned, len(per_frame or []), fallback_label,
                 )
     if not records:
         log.warning(

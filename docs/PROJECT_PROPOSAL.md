@@ -2,6 +2,10 @@
 
 # Project Proposal — Content Pack
 
+> Historical course proposal draft. Its GRU/TCN and recorded-video commitments do not
+> describe the current product. Follow the [live YOLO implementation plan](IMPLEMENTATION_PLAN.zh-CN.md)
+> for current work; revise this draft and its generator before any future submission.
+
 Ready-to-paste content for [`Project_Proposal_Template.docx`](Project_Proposal_Template.docx).
 **Deadline: 30 Sep 2026.** Open the DOCX template, fill each row of its table from the sections
 below, export to PDF, and submit one copy per team to Canvas → Assignments → Practice Module.
@@ -10,12 +14,12 @@ below, export to PDF, and submit one copy per team to Canvas → Assignments →
 one command, so the DOCX and this file can never drift apart:
 
 ```bash
-python scripts/make_proposal.py --lang en --group-id 43 \
-    --members "Shen Ziyi:A0350940J" "Wang Lepeng:A0357864L" \
-              "Zhu Jianyu:A0353769L" "Xu Wenzhe:A0328771W"
-python scripts/make_proposal.py --lang zh --group-id 43 \
-    --members "Shen Ziyi:A0350940J" "Wang Lepeng:A0357864L" \
-              "Zhu Jianyu:A0353769L" "Xu Wenzhe:A0328771W"
+python scripts/make_proposal.py --lang en --group-id 0 \
+    --members "Member One:A0000000X" "Member Two:A0000000Y" \
+              "Member Three:A0000000Z" "Member Four:A0000000W"
+python scripts/make_proposal.py --lang zh --group-id 0 \
+    --members "Member One:A0000000X" "Member Two:A0000000Y" \
+              "Member Three:A0000000Z" "Member Four:A0000000W"
 ```
 
 Output: `deliverables/project_proposal_en.docx` and `deliverables/project_proposal_zh.docx`
@@ -27,8 +31,8 @@ the proposal carries student IDs, so it circulates locally, not through the publ
 > `Group Members (name, Student ID)` · `Sponsor/Client` · `Background/Aims/Objectives` ·
 > `Project Descriptions`.
 >
-> The group ID and member list are filled in below (Canvas group **43**). Everything else is
-> written and ready.
+> The group ID and member list below are placeholders for public distribution. Replace them
+> locally before any course submission.
 
 ---
 
@@ -55,16 +59,16 @@ Recognition and Procedure Completeness Assessment
 ## 3. Group ID (As Enrolled in Canvas Class Groups)
 
 ```
-43
+0  (replace with your group ID)
 ```
 
 ## 4. Group Members (name, Student ID)
 
 ```
-[1] Shen Ziyi  — A0350940J     (Data & Evaluation Lead)
-[2] Wang Lepeng — A0357864L    (Model & Training Lead)
-[3] Zhu Jianyu — A0353769L     (Temporal & Assessment Lead)
-[4] Xu Wenzhe  — A0328771W     (Product, Demo & Delivery Lead)
+[1] Member One   — A0000000X  (Data & Evaluation Lead)
+[2] Member Two   — A0000000Y  (Model & Training Lead)
+[3] Member Three — A0000000Z  (Temporal & Assessment Lead)
+[4] Member Four  — A0000000W  (Product, Demo & Delivery Lead)
 ```
 
 ## 5. Sponsor/Client
@@ -280,8 +284,8 @@ reproducible environments.
 
 - [x] `Date of proposal` filled
 - [x] `Project Title` filled (use §2 verbatim)
-- [x] Canvas group ID (**43**) filled in, and all four members enrolled
-- [x] All four members' names **and student IDs** present and correct
+- [ ] Replace the placeholder group ID and confirm all members are enrolled
+- [ ] Replace all placeholder names and student IDs locally before submission
 - [x] `Sponsor/Client` row says `Not applicable — self-initiated project.`
 - [x] `Background/Aims/Objectives` generated, and the objective table reads cleanly
 - [x] `Project Descriptions` generated, with §7.2 making the 3-of-4 aspect coverage unambiguous

@@ -122,6 +122,14 @@ if total_wash_duration_s < assess.min_total_duration_s  → one error
 A step that occurs more than once in the action sequence → `severity="info"`.
 With `assess.allow_repeats: true` it is no longer reported.
 
+### 4.5 Optional faucet events
+
+When `assess.require_faucet_events` is true, the smoothed sequence must contain both
+`faucet_on` and `faucet_off`; each missing event produces a warning. These supplemental
+warnings do **not** change `is_complete` or `overall_score`, which describe the WHO six
+hand-rubbing steps. The configured model label space must contain both event classes.
+PSKUS has no `faucet_on` annotation, so its configuration keeps this option false.
+
 ---
 
 ## 5. Overall score (overall_score, 0—1)

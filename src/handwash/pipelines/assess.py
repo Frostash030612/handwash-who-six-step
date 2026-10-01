@@ -20,7 +20,7 @@ from handwash.core.config import ResolvedConfig
 from handwash.core.labels import STEP_ZH, Step
 from handwash.core.protocol import build_report
 from handwash.core.schema import ProtocolReport
-from handwash.io.utils import list_videos, write_json
+from handwash.io.utils import list_videos, write_json, write_text
 from handwash.logging import get_logger
 from handwash.paths import ensure_dir
 from handwash.pipelines.common import resolve_device
@@ -42,6 +42,7 @@ _KIND_ZH = {
     "insufficient_duration": "时长不足",
     "repeated": "步骤重复",
     "extra_activity": "额外动作",
+    "missing_faucet_event": "水龙头事件缺失",
 }
 
 
@@ -53,7 +54,15 @@ def assess_clip(
     device: torch.device | None = None,
 ) -> tuple[ProtocolReport, InferenceOutput]:
     """对一段已解码的 ``Clip`` 做推理 + 判定。"""
-    output = predict_clip(rc, model, clip, device=device or resolve_device(rc.runtime.device))
+    # Protocol assessment owns its smoothing parameters; inference smoothing is
+    # disabled here so the same predictions are never smoothed twice.
+    output = predict_clip(
+        rc,
+        model,
+        clip,
+        device=device or resolve_device(rc.runtime.device),
+        apply_smoothing=False,
+    )
     labels = output.labels()
     report = build_report(
         clip_id=output.clip_id,
@@ -139,7 +148,7 @@ def save_report(report: ProtocolReport, directory: str | Path, *, stem: str | No
     name = stem or report.clip_id
     json_path = write_json(target / f"{name}.json", report.to_dict())
     md_path = target / f"{name}.md"
-    md_path.write_text(report_to_markdown(report), encoding="utf-8", newline="\n")
+    write_text(md_path, report_to_markdown(report))
     log.info("报告已保存：%s / %s", json_path.name, md_path.name)
     return json_path, md_path
 

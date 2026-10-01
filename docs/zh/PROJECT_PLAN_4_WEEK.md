@@ -2,6 +2,11 @@
 
 # 四周团队计划（4 人）—— PRS Practice Module
 
+**旧课程排期存档：**当前产品与执行顺序见
+[动态 YOLO 分类实施主计划](../IMPLEMENTATION_PLAN.zh-CN.md)。
+下面的日期、分工与提交要求只作为课程历史资料；GRU/TCN 消融属于可选研究，
+不是摄像头产品的验收关口。
+
 依据官方文件 [`docs/PRS-Practice-Module-brief.pdf`](/docs/PRS-Practice-Module-brief.pdf) 制定
 （NUS-ISS，© 2026 National University of Singapore —— 课程内部材料，请勿外传）。
 **下面每一项任务都挂在一个计分项上**，没有纯体力活。
@@ -103,13 +108,13 @@
 
 | 角色 | 成员 | 负责 | 主要模块 / 文件 | 服务于哪个计分项 |
 | --- | --- | --- | --- | --- |
-| **R1 — 数据与评估负责人** | **Shen Ziyi**（A0350940J） | 数据集、划分、指标、评估协议、统计结论 | `src/handwash/io/`、`src/handwash/data/`、`scripts/prepare_data.py`、`docs/DATA.md`、`docs/EXPERIMENTS.md` | 最终系统、最终报告（性能） |
-| **R2 — 模型与训练负责人** | **Wang Lepeng**（A0357864L） | 帧级分类器、训练流程、基线、超参 | `src/handwash/models/`、`src/handwash/pipelines/train.py`、`configs/models/`、`configs/experiments/` | 最终系统、最终报告（设计） |
-| **R3 — 时序与判定负责人** | **Zhu Jianyu**（A0353769L） | 时序融合、完整性规则、跨场景鲁棒性 | `src/handwash/models/temporal.py`、`src/handwash/core/protocol.py`、`configs/config.yaml` 的 `assess` 段 | 最终系统（本项目的差异点） |
-| **R4 — 产品、演示与交付负责人** | **Xu Wenzhe**（A0328771W） | 提案、可运行 demo、视频、PPT、报告整合、ZIP、互评事务 | `docs/PROJECT_PROPOSAL.md`、`scripts/run_assess.py`、`deliverables/` | **提案、首次展示**、最终展示、最终报告、同伴互评 |
+| **R1 — 数据与评估负责人** | **成员 1** | 数据集、划分、指标、评估协议、统计结论 | `src/handwash/io/`、`src/handwash/data/`、`scripts/prepare_data.py`、`docs/DATA.md`、`docs/EXPERIMENTS.md` | 最终系统、最终报告（性能） |
+| **R2 — 模型与训练负责人** | **成员 2** | 帧级分类器、训练流程、基线、超参 | `src/handwash/models/`、`src/handwash/pipelines/train.py`、`configs/models/`、`configs/experiments/` | 最终系统、最终报告（设计） |
+| **R3 — 时序与判定负责人** | **成员 3** | 时序融合、完整性规则、实时推理服务、跨场景鲁棒性 | `src/handwash/models/temporal.py`、`src/handwash/core/protocol.py`、`configs/config.yaml` 的 `assess` 段 | 最终系统（本项目的差异点） |
+| **R4 — 产品、演示与交付负责人** | **成员 4** | 提案、外接摄像头网页、可运行 demo、视频、PPT、报告整合、ZIP、互评事务 | `docs/PROJECT_PROPOSAL.md`、`scripts/run_assess.py`、`deliverables/` | **提案、首次展示**、最终展示、最终报告、同伴互评 |
 
-Canvas 分组编号：**43**。注意提案截止 **2026-09-30**，内容见
-[`PROJECT_PROPOSAL.md`](/docs/zh/PROJECT_PROPOSAL.md)（已写好可直接粘贴）。
+Canvas 分组编号请在本地填写。注意提案截止 **2026-09-30**，内容见
+[`PROJECT_PROPOSAL.md`](/docs/zh/PROJECT_PROPOSAL.md)（公开版使用占位信息）。
 
 > **这份分工是建议值，请在启动会上确认或互换。** 它按"每个人本来就会碰的东西"来分，
 > 并且把关键路径前置：R1 拿下所有结果都依赖的基础（划分不对，任何准确率都没有意义），
@@ -139,7 +144,7 @@ R4 负责两个提交关卡（9/30 提案、10/6 展示）和两个最终关卡�
 | # | 任务 | 负责人 | 交付物（证据） |
 | --- | --- | --- | --- |
 | 1.1 | **启动会（45 分钟）：确认或互换第 2 节的分工，定下「四项选三项」的说法** | 全组 | 第 2 节分工表已确认 |
-| 1.2 | 确认 Canvas 分组编号（**43**），确认 4 人都已入组 | [R4] | Canvas 分组截图 |
+| 1.2 | 确认 Canvas 分组编号，确认 4 人都已入组 | [R4] | Canvas 分组截图 |
 | 1.3 | **把提案写进 `docs/Project_Proposal_Template.docx`** —— 内容见 `docs/PROJECT_PROPOSAL.md`（可直接粘贴） | [R4] + 全组 | `deliverables/project_proposal.pdf` |
 | 1.4 | **把提案提交到 Canvas —— 截止 9/30。不要拖到 30 号当天** | [R4] | 提交回执 |
 | 1.5 | 下载 Kaggle 小数据集；跑 `prepare_data.py --inspect` 核对标签映射 | [R1] | `data/processed/kaggle/split_report.json` |
@@ -171,9 +176,9 @@ R4 负责两个提交关卡（9/30 提案、10/6 展示）和两个最终关卡�
 | 2.1 | 排练两遍；卡时间；定下谁讲哪几页 | 全组 | 排练记录 |
 | 2.2 | **完成首次展示 —— 10/6 09:00–18:00，Zoom**（5%） | [R4] 主讲 | PPT + 出席记录 |
 | 2.3 | 逐条记下老师反馈，并转成任务 | [R4] | 反馈记入 `docs/EXPERIMENTS.md` |
-| 2.4 | 准备 PSKUS 子集：按原始视频划分、抽帧、重建 manifest | [R1] | `split_report.json`（三个 split 的段数） |
-| 2.5 | 泄漏审计：跑校验，确认没有原始视频跨 split | [R1] | `docs/EXPERIMENTS.md` 里的审计结论 |
-| 2.6 | 训练主模型（`exp02`：YOLO26n-cls + GRU），记录全部曲线 | [R2] | `outputs/e2_*/models/best.pt` + `history.json` |
+| 2.4 | 清洗 PSKUS 子集并核查标签与时间戳；按原始视频划分后抽帧 | [R1] | 版本化 manifest、人工抽查表、划分报告 |
+| 2.5 | 核查重复片段与数据泄漏，在云端训练前冻结 train/val/test | [R1] | 数据版本及 `docs/EXPERIMENTS.md` 中的审计结论 |
+| 2.6 | 先在云端训练逐帧基线；数据关口通过后再训练 `exp02` | [R2] | 基线权重、就绪后的 `outputs/e2_*/models/best.pt`、训练曲线 |
 | 2.7 | 基线矩阵：在同一划分上跑 MobileNetV2（帧级）与 YOLOv8n-cls（帧级） | [R2] | 实验记录里 3 行可比数据 |
 | 2.8 | 把时序头接到已训练 checkpoint 上（冻结骨干 → 只训头） | [R3] | `outputs/e2_temporal/` |
 | 2.9 | 在真实片段上端到端跑通 `assess`：报告 JSON + Markdown | [R3] | `outputs/*/assess/<clip>.md` |
@@ -202,8 +207,9 @@ R4 负责两个提交关卡（9/30 提案、10/6 展示）和两个最终关卡�
 | 3.6 | 错误分析：挑 5 个失败案例，逐个归因为视觉困难（遮挡/动作相似）或流程困难（乱序/过快） | [R2] | `deliverables/error_analysis.md` |
 | 3.7 | 自采验证集：每人 4–6 段，覆盖 完整/漏步/换序/过短 | 全组 | 视频 + `docs/SELF_RECORDING.md` 的表格 |
 | 3.8 | 与人工答案对比：模型判定 vs 人工判定，完整性/顺序准确率 | [R4] | `assess_vs_ground_truth.csv` |
-| 3.9 | 把 demo 收拾到"陌生人照 README 5 分钟能跑起来" | [R4] | 演示脚本 + `docs/DEMO.md` |
+| 3.9 | 在本地视频上验证云端选出的权重，再实现实时推理服务 | [R3] | 本地视频报告 + 实时会话接口 |
 | 3.10 | 起草报告：工具/技术、系统设计、性能、发现 | [R4] + 全组 | `deliverables/report_draft_v1.pdf` |
+| 3.11 | 实现外接摄像头网页，并连接实时推理服务 | [R4] | 浏览器中的画面、步骤进度和最终报告 |
 
 **第 3 周验收**
 - [ ] 报告的核心表（消融）已完成且可复现
@@ -222,7 +228,7 @@ R4 负责两个提交关卡（9/30 提案、10/6 展示）和两个最终关卡�
 | # | 任务 | 负责人 | 交付物（证据） |
 | --- | --- | --- | --- |
 | 4.1 | 周一同步会上**功能冻结**，之后只修 bug | 全组 | 决定记入实验记录 |
-| 4.2 | 冻结可运行系统：一条命令装好，一条命令跑 demo | [R4] | 在**干净机器 / 全新环境**上验证过 |
+| 4.2 | 冻结可运行系统：连接外接摄像头、启动服务并完成一次网页演示 | [R4] | 在**干净机器 / 全新环境**上验证过 |
 | 4.3 | 把数据集 + 代码 + 模型文件打进 `deliverables/` | [R1] | 数据集说明 + 下载指引 |
 | 4.4 | 最终报告：各节写完、图定稿、参考文献齐全 | [R4] + 全组 | `deliverables/final_report.pdf`（终稿前一版） |
 | 4.5 | 每人起草自己的 **1–2 页个人报告** | 全组 | 4 份草稿 |

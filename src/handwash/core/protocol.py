@@ -264,8 +264,6 @@ def check_coverage(
 
 def check_order(
     sequence: Sequence[Step],
-    *,
-    check_faucet: bool = False,
 ) -> list[tuple[Step, Step]]:
     """顺序判定：返回所有**逆序对** (前, 后)，即后出现的步骤序号小于前面的。
 
@@ -276,8 +274,6 @@ def check_order(
     单独说明，而不是静默忽略——因为"顺序异常"本身就是作业要检出的目标。
     """
     who_seq: list[Step] = [s for s in sequence if s in STEP_ORDER]
-    if check_faucet:
-        pass  # 预留：需要把开关水龙头纳入顺序约束时在此扩展，并在 config 里加开关
     inversions: list[tuple[Step, Step]] = []
     for i in range(len(who_seq)):
         for j in range(i + 1, len(who_seq)):
@@ -364,6 +360,10 @@ def build_report(
     labels = list(labels)
     if not labels:
         raise ProtocolError(f"视频 {clip_id} 的标签序列为空，无法评估")
+    if confidences is not None and len(confidences) != len(labels):
+        raise ProtocolError(
+            f"confidences 长度 {len(confidences)} 与 labels 长度 {len(labels)} 不一致"
+        )
 
     if apply_smoothing:
         smoothed, smoothed_conf = smooth_labels(
@@ -460,6 +460,19 @@ def build_report(
                     severity="info",
                 )
             )
+
+    if cfg.require_faucet_events:
+        observed = set(smoothed)
+        for event in (Step.FAUCET_ON, Step.FAUCET_OFF):
+            if event not in observed:
+                violations.append(
+                    ProtocolViolation(
+                        kind="missing_faucet_event",
+                        step=event,
+                        detail=f"未检出水龙头事件：{STEP_ZH[event]}",
+                        severity="warning",
+                    )
+                )
 
     if total_wash_s < cfg.min_total_duration_s:
         violations.append(

@@ -1,4 +1,6 @@
-"""项目提案正文内容（中文版），供 ``scripts/make_proposal.py --lang zh`` 使用。
+"""历史项目提案正文内容（中文版），供 ``scripts/make_proposal.py --lang zh`` 使用。
+
+当前产品路径见 docs/IMPLEMENTATION_PLAN.zh-CN.md；重新提交前需更新此稿。
 
 与 ``proposal_content.py`` 的关系
 --------------------------------

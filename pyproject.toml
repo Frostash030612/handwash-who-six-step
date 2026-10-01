@@ -15,12 +15,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "handwash"
 version = "0.1.0"
-description = "基于视频的 WHO 六步洗手动作识别与完整性评估（classification + temporal assessment）"
+description = "外接摄像头实时 YOLO 洗手动作分类与 WHO 六步完整性评估"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Proprietary" }
 authors = [{ name = "Group Project PRS" }]
-keywords = ["hand-hygiene", "WHO-six-steps", "video-classification", "YOLO26", "temporal-model"]
+keywords = ["hand-hygiene", "WHO-six-steps", "live-camera", "YOLO-classification"]
 classifiers = [
   "Private :: Do Not Upload",
   "Programming Language :: Python :: 3.10",
@@ -32,6 +32,7 @@ classifiers = [
 # --- 运行时依赖（宽松范围；精确锁定见 environment.yml）---------------------
 dependencies = [
   "numpy>=1.26,<3",
+  "Pillow>=10.0",
   "PyYAML>=6.0",
   "pandas>=2.0",
   "scikit-learn>=1.3",
@@ -64,7 +65,7 @@ all = [
 handwash = "handwash.cli:main"
 
 [project.urls]
-"项目计划" = "docs/PROJECT_PLAN.md"
+"项目计划" = "docs/IMPLEMENTATION_PLAN.zh-CN.md"
 "修改规则" = "CONTRIBUTING.md"
 "架构说明" = "docs/ARCHITECTURE.md"
 
@@ -81,7 +82,7 @@ include = ["handwash*"]
 exclude = ["tests*", "scripts*"]
 
 [tool.setuptools.package-data]
-handwash = ["py.typed"]
+handwash = ["py.typed", "static/*.html"]
 
 # ============================================================================
 # pytest —— 只允许一个测试目录 tests/，且必须与 src/ 分层对应

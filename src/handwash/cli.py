@@ -52,7 +52,7 @@ def split_argv(argv: Sequence[str]) -> tuple[list[str], list[str]]:
 
     判定规则：形如 ``^[A-Za-z_][A-Za-z0-9_.]*=`` 的才算配置覆盖
     （即等号左边必须是合法的"点分键名"）。这样 ``config=configs/x.yaml``
-    会被正确识别，而 Windows 绝对路径 ``E:/data/x`` 不会被误判。
+    会被正确识别，而作为普通参数传入的绝对路径不会被误判。
     """
     plain: list[str] = []
     overrides: list[str] = []
@@ -75,7 +75,9 @@ def build_parser() -> argparse.ArgumentParser:
             "  handwash prepare config=configs/data/kaggle.yaml\n"
             "  handwash train config=configs/experiments/smoke.yaml train.epochs=2\n"
             "  handwash evaluate --checkpoint outputs/run/models/best.pt\n"
-            "  handwash assess --video data/external/self/demo.mp4\n"
+            "  handwash infer --video demo.mp4 --checkpoint outputs/run/models/best.pt\n"
+            "  handwash assess --video demo.mp4 --checkpoint outputs/run/models/best.pt\n"
+            "  handwash camera config=configs/experiments/live_yolo_frame.yaml\n"
             "\n配置覆盖统一写作 key.sub=value（与 Makefile 一致）。"
         ),
     )
@@ -98,7 +100,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_train = sub.add_parser("train", help="训练模型")
     p_train.add_argument("--epochs", type=int, default=None, help="覆盖 train.epochs（冒烟测试用）")
     p_train.add_argument("--run-name", default=None, help="覆盖 runtime.run_name（输出目录名）")
-    p_train.add_argument("--no-synthetic", action="store_true", help="禁止回退到合成数据")
+    p_train.add_argument("--no-synthetic", action="store_true", help="禁止使用显式配置的合成数据")
 
     p_eval = sub.add_parser("evaluate", help="评估：内部测试 + 跨场景")
     p_eval.add_argument("--checkpoint", default=None, help="checkpoint 路径（默认取 best.pt）")
@@ -106,12 +108,18 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_infer = sub.add_parser("infer", help="推理单段视频，输出逐帧预测")
     p_infer.add_argument("--video", required=True, help="视频文件路径")
+    p_infer.add_argument("--checkpoint", default=None, help="checkpoint 路径（默认取 best.pt）")
 
     p_assess = sub.add_parser("assess", help="WHO 完整性评估（漏步/乱序/时长）")
     p_assess.add_argument("--video", default=None, help="单个视频文件")
     p_assess.add_argument("--folder", default=None, help="整个目录的视频")
     p_assess.add_argument("--checkpoint", default=None, help="checkpoint 路径（默认取 best.pt）")
     p_assess.add_argument("--json", action="store_true", help="以 JSON 输出报告（供程序调用）")
+
+    p_camera = sub.add_parser("camera", help="启动外接摄像头的实时 YOLO 分类网页")
+    p_camera.add_argument("--checkpoint", default=None, help="权重路径；正式版默认 best.pt，--demo-exp 默认根目录 exp.pt")
+    p_camera.add_argument("--port", type=int, default=8765, help="本机网页端口（默认 8765）")
+    p_camera.add_argument("--demo-exp", action="store_true", help="使用根目录 exp.pt 七类演示模型")
 
     sub.add_parser("doctor", help="环境与配置自检")
     sub.add_parser("config", help="打印最终生效的配置（含 config_hash）")
@@ -195,6 +203,12 @@ def _dispatch(args: argparse.Namespace, overrides: dict) -> int:
             print(f"manifest：{result.manifest_path}")
         for split, info in result.splits.items():
             print(f"  {split:<8} {info['num_clips']:>5} 段 / {info['num_frames']:>7} 帧")
+        if args.stage == "scan":
+            print("下一步：handwash prepare --stage split")
+        elif args.stage == "split":
+            print("下一步：handwash prepare --stage frames")
+        elif result.manifest_path:
+            print("下一步：handwash train")
         return EXIT_OK
 
     if command == "train":
@@ -203,7 +217,7 @@ def _dispatch(args: argparse.Namespace, overrides: dict) -> int:
         if args.run_name:
             overrides = {**overrides, "runtime": {**overrides.get("runtime", {}), "run_name": args.run_name}}
         rc = _load(args, overrides)
-        result = train(rc, max_epochs=args.epochs)
+        result = train(rc, max_epochs=args.epochs, allow_synthetic=not args.no_synthetic)
         print(f"训练完成：best val macro-F1 = {result.best_metric:.4f}")
         print(f"checkpoint：{result.best_checkpoint}")
         if result.used_synthetic_data:
@@ -219,14 +233,21 @@ def _dispatch(args: argparse.Namespace, overrides: dict) -> int:
         return EXIT_OK
 
     if command == "infer":
-        from handwash.pipelines.infer import predict_video, save_predictions
+        from handwash.pipelines.infer import predict_video, save_overlay_video, save_predictions
 
         rc = _load(args, overrides)
-        model = _load_model(rc, checkpoint=None)
+        model = _load_model(rc, checkpoint=args.checkpoint)
         output = predict_video(rc, model, args.video)
         target = rc.resolve_out_dir() / "infer"
-        path = save_predictions(output, target / f"{Path(args.video).stem}_frames.jsonl")
-        print(f"推理完成：{output.prediction.num_frames} 帧，逐帧结果 -> {path}")
+        print(f"推理完成：{output.prediction.num_frames} 帧")
+        if rc.infer.save_frame_predictions:
+            path = save_predictions(output, target / f"{Path(args.video).stem}_frames.jsonl")
+            print(f"逐帧结果 -> {path}")
+        if rc.infer.save_overlay_video:
+            overlay = save_overlay_video(
+                rc, args.video, output, target / f"{Path(args.video).stem}_overlay.gif"
+            )
+            print(f"叠加预览 -> {overlay}")
         return EXIT_OK
 
     if command == "assess":
@@ -244,37 +265,48 @@ def _dispatch(args: argparse.Namespace, overrides: dict) -> int:
                 from handwash.pipelines.assess import report_to_markdown
 
                 print(report_to_markdown(report))
-            return EXIT_OK if report.is_complete else EXIT_PROTOCOL
+            # A detected protocol violation is the assessment result, not a
+            # command failure. EXIT_PROTOCOL is reserved for ProtocolError.
+            return EXIT_OK
         if args.folder:
             reports = assess_folder(rc, model, args.folder)
+            if not reports:
+                raise HandwashError(
+                    "目录中没有成功评估的视频",
+                    hint="检查目录里是否有受支持的视频文件，以及视频解码和 checkpoint 是否正常。",
+                )
             for report in reports:
                 verdict = "完整" if report.is_complete else "不完整"
                 print(f"{report.clip_id:<24} {verdict:<6} 得分 {report.overall_score:.2f}")
             return EXIT_OK
         raise HandwashError("assess 需要 --video 或 --folder", hint="见 handwash assess -h")
 
+    if command == "camera":
+        from handwash.camera_app import serve_camera
+
+        if args.demo_exp:
+            runtime = {"run_name": "exp_demo", **overrides.get("runtime", {})}
+            overrides = {**overrides, "runtime": runtime}
+        rc = _load(args, overrides)
+        serve_camera(rc, checkpoint=args.checkpoint, port=args.port, demo_exp=args.demo_exp)
+        return EXIT_OK
+
     raise HandwashError(f"未实现的子命令：{command}")
 
 
 def _load_model(rc, *, checkpoint: str | None):
     """按配置加载模型（评估/推理共用）。"""
-    from handwash.core.labels import get_label_space
-    from handwash.models.checkpoint import load_checkpoint
-    from handwash.models.factory import build_model
     from handwash.pipelines.common import resolve_device
+    from handwash.pipelines.evaluate import _load_model_from_checkpoint
 
     device = resolve_device(rc.runtime.device)
-    model = build_model(rc).to(device)
     ckpt = Path(checkpoint) if checkpoint else checkpoint_path(rc.resolve_out_dir())
-    if ckpt.exists():
-        space = get_label_space(rc.label_space)
-        payload = load_checkpoint(
-            ckpt, map_location=device, expect_num_classes=len(space), expect_label_space=rc.label_space
+    if not ckpt.is_file():
+        raise HandwashError(
+            f"找不到已训练的 checkpoint：{ckpt}",
+            hint="推理与完整性评估必须指定项目格式的训练权重；先训练或传入 --checkpoint。",
         )
-        model.load_state_dict(payload["state"], strict=False)
-    else:
-        log.warning("未找到 checkpoint（%s），本次使用未微调的预训练权重", ckpt)
-    model.eval()
+    model, _ = _load_model_from_checkpoint(rc, ckpt, device=device)
     return model
 
 

@@ -1,4 +1,7 @@
-"""项目提案的正文内容（供 ``scripts/make_proposal.py`` 生成 DOCX 使用）。
+"""历史项目提案的正文内容（供 ``scripts/make_proposal.py`` 生成 DOCX 使用）。
+
+此草稿保留原课程提案；当前产品路径见 docs/IMPLEMENTATION_PLAN.zh-CN.md。
+重新提交提案前需同步更新中英文内容。
 
 为什么把文案单独放一个模块（CONTRIBUTING.md R3）
 --------------------------------------------------

@@ -24,12 +24,14 @@ from handwash.paths import ensure_dir
 __all__ = [
     "read_json",
     "write_json",
+    "write_jsonl",
     "append_jsonl",
     "read_jsonl",
     "write_csv",
     "read_csv",
     "read_yaml",
     "write_yaml",
+    "write_text",
     "list_files",
     "list_videos",
     "file_size_mb",
@@ -84,6 +86,12 @@ def write_json(path: str | Path, payload: Any, *, indent: int = 2) -> Path:
     """写 JSON（UTF-8、保留中文、末尾换行）。"""
     text = json.dumps(payload, ensure_ascii=False, indent=indent, sort_keys=False)
     return _atomic_write_text(Path(path), text + "\n")
+
+
+def write_jsonl(path: str | Path, rows: Iterable[Mapping[str, Any]]) -> Path:
+    """原子覆盖写 JSONL，适用于可重复生成的预测结果。"""
+    content = "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows)
+    return _atomic_write_text(Path(path), content)
 
 
 def append_jsonl(path: str | Path, rows: Iterable[Mapping[str, Any]]) -> Path:
@@ -169,6 +177,11 @@ def read_yaml(path: str | Path) -> dict[str, Any]:
 def write_yaml(path: str | Path, payload: Mapping[str, Any]) -> Path:
     text = yaml.safe_dump(dict(payload), allow_unicode=True, sort_keys=False, default_flow_style=False)
     return _atomic_write_text(Path(path), text)
+
+
+def write_text(path: str | Path, content: str) -> Path:
+    """原子写 UTF-8 文本（Markdown 报告等）。"""
+    return _atomic_write_text(Path(path), content)
 
 
 # ============================================================================

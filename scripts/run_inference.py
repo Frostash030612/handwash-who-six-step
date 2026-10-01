@@ -7,15 +7,6 @@
     python scripts/run_inference.py --video demo.mp4 --checkpoint outputs/e2/models/best.pt
 """
 
-#!/usr/bin/env python
-"""推理脚本：视频 -> 逐帧动作预测（JSONL + 可选 GIF 叠加预览）。
-
-用法::
-
-    python scripts/run_inference.py --video data/external/self_recorded/full/demo.mp4
-    python scripts/run_inference.py --video demo.mp4 --checkpoint outputs/e2/models/best.pt
-"""
-
 import sys
 from pathlib import Path
 
@@ -47,15 +38,20 @@ def main() -> int:
     rc = load_config_from_args(args, parse_overrides(override_items))
 
     from handwash.cli import _load_model
-    from handwash.pipelines.infer import predict_video, save_predictions
+    from handwash.pipelines.infer import (
+        predict_video,
+        save_overlay_video,
+        save_predictions,
+    )
 
     model = _load_model(rc, checkpoint=args.checkpoint)
     output = predict_video(rc, model, args.video)
 
     out_dir = rc.resolve_out_dir() / "infer"
-    path = save_predictions(output, out_dir / f"{Path(args.video).stem}_frames.jsonl")
     print(f"推理完成：{output.prediction.num_frames} 帧，fps={output.fps:.1f}")
-    print(f"逐帧结果：{path}")
+    if rc.infer.save_frame_predictions:
+        path = save_predictions(output, out_dir / f"{Path(args.video).stem}_frames.jsonl")
+        print(f"逐帧结果：{path}")
 
     counts: dict[str, int] = {}
     for label in output.labels():
@@ -64,44 +60,12 @@ def main() -> int:
     for name, count in sorted(counts.items(), key=lambda kv: -kv[1]):
         print(f"  {name:<32} {count:>6}")
 
-    if args.overlay:
-        _write_overlay(rc, args.video, output, out_dir)
+    if args.overlay or rc.infer.save_overlay_video:
+        path = save_overlay_video(
+            rc, args.video, output, out_dir / f"{Path(args.video).stem}_overlay.gif"
+        )
+        print(f"叠加预览：{path}")
     return 0
-
-
-def _write_overlay(rc, video_path: str, output, out_dir: Path) -> None:
-    """把预测标签画在帧上，导出一段 GIF，便于答辩时"看得见"。
-
-    GIF 是刻意选择：不需要额外编码器即可生成，且任何电脑都能播放。
-    """
-    import numpy as np
-
-    from handwash.core.labels import STEP_ZH
-    from handwash.io.video import extract_frames, write_video
-
-    out_dir.mkdir(parents=True, exist_ok=True)
-    _, _, frames = extract_frames(video_path, sample_fps=rc.dataset.prep.fps)
-    labels = output.labels()
-    confidences = output.confidences()
-
-    try:
-        from PIL import Image, ImageDraw
-    except ImportError:  # pragma: no cover
-        log.warning("未安装 Pillow，跳过叠加预览")
-        return
-
-    drawn = []
-    for index, frame in enumerate(frames[: len(labels)]):
-        image = Image.fromarray(frame).convert("RGB")
-        draw = ImageDraw.Draw(image, "RGBA")
-        step = labels[index]
-        text = f"{step.order_index or '-'} {STEP_ZH.get(step, step.value)}  {confidences[index]:.2f}"
-        draw.rectangle([0, 0, image.width, 26], fill=(0, 0, 0, 160))
-        draw.text((6, 6), text, fill=(255, 255, 255, 255))
-        drawn.append(np.asarray(image))
-
-    target = write_video(drawn, out_dir / f"{Path(video_path).stem}_overlay.gif", fps=output.fps)
-    print(f"叠加预览：{target}")
 
 
 if __name__ == "__main__":

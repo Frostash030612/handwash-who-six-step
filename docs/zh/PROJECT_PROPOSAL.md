@@ -2,6 +2,10 @@
 
 # 项目提案 —— 内容包
 
+> 历史课程提案草稿。其中 GRU/TCN 与录制视频演示不代表当前产品。
+> 当前实施以[动态 YOLO 主计划](/docs/IMPLEMENTATION_PLAN.zh-CN.md)为准；
+> 若以后重新提交提案，须先修改本草稿及生成器文案。
+
 可直接粘贴进 [`Project_Proposal_Template.docx`](/docs/Project_Proposal_Template.docx) 的内容。
 **截止：2026-09-30。** 打开 DOCX 模板，把下表各栏用下面的文字填上，导出 PDF，
 每队交一份到 Canvas → Assignments → Practice Module。
@@ -10,12 +14,12 @@
 DOCX 与本文件因此不可能互相漂移：
 
 ```bash
-python scripts/make_proposal.py --lang en --group-id 43 \
-    --members "Shen Ziyi:A0350940J" "Wang Lepeng:A0357864L" \
-              "Zhu Jianyu:A0353769L" "Xu Wenzhe:A0328771W"
-python scripts/make_proposal.py --lang zh --group-id 43 \
-    --members "Shen Ziyi:A0350940J" "Wang Lepeng:A0357864L" \
-              "Zhu Jianyu:A0353769L" "Xu Wenzhe:A0328771W"
+python scripts/make_proposal.py --lang en --group-id 0 \
+    --members "Member One:A0000000X" "Member Two:A0000000Y" \
+              "Member Three:A0000000Z" "Member Four:A0000000W"
+python scripts/make_proposal.py --lang zh --group-id 0 \
+    --members "Member One:A0000000X" "Member Two:A0000000Y" \
+              "Member Three:A0000000Z" "Member Four:A0000000W"
 ```
 
 产物：`deliverables/project_proposal_en.docx` 与 `deliverables/project_proposal_zh.docx`
@@ -27,7 +31,7 @@ python scripts/make_proposal.py --lang zh --group-id 43 \
 > `Group Members (name, Student ID)` · `Sponsor/Client` · `Background/Aims/Objectives` ·
 > `Project Descriptions`。
 >
-> 分组编号与组员名单已在下面填好（Canvas 分组 **43**）。其余内容都已写好。
+> 下方分组编号和组员名单为公开占位信息；课程提交前请在本地替换。
 
 ---
 
@@ -54,16 +58,16 @@ Recognition and Procedure Completeness Assessment
 ## 3. Group ID（Canvas 分组编号）
 
 ```
-43
+0（请在本地替换为实际分组编号）
 ```
 
 ## 4. Group Members（组员姓名、学号）
 
 ```
-[1] Shen Ziyi  — A0350940J     （数据与评估负责人）
-[2] Wang Lepeng — A0357864L    （模型与训练负责人）
-[3] Zhu Jianyu — A0353769L     （时序与判定负责人）
-[4] Xu Wenzhe  — A0328771W     （产品、演示与交付负责人）
+[1] Member One   — A0000000X  （数据与评估负责人）
+[2] Member Two   — A0000000Y  （模型与训练负责人）
+[3] Member Three — A0000000Z  （时序与判定负责人）
+[4] Member Four  — A0000000W  （产品、演示与交付负责人）
 ```
 
 ## 5. Sponsor/Client（委托方）
@@ -254,8 +258,8 @@ Git（PR 评审 + CI）· conda（可复现环境）。
 
 - [x] `Date of proposal` 已填
 - [x] `Project Title` 已填（照抄第 2 节）
-- [x] Canvas 分组编号（**43**）已填，且 4 人均已入组
-- [x] 4 人的姓名**与学号**齐全且正确
+- [ ] 在本地替换占位分组编号，并确认 4 人均已入组
+- [ ] 课程提交前在本地替换占位姓名与学号
 - [x] `Sponsor/Client` 一栏填写 `Not applicable — self-initiated project.`
 - [x] `Background/Aims/Objectives` 已生成，目标表格排版正常
 - [x] `Project Descriptions` 已生成，且第 7.2 节让"四项选三项"的覆盖清晰无歧义

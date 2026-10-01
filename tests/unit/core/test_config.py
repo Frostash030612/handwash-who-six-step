@@ -410,11 +410,11 @@ def test_out_of_range_or_unknown_enum_values_raise(
 
 # --- AppConfig 默认值 -------------------------------------------------------
 def test_app_config_from_empty_mapping_uses_documented_defaults() -> None:
-    """空 mapping 代表"全用默认值"，默认值本身必须自洽（kaggle 档案是默认数据集）。"""
+    """空 mapping 代表"全用默认值"，默认值指向当前 PSKUS 主线。"""
     config = AppConfig.from_mapping({})
     assert config.schema_version == CONFIG_SCHEMA_VERSION
-    assert config.dataset.name == "kaggle"
-    assert config.label_space_name() == "kaggle"
+    assert config.dataset.name == "pskuss"
+    assert config.label_space_name() == "pskuss"
     assert config.model.image_size == 224
     assert config.split.train + config.split.val + config.split.test == pytest.approx(1.0)
 
@@ -430,7 +430,7 @@ def test_app_config_defaults_are_self_consistent_and_validatable() -> None:
     config.validate()
     assert config.datasets, "默认应当带一套数据集档案"
     assert config.dataset.name in config.datasets
-    assert config.label_space_name() == "kaggle"
+    assert config.label_space_name() == "pskuss"
 
 
 def test_app_config_from_mapping_accepts_complete_payload(config_file: Path) -> None:

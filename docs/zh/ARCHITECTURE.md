@@ -2,6 +2,23 @@
 
 # 架构说明（ARCHITECTURE）
 
+## 当前产品主线
+
+当前产品以 YOLO **图像分类**为核心。高质量数据集按原视频分组后在云端训练逐帧模型；
+部署电脑载入对应的项目 checkpoint 与配置。浏览器读取外接摄像头，
+按采样率把 JPEG 画面发给本机服务，展示当前动作和六步进度。
+
+```
+清洗视频与标注 → 云端训练/评估 → 项目 best.pt + 对应配置 → 本机 camera_app.py
+外接摄像头 → 浏览器 → 采样 JPEG → pipelines/live.py → YOLO 逐帧分类
+                                                   → 只用过去帧稳定实时显示
+                                                   → core.protocol 最终报告 → 浏览器
+```
+
+实时服务只使用已拍到的画面；缺帧过久的时间段在报告时间轴上记为未知，
+避免把未观测时间计入某个动作。旧 GRU/TCN 与 PE 方案保留为可选研究，
+不是摄像头产品的前置条件。下文的离线流程继续服务数据准备、模型验证和录制视频分析。
+
 本文件解释**为什么这样分层**，以及**为什么`core/` 的接口不能随便改**。
 读代码前先读这份文件，能省掉大量"这个函数为什么在这儿"的困惑。
 
@@ -13,7 +30,7 @@
                         ┌──────────────────────────────────────────┐
    L4  入口与编排        │  cli.py  cli_doctor.py  scripts/*.py     │
                         │  pipelines/: prepare train evaluate      │
-                        │              infer  assess  common       │
+                        │              infer assess live common    │
                         └────────────────┬─────────────────────────┘
                                          │ 可以 import 下面所有层
                         ┌────────────────▼─────────────────────────┐
@@ -189,6 +206,45 @@ class MyModel(BaseClassifier): ...
 ```
 
 ### 已通过的 RFC
+
+#### RFC-0006：将 PSKUS 设为实时 YOLO 分类的默认数据集
+- 日期：2026-10-01    提出人：项目负责人请求    状态：已通过
+- 现状：基础配置仍选择 Kaggle 原型数据，而当前产品要用清洗后的 PSKUS 数据训练 YOLO
+  逐帧分类模型；直接运行 `handwash train` 可能在错误的数据上训练。
+- 改动：`DataConfig` 默认值、数据集档案根目录和基础 YAML 改为 `pskuss` 及其标签空间，
+  保留非洗手类别；`DataPrepConfig` 默认值同步基础 YAML 的 224 像素与 JPEG 质量 85；
+  旧 Kaggle 单帧实验显式选择 Kaggle，保持实验语义。
+- 影响：之前依赖隐式 Kaggle 默认值的命令或自定义实验现在会选择 PSKUS，训练数据和
+  输出通道都会变化。
+- 迁移：旧基线显式设置 `dataset.name: kaggle`、`dataset.label_space: kaggle`、
+  `dataset.root: data/raw/kaggle`、`dataset.include_non_wash: false`，或叠加
+  `configs/data/kaggle.yaml`；已有 checkpoint 仍按其记录的完整配置解释。
+- 同意：本工作区中的项目负责人明确请求。
+
+#### RFC-0005：让时序窗口与 checkpoint 选择采用同一推理路径
+- 日期：2026-10-01    提出人：项目负责人请求    状态：已通过
+- 现状：clip 训练使用不重叠窗口，推理使用另一套硬编码的重叠窗口；`model.temporal.stride`
+  没有控制训练或评估。即使评估使用 TTA、重叠窗口平均或概率平滑，验证选模仍按原始窗口输出。
+  `train.mode=hybrid` 也会被当作 clip 训练，实际并没有联合训练目标。clip 内每一帧还会独立
+  随机增强，可能引入不存在的帧间闪烁。
+- 改动：训练、验证和推理共用窗口/步长；验证先按原始帧平均概率，再按配置的推理方式
+  做 checkpoint 选择；时序头必须用 clip 训练并用 clip/hybrid 推理；拒绝尚未实现的 hybrid 训练；
+  同一视频同一轮训练的所有帧共用增强随机参数；配置结构版本升至 2。
+- 影响：时序模型训练和验证指标会变化。E2、E3-C/D、E4 需要重新训练后才能与新结果比较。
+  逐帧模型 E1、E3-A/B 结构不变；若需 schema 2 的 `config_hash`，可用原 checkpoint 重新评估。
+- 迁移：自定义配置将 `schema_version` 更新为 2；时序头设置 `train.mode=clip` 和
+  `infer.mode=clip` 或 `hybrid`；保持 `1 <= stride <= window`。
+- 同意：本工作区中的项目负责人明确请求。
+
+#### RFC-0004：准确建模公开的 METC 标签空间
+- 日期：2026-10-01    提出人：项目负责人请求    状态：已通过
+- 现状：旧 `metc` 命名空间含 9 个通道，而 Zenodo 公开子集只有 movement code 0..6
+  （0=other，1..6=WHO 六步）。
+- 改动：增加数字别名但不重排旧通道；新增七类顺序的 `metc_public`；增加 JSON/视频准备和外部评估。
+- 影响：旧 `metc` checkpoint 的通道顺序不变。新 METC manifest 使用七类；之前依赖错误标签假设的
+  METC 指标需要重新生成。
+- 迁移：新 METC 准备配置用 `label_space: metc_public`；跨域评估按源 checkpoint 的规范标签空间映射。
+- 同意：本工作区中的项目负责人明确请求。
 
 #### RFC-0001：统一模型输出为 `(B, T, C)`
 - 日期：项目初始化    状态：已通过（本框架的初始设计）

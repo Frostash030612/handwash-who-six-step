@@ -8,24 +8,30 @@
 #   正确用法：
 #     1) 用 PSKUS 训练模型（configs/data/pskuss.yaml）；
 #     2) 把 METC 的帧准备好后，作为 external split 评估：
-#            python -m handwash.cli evaluate \
-#                --checkpoint outputs/pskuss_run/models/best.pt eval.splits=[external]
+#            python -m handwash.cli evaluate config=configs/experiments/exp04_cross_domain.yaml \
+#                --checkpoint outputs/e4_cross_domain/models/best.pt --splits test external
 #   不要用 METC 训练再在 METC 上测试 —— 那就不是跨场景实验了。
 #
-# 期望目录结构：
-#     data/raw/metc/<label_name>/<video>.mp4
-#     或 data/raw/metc/<clip_id>.csv（列含 frame / label）
+# Zenodo 发布结构：Interface_number_1..3 下为视频及同 stem 的逐帧 JSON 标注。
+# movement code: 0=other, 1..6=WHO 六步；公开子集没有 faucet_on/off 标签。
 # ============================================================================
 
 dataset:
   name: metc
   root: data/raw/metc
-  label_space: metc         # 9 类：六步 + faucet_on/off + other
+  label_space: metc_public  # 7 类：六步 + other，与公开标注一致
   include_non_wash: true
   prep:
-    fps: 5.0
+    # Match the 2 fps PSKUS cadence used by exp04's GRU checkpoint so each
+    # temporal window covers a comparable amount of real time at evaluation.
+    fps: 2.0
     resize_hw: [224, 224]
     min_frames_per_clip: 10
+
+datasets:
+  metc:
+    # 全部 METC clip 作为 external 评估集，不按训练/验证比例拆分。
+    external_only: true
 
 split:
   group_key: original_video
@@ -38,7 +44,7 @@ split:
 
 eval:
   splits: [external]
-  extra_datasets: [metc]
+  extra_datasets: []
 
 assess:
   min_total_duration_s: 40.0

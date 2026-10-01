@@ -15,7 +15,7 @@
 # ============================================================================
 
 # 配置结构版本：破坏性改动时才 +1（见 CHANGELOG.md）
-schema_version: 1
+schema_version: 2
 
 # ---------------------------------------------------------------------------
 # 项目标识：会出现在日志与产物元数据里
@@ -35,7 +35,7 @@ runtime:
   num_workers: 4           # Windows 下若报 DataLoader 错误，改成 0
   pin_memory: true
   log_level: INFO          # DEBUG / INFO / WARNING / ERROR
-  tracking: csv            # none | csv | tensorboard | wandb
+  tracking: csv            # none | csv（每轮同时记录 JSONL）
   tracking_project: handwash
   run_name: null           # null = 自动用时间戳；写死便于对比实验，如 baseline_v1
 
@@ -48,13 +48,13 @@ paths:
   cache_dir: .cache/handwash
 
 # ---------------------------------------------------------------------------
-# 当前使用的数据集（换个数据集做实验时改这里，或叠加 configs/data/*.yaml）
+# 当前主线数据集：清洗后的 PSKUS（其他数据集通过 configs/data/*.yaml 显式切换）
 # ---------------------------------------------------------------------------
 dataset:
-  name: kaggle             # 必须同时出现在下面的 datasets 段里
-  root: data/raw/kaggle
-  label_space: kaggle      # null 表示与 name 相同
-  include_non_wash: false  # 是否把开关水龙头等辅助动作也当类别
+  name: pskuss             # 必须同时出现在下面的 datasets 段里
+  root: data/raw/pskuss/extracted
+  label_space: pskuss      # null 表示与 name 相同
+  include_non_wash: true   # 保留 other / faucet_off 等非六步类别
   prep:
     fps: 5.0               # 抽帧率：动作级任务 5fps 足够，且显著省磁盘
     frame_step: 1
@@ -85,6 +85,8 @@ datasets:
     processed_dir: data/processed/metc
     frames_dir: data/processed/metc/frames
     manifest: data/processed/metc/manifest.csv
+    label_space: metc_public
+    external_only: true
     notes: "METC（Zenodo 5808789）：跨场景测试，72 名参与者"
   jurmala:
     root: data/raw/jurmala
@@ -128,10 +130,10 @@ model:
   pretrained: auto         # auto | true | false | 本地权重路径 | 权重名
   num_classes: null        # null = 由标签空间自动推导（**不要手写数字**）
   image_size: 224
-  normalize: zero_one      # YOLO 适配器必须用 zero_one（ultralytics 内部已归一化）
+  normalize: zero_one      # YOLO 分类模型输入为 [0, 1]，不要再做 ImageNet z-score
   dropout: 0.2
   temporal:
-    kind: gru              # gru | tcn | mean_pool | none
+    kind: none             # 默认基线逐帧训练；时序实验显式设为 gru / tcn / mean_pool
     hidden_size: 128
     num_layers: 1
     bidirectional: false   # true 会用到未来帧，不能用于实时演示
@@ -206,8 +208,8 @@ assess:
 # 推理
 # ---------------------------------------------------------------------------
 infer:
-  mode: clip               # frame | clip | hybrid
-  temporal_apply: true
+  mode: frame              # 默认与 frame 训练一致；时序实验显式使用 clip
+  temporal_apply: false
   smooth_window: 9
   save_frame_predictions: true
   save_overlay_video: false
