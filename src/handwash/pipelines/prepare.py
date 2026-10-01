@@ -448,6 +448,18 @@ def prepare(rc: ResolvedConfig, *, stage: str = "all") -> PrepareResult:
     ensure_dir(out_root)
 
     # --- 1) 取 clip 级清单 -------------------------------------------------
+    # 【分支优先级：注册的适配器 > 图像目录树启发式 > 通用视频兜底】
+    #
+    # 这里曾经把启发式放在适配器之前，导致一个很隐蔽的错误：
+    # `_looks_like_image_tree` 比较图像数与视频数，而 PSKUS 在抽帧**之前**是
+    # "一堆 mp4 + 标注 csv、一张图都没有"，于是 len(images)=0 > len(videos)=N 不成立……
+    # 但只要 root 下没有视频能被 recursive 扫到（例如视频在更深一层、或只扫到标注），
+    # 就会误判为图像树，于是走 `_records_from_frames_dir`：
+    # 它把 `DataSet4` 这样的**分片目录名**当成标签名去 canonicalize，
+    # 全部落到兜底的 other。结果 39 段视频的 manifest 里只有 other 一个标签，
+    # 六步动作识别直接失去监督信号 —— 而流程"看起来完全正常"。
+    adapter_name = _SOURCE_ADAPTERS.get(name)
+    use_adapter = adapter_name is not None and not _looks_like_image_tree(root)
     if name == "synthetic":
         from handwash.data.synthetic import write_synthetic_dataset
 
@@ -462,7 +474,8 @@ def prepare(rc: ResolvedConfig, *, stage: str = "all") -> PrepareResult:
         for clip in clips:
             split_map[clip.split].append(clip)  # type: ignore[index]
         prepared_frames = frames
-    elif name == "kaggle" or _looks_like_image_tree(root):
+        label_source = None
+    elif name == "kaggle" or (not use_adapter and _looks_like_image_tree(root)):
         frames, clips = _records_from_frames_dir(rc, root)
         split_map = split_clips(
             clips,
@@ -472,15 +485,15 @@ def prepare(rc: ResolvedConfig, *, stage: str = "all") -> PrepareResult:
             stratify_by=rc.split.stratify_by,
         )
         prepared_frames = frames
+        label_source = None
     else:
         # 结构特殊的数据集走专门适配器；其余走通用兜底
-        adapter_name = _SOURCE_ADAPTERS.get(name)
         adapter = globals().get(adapter_name) if adapter_name else None
         if adapter is None:
             adapter = _records_from_video_dirs
         elif adapter_name:
             log.info("使用专门适配器：%s", adapter_name)
-        _, clips = adapter(rc, root)
+        frames, clips = adapter(rc, root)
         split_map = split_clips(
             clips,
             ratios={"train": rc.split.train, "val": rc.split.val, "test": rc.split.test},
@@ -488,6 +501,11 @@ def prepare(rc: ResolvedConfig, *, stage: str = "all") -> PrepareResult:
             group_key=rc.split.group_key,
             stratify_by=rc.split.stratify_by,
         )
+        # 适配器给出的 FrameRecord 是"抽帧前的逐帧标注"：image_path 指向**视频**，
+        # label/timestamp_s 才是真值。把它们按 clip 收好，抽帧时按原始帧号对齐取用。
+        # 不使用这些数据的话，抽帧阶段会只剩 `clip.label_sequence[0]` 一个标签，
+        # 整段视频被赋成同一个类（曾经就是这样丢掉全部六步标签的）。
+        label_source = _group_frame_labels(frames)
         prepared_frames = []
 
     if rc.split.guard_leakage:
@@ -496,7 +514,11 @@ def prepare(rc: ResolvedConfig, *, stage: str = "all") -> PrepareResult:
     # --- 2) 抽帧（仅当需要时执行）-----------------------------------------
     if stage in ("all", "frames") and not prepared_frames:
         prepared_frames = _extract_and_register(
-            rc, split_map, frames_root=frames_root, out_root=out_root
+            rc,
+            split_map,
+            frames_root=frames_root,
+            out_root=out_root,
+            label_source=label_source,
         )
     elif stage in ("all", "frames") and prepared_frames and name != "synthetic":
         # 已有帧目录（如 Kaggle）：只把 split 写回记录
@@ -590,14 +612,37 @@ def _apply_split(
     return out
 
 
+def _group_frame_labels(
+    frames: Sequence[FrameRecord],
+) -> dict[str, list[FrameRecord]]:
+    """把适配器给出的逐帧标注按 clip 分组，并**按原始帧号排序**。
+
+    为什么要排序：抽帧时用 `indices` 里的原始帧号去索引这个列表，
+    所以列表下标必须等于原始帧号。PSKUS 的标注是一行一帧、顺序递增的，
+    排序后下标恰好就是帧号；若将来遇到缺行或乱序的标注，这里会暴露出来
+    （下标越界时抽帧逻辑会回退到 clip 级标签并记 warning，而不是静默取错标签）。
+    """
+    grouped: dict[str, list[FrameRecord]] = defaultdict(list)
+    for record in frames:
+        grouped[record.clip_id].append(record)
+    for records in grouped.values():
+        records.sort(key=lambda r: r.frame_index)
+    return dict(grouped)
+
+
 def _extract_and_register(
     rc: ResolvedConfig,
     split_map: dict[Split, list[ClipRecord]],
     *,
     frames_root: Path,
     out_root: Path,
+    label_source: dict[str, list[FrameRecord]] | None = None,
 ) -> list[FrameRecord]:
-    """按划分结果抽帧并登记（**先划分、后抽帧**）。"""
+    """按划分结果抽帧并登记（**先划分、后抽帧**）。
+
+    ``label_source``：clip_id -> 按原始帧号排序的逐帧标注（来自专门适配器）。
+    有它时，每一帧用**它自己的**标签与时间戳；没有时只能退化为整段一个标签。
+    """
     ensure_dir(frames_root)
     records: list[FrameRecord] = []
     caps = {
@@ -635,9 +680,22 @@ def _extract_and_register(
                 )
                 continue
 
-            label = clip.label_sequence[0] if clip.label_sequence else None
+            # 整段一个标签只是**兜底**（没有任何逐帧标注时才用）。
+            # 有 label_source 时必须逐帧取标签，否则整段视频被赋成同一个类 ——
+            # 六步动作识别会因此完全失去监督信号（曾经真实发生：
+            # 39 段视频的 manifest 里只剩 other 一个标签）。
+            fallback_label = clip.label_sequence[0] if clip.label_sequence else None
+            per_frame = label_source.get(clip.clip_id) if label_source else None
+            if label_source is not None and not per_frame:
+                log.warning(
+                    "适配器没有给出 %s 的逐帧标注，只能退化为整段一个标签（%s）",
+                    clip.clip_id, fallback_label,
+                )
+            misaligned = 0
 
-            for local_index, (_, stamp, frame) in enumerate(zip(indices, stamps, frames, strict=True)):
+            for local_index, (original_index, stamp, frame) in enumerate(
+                zip(indices, stamps, frames, strict=True)
+            ):
                 # 【关键】image_path 记录成**相对 frames_root** 的路径（`<clip_id>/00000.jpg`），
                 # 与 data/dataset.py 的 _image_root_from() 约定一致：那边把 image_root
                 # 解析为配置里的 frames_dir，再用 image_root / image_path 打开文件。
@@ -647,16 +705,39 @@ def _extract_and_register(
                 relative = Path(clip.clip_id) / f"{local_index:05d}.jpg"
                 save_frame(frame, frames_root / clip.clip_id / f"{local_index:05d}.jpg",
                            quality=rc.dataset.prep.jpeg_quality)
+
+                # 逐帧标注里用**原始帧号**索引（列表已按 frame_index 排序）。
+                # 时间戳也用标注里的真实时间（PSKUS 是毫秒转秒），
+                # 比"采样序号 ÷ 采样帧率"更可靠：后者在原生帧率不能被采样帧率整除时
+                # 会有系统性偏差（例如原生 16fps 请求 5fps，stride=3，实际 5.333fps）。
+                label = fallback_label
+                timestamp = stamp
+                if per_frame is not None:
+                    if 0 <= original_index < len(per_frame):
+                        label = per_frame[original_index].label
+                        timestamp = per_frame[original_index].timestamp_s
+                    else:
+                        misaligned += 1
+
+                if label is None:
+                    label = Step.UNKNOWN
+
                 records.append(
                     FrameRecord(
                         clip_id=clip.clip_id,
                         frame_index=local_index,
                         image_path=str(relative).replace("\\", "/"),
-                        label=label if label is not None else Step.UNKNOWN,
+                        label=label,
                         dataset=clip.dataset,
                         split=split_name,  # type: ignore[arg-type]
-                        timestamp_s=stamp,
+                        timestamp_s=timestamp,
                     )
+                )
+
+            if misaligned:
+                log.warning(
+                    "%s：%d 帧的原始帧号超出标注范围（标注 %d 行），这些帧回退到整段标签 %s",
+                    clip.clip_id, misaligned, len(per_frame or []), fallback_label,
                 )
     if not records:
         log.warning(
