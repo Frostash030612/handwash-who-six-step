@@ -155,7 +155,7 @@ def test_temporal_head_roundtrip_checks_exp_fingerprint_and_fps(tmp_path) -> Non
     features = torch.randn(1, 4, 16)
     with torch.no_grad():
         expected, _ = head.eval()(features)
-        actual, state = loaded(features)
+        actual, _ = loaded(features)
     assert torch.allclose(expected, actual)
     # 逐帧流式推理与整段推理结果一致（单向 GRU）
     with torch.no_grad():

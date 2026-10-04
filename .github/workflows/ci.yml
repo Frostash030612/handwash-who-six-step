@@ -67,9 +67,11 @@ jobs:
             echo "::error::data/raw 下有文件被提交；数据集不得进入仓库（见 CONTRIBUTING.md R6）"
             exit 1
           fi
-          if git ls-files 'models/*' 'outputs/*' '*.pt' '*.pth' | grep -v -x 'exp.pt' | grep -q .; then
+          # 演示模型包（exp.pt + 时序头）与 outputs/README.md 是刻意提交的（见 CHANGELOG 2026-10-04）
+          allowed='-e exp.pt -e exp_temporal_head.pt -e outputs/README.md'
+          if git ls-files 'models/*' 'outputs/*' '*.pt' '*.pth' | grep -v -x $allowed | grep -q .; then
             echo "::error::发现被提交的非演示模型权重或实验产物（见 CONTRIBUTING.md R6）"
-            git ls-files 'models/*' 'outputs/*' '*.pt' '*.pth' | grep -v -x 'exp.pt'
+            git ls-files 'models/*' 'outputs/*' '*.pt' '*.pth' | grep -v -x $allowed
             exit 1
           fi
           echo "仓库卫生检查通过"

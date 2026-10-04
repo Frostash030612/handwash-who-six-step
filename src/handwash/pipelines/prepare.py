@@ -370,7 +370,7 @@ def _records_from_pskuss(rc: ResolvedConfig, root: Path) -> tuple[list[FrameReco
                 kept_consensus_frames += sum(keep_mask)
 
             clip_frames: list[FrameRecord] = []
-            for index, row in enumerate(rows):
+            for index in range(len(rows)):
                 label = labels[index] if keep_mask[index] else Step.UNKNOWN
                 clip_frames.append(
                     FrameRecord(

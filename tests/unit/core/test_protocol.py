@@ -455,7 +455,7 @@ def test_report_timeline_matches_segments_used_for_judgement() -> None:
     assert tuple(seg.step for seg in report.timeline) == report.step_sequence
     assert report.timeline[0].start_s == pytest.approx(0.0)
     assert report.timeline[-1].end_s == pytest.approx(len(labels) / FPS)
-    for left, right in zip(report.timeline, report.timeline[1:]):
+    for left, right in zip(report.timeline, report.timeline[1:], strict=False):
         assert left.end_s == pytest.approx(right.start_s)
     payload = report.to_dict()["timeline"]
     assert payload[1] == {"step": A.value, "step_no": 1, "start_s": 2.0, "end_s": 12.0, "mean_confidence": 1.0}
