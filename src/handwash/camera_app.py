@@ -16,6 +16,7 @@ import numpy as np
 from PIL import Image, UnidentifiedImageError
 
 from handwash.core.config import ResolvedConfig
+from handwash.core.labels import STEP_ZH, Step
 from handwash.errors import DataError, HandwashError
 from handwash.io.utils import write_jsonl
 from handwash.logging import get_logger
@@ -23,12 +24,16 @@ from handwash.paths import checkpoint_path, ensure_dir, project_path
 from handwash.pipelines.assess import save_report
 from handwash.pipelines.common import resolve_device
 from handwash.pipelines.evaluate import _load_model_from_checkpoint
-from handwash.pipelines.exp_demo import ExpDemoClassifier
+from handwash.pipelines.exp_demo import DEFAULT_TEMPORAL_HEAD, ExpDemoClassifier
 from handwash.pipelines.live import LiveClassifier, LiveSession
 
 __all__ = ["CameraApp", "serve_camera"]
 
 log = get_logger(__name__)
+_LABELS_JSON = json.dumps(
+    {step.value: {"name": STEP_ZH[step], "step_no": step.order_index} for step in Step},
+    ensure_ascii=False,
+).encode("utf-8")
 _MAX_JPEG_BYTES = 4 * 1024 * 1024
 _MAX_IMAGE_SIDE = 4096
 
@@ -42,7 +47,10 @@ class CameraApp:
         *,
         checkpoint: str | Path | None = None,
         demo_exp: bool = False,
+        temporal_head: str | Path | bool = True,
     ) -> None:
+        """``temporal_head``：True 表示根目录有 exp_temporal_head.pt 时自动加载，
+        False 表示只用 exp.pt 逐帧分类，路径表示加载指定的时序头。"""
         if checkpoint is not None:
             target = Path(checkpoint)
         elif demo_exp:
@@ -55,7 +63,21 @@ class CameraApp:
                 hint="演示版需要项目根目录的 exp.pt；正式版需要云端训练后复制的项目 best.pt。",
             )
         if demo_exp:
-            self.classifier = ExpDemoClassifier(rc, target)
+            head_path: Path | None
+            if temporal_head is True:
+                default_head = project_path(DEFAULT_TEMPORAL_HEAD)
+                head_path = default_head if default_head.is_file() else None
+            elif temporal_head is False:
+                head_path = None
+            else:
+                head_path = Path(temporal_head)
+            self.classifier = ExpDemoClassifier(rc, target, temporal_head=head_path)
+            if head_path is None:
+                log.info("未加载时序头：exp.pt 逐帧分类")
+            else:
+                log.info("已加载时序头：%s", head_path)
+        elif temporal_head not in (True, False):
+            raise DataError("时序头目前只适用于 --demo-exp 的 exp.pt")
         else:
             device = resolve_device(rc.runtime.device)
             model, _ = _load_model_from_checkpoint(rc, target, device=device)
@@ -138,6 +160,8 @@ class _CameraHandler(BaseHTTPRequestHandler):
             self._send(404, {"error": "页面不存在"})
             return
         body = files("handwash").joinpath("static/camera.html").read_bytes()
+        # 步骤名称只在 core/labels.py 定义一次；页面加载时注入，避免前端再抄一份。
+        body = body.replace(b"__HANDWASH_LABELS__", _LABELS_JSON)
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -206,11 +230,12 @@ def serve_camera(
     checkpoint: str | Path | None = None,
     port: int = 8765,
     demo_exp: bool = False,
+    temporal_head: str | Path | bool = True,
 ) -> None:
     """只监听本机；浏览器打开 http://127.0.0.1:<port>/。"""
     if not 1 <= port <= 65535:
         raise DataError(f"端口必须在 1..65535，实际 {port}")
-    app = CameraApp(rc, checkpoint=checkpoint, demo_exp=demo_exp)
+    app = CameraApp(rc, checkpoint=checkpoint, demo_exp=demo_exp, temporal_head=temporal_head)
     server = ThreadingHTTPServer(("127.0.0.1", port), _CameraHandler)
     server.app = app  # type: ignore[attr-defined]
     log.info("摄像头页面：http://127.0.0.1:%d/；模型：%s", port, app.checkpoint)

@@ -178,6 +178,24 @@ def report_to_markdown(report: ProtocolReport) -> str:
         )
     lines.append("")
 
+    if report.timeline:
+        # 与顺序/重复判定同一口径：只看六步，中途的 other/unknown 停顿不拆开同一步。
+        order: list[Step] = []
+        for seg in report.timeline:
+            if seg.step.order_index and (not order or order[-1] is not seg.step):
+                order.append(seg.step)
+        lines.append("## 识别时间轴")
+        lines.append("")
+        lines.append("- 识别顺序：" + (" → ".join(f"第 {s.order_index} 步" for s in order) or "未识别到六步动作"))
+        lines.append("")
+        lines.append("| 时间(s) | 识别结果 | 平均置信度 |")
+        lines.append("| --- | --- | --- |")
+        for seg in report.timeline:
+            name = STEP_ZH.get(seg.step, seg.step.value)
+            label = f"第 {seg.step.order_index} 步 · {name}" if seg.step.order_index else name
+            lines.append(f"| {seg.start_s:.1f}–{seg.end_s:.1f} | {label} | {seg.mean_confidence:.2f} |")
+        lines.append("")
+
     lines.append("## 发现的问题")
     lines.append("")
     if not report.violations:

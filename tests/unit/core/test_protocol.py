@@ -427,6 +427,40 @@ def test_build_report_flags_repeated_step_when_repeats_disallowed() -> None:
     assert A in steps_of_kind(report, "out_of_order")
 
 
+def test_pause_inside_a_step_is_not_a_repeat() -> None:
+    """第 5 步中途停顿 2 秒（other / unknown）再继续，不是"重做第 5 步"。
+
+    真实视频里手会短暂移出画面或停下取洗手液；只有中间插入另一个 WHO 步骤
+    才算重复，这与顺序判定忽略 other/unknown 的口径一致。
+    """
+    for pause in (Step.OTHER, Step.UNKNOWN):
+        labels = seq((A, 50), (B, 50), (C, 50), (D, 50), (E, 25), (pause, 10), (E, 25), (F, 50))
+        report = build_report(clip_id="pause", labels=labels, fps=FPS, cfg=AssessConfig(), apply_smoothing=False)
+        assert "repeated" not in kinds(report)
+        assert report.is_in_order is True
+
+
+def test_same_inversion_is_reported_once_across_pauses() -> None:
+    """2 → 停顿 → 2 → 1 只是一次"回到第 1 步"，不应因停顿被报成两条乱序。"""
+    labels = seq((A, 50), (B, 25), (Step.OTHER, 10), (B, 25), (A, 50), (C, 50), (D, 50), (E, 50), (F, 50))
+    report = build_report(clip_id="dup", labels=labels, fps=FPS, cfg=AssessConfig(), apply_smoothing=False)
+    assert steps_of_kind(report, "out_of_order") == [A]
+    assert steps_of_kind(report, "repeated") == [A]
+
+
+def test_report_timeline_matches_segments_used_for_judgement() -> None:
+    """页面时间轴直接画 report.timeline，它必须与判定所用的分段一致且首尾相接。"""
+    labels = seq((Step.OTHER, 10), (A, 50), (B, 50), (A, 20), (C, 50))
+    report = build_report(clip_id="tl", labels=labels, fps=FPS, cfg=AssessConfig(), apply_smoothing=False)
+    assert tuple(seg.step for seg in report.timeline) == report.step_sequence
+    assert report.timeline[0].start_s == pytest.approx(0.0)
+    assert report.timeline[-1].end_s == pytest.approx(len(labels) / FPS)
+    for left, right in zip(report.timeline, report.timeline[1:]):
+        assert left.end_s == pytest.approx(right.start_s)
+    payload = report.to_dict()["timeline"]
+    assert payload[1] == {"step": A.value, "step_no": 1, "start_s": 2.0, "end_s": 12.0, "mean_confidence": 1.0}
+
+
 def test_build_report_allows_repeats_when_configured() -> None:
     """allow_repeats=True 时不得再产生 repeated 违规（阈值全部来自 AssessConfig）。"""
     labels = full_sequence() + seq((A, STEP_FRAMES))

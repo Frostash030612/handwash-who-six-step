@@ -38,6 +38,7 @@ __all__ = [
     "Sample",
     "Split",
     "StepStatistic",
+    "TimelineSegment",
 ]
 
 #: 契约版本号。任何破坏兼容的改动都必须 +1，并在 CHANGELOG.md 记录。
@@ -255,6 +256,16 @@ class ProtocolViolation:
 
 
 @dataclass(frozen=True, slots=True)
+class TimelineSegment:
+    """报告时间轴上的一段，与判定所用的分段完全一致（半开区间，单位秒）。"""
+
+    step: Step
+    start_s: float
+    end_s: float
+    mean_confidence: float
+
+
+@dataclass(frozen=True, slots=True)
 class ProtocolReport:
     """最终交付物：一段视频的 WHO 六步完整性评估报告。
 
@@ -272,6 +283,7 @@ class ProtocolReport:
     overall_score: float = 0.0  # 0~1 综合得分（六步覆盖率 × 顺序正确率 × 时长充足率）
     model_name: str = "unknown"
     notes: tuple[str, ...] = ()
+    timeline: tuple[TimelineSegment, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -301,6 +313,16 @@ class ProtocolReport:
             "overall_score": round(self.overall_score, 4),
             "model_name": self.model_name,
             "notes": list(self.notes),
+            "timeline": [
+                {
+                    "step": seg.step.value,
+                    "step_no": seg.step.order_index,
+                    "start_s": round(seg.start_s, 3),
+                    "end_s": round(seg.end_s, 3),
+                    "mean_confidence": round(seg.mean_confidence, 4),
+                }
+                for seg in self.timeline
+            ],
         }
 
 

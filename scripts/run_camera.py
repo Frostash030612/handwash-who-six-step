@@ -23,6 +23,12 @@ def main() -> int:
     parser.add_argument("--checkpoint", default=None, help="权重路径；正式版默认 best.pt，--demo-exp 默认根目录 exp.pt")
     parser.add_argument("--port", type=int, default=8765, help="本机网页端口")
     parser.add_argument("--demo-exp", action="store_true", help="使用项目根目录的 exp.pt 七类演示模型")
+    parser.add_argument(
+        "--temporal-head",
+        default=None,
+        help="exp.pt 的 GRU 时序头；默认根目录 exp_temporal_head.pt 存在时自动加载",
+    )
+    parser.add_argument("--no-temporal-head", action="store_true", help="不加载时序头，只用 exp.pt 逐帧分类")
     plain, override_items = split_argv(sys.argv[1:])
     args, unknown = parser.parse_known_args(plain)
     if unknown:
@@ -32,8 +38,17 @@ def main() -> int:
     if args.demo_exp:
         overrides["runtime"] = {"run_name": "exp_demo", **overrides.get("runtime", {})}
     rc = load_config_from_args(args, overrides)
+    if args.no_temporal_head and args.temporal_head:
+        parser.error("--temporal-head 与 --no-temporal-head 不能同时使用")
+    temporal_head = False if args.no_temporal_head else (args.temporal_head or True)
     try:
-        serve_camera(rc, checkpoint=args.checkpoint, port=args.port, demo_exp=args.demo_exp)
+        serve_camera(
+            rc,
+            checkpoint=args.checkpoint,
+            port=args.port,
+            demo_exp=args.demo_exp,
+            temporal_head=temporal_head,
+        )
     except HandwashError as exc:
         print(f"摄像头启动失败：{exc}", file=sys.stderr)
         return getattr(exc, "exit_code", 1)

@@ -16,3 +16,12 @@ dataset:
     image_ext: jpg
     jpeg_quality: 85
     min_frames_per_clip: 10
+
+# 两名独立标注者一致，且远离动作切换边界的帧才进入正式训练集。
+# 这会减少样本量，但避免把过渡画面硬标为某一个 WHO 步骤。
+datasets:
+  pskuss:
+    annotators: [Annotator1, Annotator2]
+    quality_filter:
+      enabled: true
+      stable_radius_frames: 7

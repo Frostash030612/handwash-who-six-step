@@ -21,6 +21,14 @@ dataset:
     jpeg_quality: 85
     min_frames_per_clip: 10
 
+# 正式主线使用高置信度 PSKUS 帧：双标注一致且避开切换边界。
+datasets:
+  pskuss:
+    annotators: [Annotator1, Annotator2]
+    quality_filter:
+      enabled: true
+      stable_radius_frames: 7
+
 model:
   name: yolo26n-cls
   arch: yolo26n-cls

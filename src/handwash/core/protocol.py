@@ -24,7 +24,7 @@ import numpy as np
 
 from handwash.core.config import AssessConfig
 from handwash.core.labels import CANONICAL_STEPS, NON_WASH_STEPS, STEP_ORDER, STEP_ZH, Step
-from handwash.core.schema import ProtocolReport, ProtocolViolation, StepStatistic
+from handwash.core.schema import ProtocolReport, ProtocolViolation, StepStatistic, TimelineSegment
 from handwash.errors import ProtocolError
 
 __all__ = [
@@ -424,7 +424,10 @@ def build_report(
         )
 
     action_sequence = collapse_repeats([s.label for s in segments])
-    inversions = check_order(action_sequence) if cfg.order_check else []
+    # 顺序与重复只看六步本身：同一步被 other/unknown 短暂打断（停顿、手移出画面）
+    # 不算"重做"；只有中间插入了另一个 WHO 步骤（如 5→6→5）才算重复。
+    step_actions = collapse_repeats([label for label in action_sequence if label in STEP_ORDER])
+    inversions = check_order(step_actions) if cfg.order_check else []
     for first, second in inversions:
         violations.append(
             ProtocolViolation(
@@ -451,7 +454,7 @@ def build_report(
         )
 
     if not cfg.allow_repeats:
-        for step, count in check_repeats(action_sequence):
+        for step, count in check_repeats(step_actions):
             violations.append(
                 ProtocolViolation(
                     kind="repeated",
@@ -506,6 +509,15 @@ def build_report(
         ),
         model_name=model_name,
         notes=tuple(_notes(detected_steps, action_sequence)),
+        timeline=tuple(
+            TimelineSegment(
+                step=seg.label,
+                start_s=seg.start / fps,
+                end_s=seg.end / fps,
+                mean_confidence=conf,
+            )
+            for seg, conf in zip(segments, _segment_mean_confs(segments), strict=True)
+        ),
     )
     return report
 

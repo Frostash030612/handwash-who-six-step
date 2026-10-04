@@ -120,6 +120,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_camera.add_argument("--checkpoint", default=None, help="权重路径；正式版默认 best.pt，--demo-exp 默认根目录 exp.pt")
     p_camera.add_argument("--port", type=int, default=8765, help="本机网页端口（默认 8765）")
     p_camera.add_argument("--demo-exp", action="store_true", help="使用根目录 exp.pt 七类演示模型")
+    p_camera.add_argument(
+        "--temporal-head",
+        default=None,
+        help="exp.pt 的 GRU 时序头；默认根目录 exp_temporal_head.pt 存在时自动加载",
+    )
+    p_camera.add_argument("--no-temporal-head", action="store_true", help="不加载时序头，只用 exp.pt 逐帧分类")
 
     sub.add_parser("doctor", help="环境与配置自检")
     sub.add_parser("config", help="打印最终生效的配置（含 config_hash）")
@@ -288,7 +294,16 @@ def _dispatch(args: argparse.Namespace, overrides: dict) -> int:
             runtime = {"run_name": "exp_demo", **overrides.get("runtime", {})}
             overrides = {**overrides, "runtime": runtime}
         rc = _load(args, overrides)
-        serve_camera(rc, checkpoint=args.checkpoint, port=args.port, demo_exp=args.demo_exp)
+        if args.no_temporal_head and args.temporal_head:
+            raise HandwashError("--temporal-head 与 --no-temporal-head 不能同时使用")
+        temporal_head = False if args.no_temporal_head else (args.temporal_head or True)
+        serve_camera(
+            rc,
+            checkpoint=args.checkpoint,
+            port=args.port,
+            demo_exp=args.demo_exp,
+            temporal_head=temporal_head,
+        )
         return EXIT_OK
 
     raise HandwashError(f"未实现的子命令：{command}")

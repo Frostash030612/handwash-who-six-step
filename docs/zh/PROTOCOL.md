@@ -72,8 +72,8 @@ is_complete    := |{六步中 detected 的}| >= 6 - assess.missing_tolerance
 ### 4.2 顺序异常（out_of_order）
 
 ```
-行动序列 := collapse_repeats(片段标签序列)      # 去掉连续重复
-对六步子序列，统计所有逆序对 (前, 后)：
+步骤序列 := collapse_repeats(片段标签序列中的六步)   # 先去掉 other/unknown/水龙头，再合并连续重复
+对步骤序列，统计所有逆序对 (前, 后)：
     若 order(后) < order(前)  → 一条 out_of_order
 ```
 
@@ -106,8 +106,12 @@ is_complete    := |{六步中 detected 的}| >= 6 - assess.missing_tolerance
 
 ### 4.4 重复步骤（repeated）
 
-某一步在行动序列中出现多次 → `severity="info"`。
+某一步在步骤序列中出现多次 → `severity="info"`。
 `assess.allow_repeats: true` 时不再报告。
+
+- 同一步被 `other` / `unknown` 短暂打断（停顿、手移出画面）后继续，合并为一次，
+  **不算**重复；只有中间插入了另一个 WHO 步骤（如 5 → 6 → 5）才算。
+- 同理，2 → 停顿 → 2 → 1 只记一条乱序，不会因停顿重复报告。
 
 ### 4.5 可选的水龙头事件检查
 

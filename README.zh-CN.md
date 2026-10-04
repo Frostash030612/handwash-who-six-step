@@ -61,9 +61,9 @@ python -m handwash.cli doctor
 
 ### 直接体验 exp.pt 演示
 
-根目录的 `exp.pt` 是早期七类 Ultralytics 分类模型，随 GitHub 仓库提供，
-用于直接体验摄像头网页。用于早期测试的 NDJSON 导出清单不随仓库发布；
-正式数据请按下文从公开来源获取。
+根目录的 `exp.pt` 是当前七类 Ultralytics 帧分类模型；若同目录存在
+`exp_temporal_head.pt`，演示会自动叠加 GRU 时序头，用于直接体验摄像头网页。
+用于训练的 NDJSON 导出清单不随仓库发布；正式数据请按下文从公开来源获取。
 无需下载正式数据即可体验摄像头网页：
 
 ```bash
@@ -71,10 +71,11 @@ python scripts/run_camera.py --demo-exp
 ```
 
 打开 `http://127.0.0.1:8765/`，连接并选择外接摄像头，然后点击“开始识别”。
-页面会标明“演示”，结果保存在 `outputs/exp_demo/camera/`。这个模型的类别顺序已单独核对；
-演示报告不能当作正式准确率或最终实验结果。
+页面会标明“演示”，结果保存在 `outputs/exp_demo/camera/`。可用
+`--no-temporal-head` 查看纯帧模型对照。模型类别顺序已单独核对；演示报告不能当作
+正式准确率或最终实验结果。
 公开上传前用 `git add .` 和 `git status --short` 核对待提交文件；
-只允许根目录的演示权重 `exp.pt` 入库，NDJSON 导出清单、训练权重、
+只允许根目录的演示权重 `exp.pt` 与 `exp_temporal_head.pt` 入库，NDJSON 导出清单、训练权重、
 `deliverables/` 和 `outputs/` 不应上传。`.gitignore` 不会清除已经提交的历史文件。
 
 ### 正式数据与云端训练

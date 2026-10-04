@@ -265,11 +265,20 @@ def _records_from_pskuss(rc: ResolvedConfig, root: Path) -> tuple[list[FrameReco
     annotators = tuple(
         str(a).strip() for a in (rc.dataset_spec().get("annotators") or ["Annotator1"]) if str(a).strip()
     )
+    quality_filter = _pskuss_quality_filter(rc.dataset_spec())
+    if quality_filter["enabled"] and len(annotators) < 2:
+        raise DataError(
+            "PSKUS 高置信度清洗要求两位标注者",
+            hint="在 datasets.pskuss.annotators 中设置 [Annotator1, Annotator2]，"
+            "或关闭 quality_filter.enabled。",
+        )
 
     frames: list[FrameRecord] = []
     clips: list[ClipRecord] = []
     skipped_no_annotation = 0
     skipped_unknown_label = 0
+    skipped_consensus = 0
+    kept_consensus_frames = 0
 
     dataset_dirs = sorted(p for p in root.rglob("DataSet*") if p.is_dir())
     if not dataset_dirs:
@@ -292,11 +301,20 @@ def _records_from_pskuss(rc: ResolvedConfig, root: Path) -> tuple[list[FrameReco
             clip_id = f"{dataset_dir.name}/{video.stem}"
             annotation_stem = video.stem
             annotation: Path | None = None
-            for annotator in annotators:
-                candidate = ann_root / annotator / f"{annotation_stem}.csv"
-                if candidate.exists():
-                    annotation = candidate
-                    break
+            if quality_filter["enabled"]:
+                # 高置信度模式不能将“第二位标注者”回退成主标注者；两份独立
+                # 标注缺一不可，否则会把同一份 CSV 错当成一致性证据。
+                candidate = ann_root / annotators[0] / f"{annotation_stem}.csv"
+                if not candidate.exists():
+                    skipped_consensus += 1
+                    continue
+                annotation = candidate
+            else:
+                for annotator in annotators:
+                    candidate = ann_root / annotator / f"{annotation_stem}.csv"
+                    if candidate.exists():
+                        annotation = candidate
+                        break
             if annotation is None:
                 skipped_no_annotation += 1
                 continue
@@ -306,15 +324,54 @@ def _records_from_pskuss(rc: ResolvedConfig, root: Path) -> tuple[list[FrameReco
                 skipped_no_annotation += 1
                 continue
 
-            clip_frames: list[FrameRecord] = []
             labels: list[Step] = []
-            for index, row in enumerate(rows):
+            timestamps: list[float | None] = []
+            for row in rows:
                 try:
-                    label = space.canonicalize(row["movement_code"])
+                    labels.append(space.canonicalize(row["movement_code"]))
                 except Exception:
                     skipped_unknown_label += 1
-                    label = Step.UNKNOWN
-                labels.append(label)
+                    labels.append(Step.UNKNOWN)
+                timestamps.append(_frame_time_to_seconds(row.get("frame_time", "")))
+
+            keep_mask = [label is not Step.UNKNOWN for label in labels]
+            if quality_filter["enabled"]:
+                secondary = ann_root / annotators[1] / f"{annotation_stem}.csv"
+                if not secondary.exists():
+                    skipped_consensus += 1
+                    continue
+                secondary_rows = read_csv(secondary)
+                if len(secondary_rows) != len(rows) or not secondary_rows:
+                    skipped_consensus += 1
+                    continue
+                secondary_labels: list[Step] = []
+                aligned = True
+                for primary_row, secondary_row in zip(rows, secondary_rows, strict=True):
+                    try:
+                        secondary_labels.append(space.canonicalize(secondary_row["movement_code"]))
+                    except Exception:
+                        secondary_labels.append(Step.UNKNOWN)
+                    primary_time = _frame_time_to_seconds(primary_row.get("frame_time", ""))
+                    secondary_time = _frame_time_to_seconds(secondary_row.get("frame_time", ""))
+                    if (
+                        primary_time is None
+                        or secondary_time is None
+                        or abs(primary_time - secondary_time) > 0.001
+                    ):
+                        aligned = False
+                if not aligned:
+                    skipped_consensus += 1
+                    continue
+                keep_mask = _pskuss_consensus_stable_mask(
+                    labels,
+                    secondary_labels,
+                    stable_radius_frames=quality_filter["stable_radius_frames"],
+                )
+                kept_consensus_frames += sum(keep_mask)
+
+            clip_frames: list[FrameRecord] = []
+            for index, row in enumerate(rows):
+                label = labels[index] if keep_mask[index] else Step.UNKNOWN
                 clip_frames.append(
                     FrameRecord(
                         clip_id=clip_id,
@@ -323,7 +380,7 @@ def _records_from_pskuss(rc: ResolvedConfig, root: Path) -> tuple[list[FrameReco
                         label=label,
                         dataset=str(rc.dataset.name),
                         split="train",  # 占位：真实 split 由划分阶段写入
-                        timestamp_s=_frame_time_to_seconds(row.get("frame_time", "")),
+                        timestamp_s=timestamps[index],
                     )
                 )
 
@@ -348,6 +405,13 @@ def _records_from_pskuss(rc: ResolvedConfig, root: Path) -> tuple[list[FrameReco
                         "pskuss_dataset": dataset_dir.name,
                         "annotation": _portable_path(annotation),
                         "label_timestamps_s": tuple(rec.timestamp_s for rec in clip_frames),
+                        "quality_filter": {
+                            "enabled": quality_filter["enabled"],
+                            "primary_annotator": annotators[0],
+                            "secondary_annotator": annotators[1] if quality_filter["enabled"] else None,
+                            "stable_radius_frames": quality_filter["stable_radius_frames"],
+                            "kept_frames": sum(keep_mask),
+                        },
                     },
                 )
             )
@@ -356,6 +420,10 @@ def _records_from_pskuss(rc: ResolvedConfig, root: Path) -> tuple[list[FrameReco
         log.warning("有 %d 段视频找不到标注文件，已跳过", skipped_no_annotation)
     if skipped_unknown_label:
         log.warning("有 %d 帧的 movement_code 无法识别，已记为 unknown", skipped_unknown_label)
+    if skipped_consensus:
+        log.warning(
+            "有 %d 段视频缺少可对齐的双标注，未纳入高置信度数据", skipped_consensus
+        )
     if not clips:
         raise DataError(
             f"没有解析出任何 PSKUS 片段（root={root}）",
@@ -363,10 +431,63 @@ def _records_from_pskuss(rc: ResolvedConfig, root: Path) -> tuple[list[FrameReco
         )
 
     log.info(
-        "PSKUS 适配完成：%d 段视频 / %d 帧（标注者优先级 %s）",
-        len(clips), len(frames), list(annotators),
+        "PSKUS 适配完成：%d 段视频 / %d 帧（标注者优先级 %s；高置信度清洗=%s，保留 %d 帧）",
+        len(clips),
+        len(frames),
+        list(annotators),
+        quality_filter["enabled"],
+        kept_consensus_frames,
     )
     return frames, clips
+
+
+def _pskuss_quality_filter(spec: dict[str, Any] | Any) -> dict[str, bool | int]:
+    """读取 PSKUS 专用的高置信度清洗设置。
+
+    该设置放在 ``datasets.pskuss.quality_filter``，避免给其他数据集强加双标注
+    要求。开启后，只保留两名标注者动作标签一致、且前后各
+    ``stable_radius_frames`` 个源标注帧都保持同一标签的画面。
+    """
+    raw = dict(spec).get("quality_filter", {})
+    if raw is None:
+        raw = {}
+    if not isinstance(raw, dict):
+        raise ConfigError("datasets.pskuss.quality_filter 必须是 mapping")
+    enabled = bool(raw.get("enabled", False))
+    radius = raw.get("stable_radius_frames", 0)
+    if isinstance(radius, bool) or not isinstance(radius, int) or radius < 0:
+        raise ConfigError("quality_filter.stable_radius_frames 必须是非负整数")
+    return {"enabled": enabled, "stable_radius_frames": radius}
+
+
+def _pskuss_consensus_stable_mask(
+    primary: Sequence[Step],
+    secondary: Sequence[Step],
+    *,
+    stable_radius_frames: int,
+) -> list[bool]:
+    """返回可用于训练的高置信度帧掩码。
+
+    逐帧标签必须完全一致；此外，以该帧为中心的可用邻域内不能出现标签改变。
+    视频开头和结尾只检查实际存在的邻域，因此不会因缺失的“未来帧”被无故丢弃。
+    """
+    if len(primary) != len(secondary):
+        raise DataError("两位 PSKUS 标注者的帧数不一致，无法做逐帧一致性清洗")
+    if stable_radius_frames < 0:
+        raise ConfigError("stable_radius_frames 必须是非负整数")
+    agreed = [
+        left is right and left is not Step.UNKNOWN
+        for left, right in zip(primary, secondary, strict=True)
+    ]
+    kept: list[bool] = []
+    for index, label in enumerate(primary):
+        start = max(0, index - stable_radius_frames)
+        end = min(len(primary), index + stable_radius_frames + 1)
+        kept.append(
+            agreed[index]
+            and all(agreed[neighbor] and primary[neighbor] is label for neighbor in range(start, end))
+        )
+    return kept
 
 
 def _frame_time_to_seconds(raw: str) -> float | None:

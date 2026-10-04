@@ -81,8 +81,8 @@ Rationale: a momentary misclassification must not be taken as "this step was per
 ### 4.2 Out-of-order (out_of_order)
 
 ```
-action sequence := collapse_repeats(segment label sequence)   # drop consecutive repeats
-for the six-step subsequence, count all inversion pairs (earlier, later):
+step sequence := collapse_repeats(six-step labels of the segment sequence)   # drop other/unknown/faucet, then merge consecutive repeats
+for the step sequence, count all inversion pairs (earlier, later):
     if order(later) < order(earlier)  → one out_of_order
 ```
 
@@ -119,8 +119,13 @@ if total_wash_duration_s < assess.min_total_duration_s  → one error
 
 ### 4.4 Repeated step (repeated)
 
-A step that occurs more than once in the action sequence → `severity="info"`.
+A step that occurs more than once in the step sequence → `severity="info"`.
 With `assess.allow_repeats: true` it is no longer reported.
+
+- A step briefly interrupted by `other` / `unknown` (a pause, hands leaving the frame) and
+  then continued is merged into one occurrence and is **not** a repeat; only another WHO
+  step in between (e.g. 5 → 6 → 5) counts.
+- Likewise, 2 → pause → 2 → 1 yields one out-of-order finding, not one per pause.
 
 ### 4.5 Optional faucet events
 

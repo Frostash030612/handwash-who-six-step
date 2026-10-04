@@ -65,19 +65,21 @@ Once `doctor` is all green (a non-blocking WARN or two is fine), your environmen
 
 ### Try the bundled exp.pt camera demo
 
-The repository includes `exp.pt`, an early seven-class Ultralytics classifier for trying the
-camera page. The early NDJSON export is excluded; obtain the final dataset from its public
-source below. To launch the demo:
+The repository includes the current seven-class Ultralytics frame classifier `exp.pt`. When
+`exp_temporal_head.pt` is present beside it, the demo also loads its GRU temporal head. The
+training NDJSON export is excluded; obtain the final dataset from its public source below.
+To launch the demo:
 
 ```bash
 python scripts/run_camera.py --demo-exp
 ```
 
-Open `http://127.0.0.1:8765/`, select a camera, and start recognition. The page marks this
-as a demo; its report is saved under `outputs/exp_demo/camera/` and is not a final result.
-Before publishing, use `git add .` and inspect `git status --short`. Only the root demo weight
-`exp.pt` is included; do not upload the NDJSON export, training weights, `deliverables/`, or
-`outputs/`. `.gitignore` does not remove files already present in Git history.
+Open `http://127.0.0.1:8765/`, select a camera, and start recognition. Use
+`--no-temporal-head` to compare the frame-only path. The page marks this as a demo; its report
+is saved under `outputs/exp_demo/camera/` and is not a final result. Before publishing, use
+`git add .` and inspect `git status --short`. The root demo weights `exp.pt` and
+`exp_temporal_head.pt` are included; do not upload the NDJSON export, training weights,
+`deliverables/`, or `outputs/`. `.gitignore` does not remove files already present in Git history.
 
 ### Final dataset and cloud training
 

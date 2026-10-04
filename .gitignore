@@ -64,6 +64,7 @@ data/raw/**
 /models/
 *.pt
 !/exp.pt
+!/exp_temporal_head.pt
 *.pth
 *.onnx
 *.engine

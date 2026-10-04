@@ -1,7 +1,8 @@
 """外接摄像头的逐帧 YOLO 分类与会话状态。
 
-摄像头画面由网页采集。此模块只接收 RGB 帧和采集时间，不读取摄像头设备；
-每次推理只使用当前帧，实时显示仅平均已到达帧的概率。
+摄像头画面由网页采集。此模块只接收 RGB 帧和采集时间，不读取摄像头设备。
+逐帧模型每次只看当前帧，实时显示平均已到达帧的概率；带时序头的分类器
+（提供 ``new_stream``）在会话内保留过去帧的状态，此时不再叠加概率平均。
 """
 
 from __future__ import annotations
@@ -81,8 +82,15 @@ class LiveSession:
         self.session_id = session_id
         self._first_capture_s: float | None = None
         self._last_capture_s: float | None = None
-        self._prob_window: deque[np.ndarray] = deque(maxlen=max(1, classifier.rc.assess.smooth_window))
+        self._stream = self._open_stream()
+        # 时序头已在模型内部整合过去帧；再做概率平均只会增加切换延迟。
+        window = 1 if self._stream is not None else max(1, classifier.rc.assess.smooth_window)
+        self._prob_window: deque[np.ndarray] = deque(maxlen=window)
         self._observations: list[_Observation] = []
+
+    def _open_stream(self) -> Any:
+        new_stream = getattr(self.classifier, "new_stream", None)
+        return new_stream() if callable(new_stream) else None
 
     @property
     def num_frames(self) -> int:
@@ -93,13 +101,18 @@ class LiveSession:
             raise DataError("摄像头采集时间必须是非负的有限秒数")
         if self._last_capture_s is not None and capture_time_s <= self._last_capture_s:
             raise DataError("摄像头帧的采集时间必须严格递增")
-        probabilities = self.classifier.predict(frame)
-        if self._first_capture_s is None:
-            self._first_capture_s = capture_time_s
-        if (
+        gap = (
             self._last_capture_s is not None
             and capture_time_s - self._last_capture_s > 2.0 / self.classifier.rc.dataset.prep.fps
-        ):
+        )
+        if gap and self._stream is not None:
+            # 断流后的画面与之前的上下文不连续，时序状态从头开始。
+            self._stream = self._open_stream()
+        source = self._stream if self._stream is not None else self.classifier
+        probabilities = source.predict(frame)
+        if self._first_capture_s is None:
+            self._first_capture_s = capture_time_s
+        if gap:
             self._prob_window.clear()
         self._last_capture_s = capture_time_s
         self._prob_window.append(probabilities)
@@ -112,18 +125,27 @@ class LiveSession:
         elapsed = capture_time_s - self._first_capture_s
         self._observations.append(_Observation(elapsed, label, confidence))
         report = self.report()
-        detected = {stat.step: stat.detected for stat in report.statistics}
+        stats = {stat.step: stat for stat in report.statistics}
         return {
             "session_id": self.session_id,
             "frame_count": self.num_frames,
             "elapsed_s": round(elapsed, 3),
             "label": label.value,
             "label_zh": STEP_ZH[label],
+            "step_no": label.order_index,
             "confidence": round(confidence, 4),
             "steps": [
-                {"step": step.value, "name": STEP_ZH[step], "detected": bool(detected.get(step))}
+                {
+                    "step": step.value,
+                    "step_no": step.order_index,
+                    "name": STEP_ZH[step],
+                    "detected": bool(stats[step].detected) if step in stats else False,
+                    "duration_s": round(stats[step].duration_s, 2) if step in stats else 0.0,
+                }
                 for step in STEP_ORDER
             ],
+            # 与最终报告同一套分段：页面画出的顺序就是报告判定所依据的顺序。
+            "timeline": report.to_dict()["timeline"],
             "provisional": True,
         }
 
