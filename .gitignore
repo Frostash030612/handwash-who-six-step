@@ -85,6 +85,9 @@ deliverables/*
 !deliverables/README.md
 # User-requested upload of this specific presentation. Other deliverables stay ignored.
 !deliverables/Video-based-Six-Step-Handwashing-Assessment.pptx
+# User-requested upload of the first-presentation speech scripts (names only, no student IDs).
+!deliverables/演讲稿-4人版.md
+!deliverables/演讲稿-4人版-中文.md
 # 旧版 repo/ 副本可能含姓名、分组信息或文档元数据，也留在本地。
 
 # --- 实验输出（保留结构，不保留内容）---------------------------------------
