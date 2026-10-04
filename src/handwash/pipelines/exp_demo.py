@@ -277,8 +277,9 @@ class ExpDemoClassifier:
         )
         if self.temporal_head is not None and self.temporal_head.hparams["feature_dim"] != self.extractor.feature_dim:
             raise ModelError("时序头的输入维度与 exp.pt 特征维度不一致")
+        # 显示在英文网页上，也写入报告的 model_name 字段，因此用英文。
         self.model_name = (
-            "exp.pt + GRU 时序头" if self.temporal_head is not None else "exp.pt（Ultralytics 演示）"
+            "exp.pt + GRU temporal head" if self.temporal_head is not None else "exp.pt (frame-only)"
         )
 
     def predict(self, frame: np.ndarray) -> np.ndarray:

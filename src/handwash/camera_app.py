@@ -15,8 +15,10 @@ from urllib.parse import parse_qs, urlsplit
 import numpy as np
 from PIL import Image, UnidentifiedImageError
 
-from handwash.core.config import ResolvedConfig
-from handwash.core.labels import STEP_ZH, Step
+from handwash.core.config import AssessConfig, ResolvedConfig
+from handwash.core.labels import CANONICAL_STEPS, STEP_EN, STEP_ORDER, Step
+from handwash.core.protocol import check_order, check_repeats, collapse_repeats
+from handwash.core.schema import ProtocolReport
 from handwash.errors import DataError, HandwashError
 from handwash.io.utils import write_jsonl
 from handwash.logging import get_logger
@@ -30,12 +32,69 @@ from handwash.pipelines.live import LiveClassifier, LiveSession
 __all__ = ["CameraApp", "serve_camera"]
 
 log = get_logger(__name__)
+# 网页界面为英文：步骤名称取 core/labels.py 的 STEP_EN，页面加载时注入。
 _LABELS_JSON = json.dumps(
-    {step.value: {"name": STEP_ZH[step], "step_no": step.order_index} for step in Step},
+    {step.value: {"name": STEP_EN[step], "step_no": step.order_index} for step in Step},
     ensure_ascii=False,
 ).encode("utf-8")
 _MAX_JPEG_BYTES = 4 * 1024 * 1024
 _MAX_IMAGE_SIDE = 4096
+
+
+def _step_en(step: Step) -> str:
+    return f"Step {step.order_index} ({STEP_EN[step]})" if step.order_index else STEP_EN[step]
+
+
+def _english_violation_details(report: ProtocolReport, cfg: AssessConfig) -> list[str]:
+    """为英文网页逐条生成问题说明，与 ``report.violations`` 一一对应。
+
+    core/protocol.py 只生成中文说明（L1，不在此改动）。这里用同一批公开判定函数
+    在同一份分段结果上重算逆序对与重复次数，顺序与 build_report 产出的违规条目一致；
+    保存到磁盘的报告仍是中文。
+    """
+    actions = collapse_repeats(list(report.step_sequence))
+    step_actions = collapse_repeats([step for step in actions if step in STEP_ORDER])
+    inversions = iter(check_order(step_actions))
+    repeats = dict(check_repeats(step_actions))
+    durations = {stat.step: stat.duration_s for stat in report.statistics}
+    fair_share = report.total_wash_duration_s / len(CANONICAL_STEPS)
+
+    details: list[str] = []
+    for violation in report.violations:
+        step = violation.step
+        if violation.kind == "missing" and step is not None:
+            text = f"{_step_en(step)} was not detected"
+        elif violation.kind == "out_of_order" and step is not None:
+            earlier = next(inversions, None)
+            text = (
+                f"{_step_en(step)} came after {_step_en(earlier[0])}"
+                if earlier is not None
+                else f"{_step_en(step)} is out of order"
+            )
+        elif violation.kind == "insufficient_duration" and step is None:
+            text = (
+                f"Total rubbing time is {report.total_wash_duration_s:.1f} s, below the "
+                f"WHO-recommended minimum of {cfg.min_total_duration_s:.0f} s"
+            )
+        elif violation.kind == "insufficient_duration":
+            duration = durations.get(step, 0.0)
+            if cfg.duration_check == "seconds":
+                reason = f"only {duration:.1f} s, below the {cfg.min_step_duration_s:.1f} s minimum"
+            else:
+                threshold = fair_share * cfg.step_duration_ratio
+                reason = (
+                    f"only {duration:.1f} s, below {cfg.step_duration_ratio:.0%} of the average share "
+                    f"of {fair_share:.1f} s (threshold {threshold:.1f} s)"
+                )
+            text = f"{_step_en(step)} is too short: {reason}"
+        elif violation.kind == "repeated" and step is not None:
+            text = f"{_step_en(step)} was performed {repeats.get(step, 2)} times"
+        elif violation.kind == "missing_faucet_event" and step is not None:
+            text = f"Faucet event not detected: {STEP_EN[step]}"
+        else:
+            text = violation.kind.replace("_", " ").capitalize() + (f": {_step_en(step)}" if step else "")
+        details.append(text)
+    return details
 
 
 class CameraApp:
@@ -116,10 +175,14 @@ class CameraApp:
                 return {"session_id": session_id, "frame_count": 0, "report": None}
             report, json_path = self._save_session(session)
             self._session = None
+            payload = report.to_dict()
+            details = _english_violation_details(report, self.rc.assess)
+            for violation, detail_en in zip(payload["violations"], details, strict=True):
+                violation["detail_en"] = detail_en
             return {
                 "session_id": session_id,
                 "frame_count": session.num_frames,
-                "report": report.to_dict(),
+                "report": payload,
                 "report_path": str(json_path),
             }
 
@@ -132,7 +195,7 @@ class CameraApp:
 
     def _require_session(self, session_id: str) -> LiveSession:
         if self._session is None or self._session.session_id != session_id:
-            raise DataError("摄像头会话不存在或已结束，请重新开始")
+            raise DataError("The session does not exist or has ended. Please start again.")
         return self._session
 
 
@@ -157,7 +220,7 @@ class _CameraHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if urlsplit(self.path).path != "/":
-            self._send(404, {"error": "页面不存在"})
+            self._send(404, {"error": "Page not found"})
             return
         body = files("handwash").joinpath("static/camera.html").read_bytes()
         # 步骤名称只在 core/labels.py 定义一次；页面加载时注入，避免前端再抄一份。
@@ -176,10 +239,10 @@ class _CameraHandler(BaseHTTPRequestHandler):
             host = self.headers.get("Host", "")
             port = self.server.server_port
             if host not in {"127.0.0.1", "localhost", f"127.0.0.1:{port}", f"localhost:{port}"}:
-                raise DataError("摄像头服务仅接受本机页面请求")
+                raise DataError("The camera service only accepts requests from this computer")
             origin = self.headers.get("Origin")
             if origin and origin != f"http://{host}":
-                raise DataError("摄像头接口不接受其他网站的请求")
+                raise DataError("The camera service does not accept requests from other websites")
             if parsed.path == "/api/start":
                 self._send(200, self.app.start())
                 return
@@ -192,36 +255,38 @@ class _CameraHandler(BaseHTTPRequestHandler):
                 try:
                     capture_time_s = float(raw_time)
                 except ValueError as exc:
-                    raise DataError("缺少有效的摄像头采集时间") from exc
+                    raise DataError("Missing a valid frame capture time") from exc
                 if not math.isfinite(capture_time_s):
-                    raise DataError("摄像头采集时间必须是有限数值")
+                    raise DataError("The frame capture time must be a finite number")
                 if self.headers.get("Content-Type", "").split(";", 1)[0].strip() != "image/jpeg":
-                    raise DataError("摄像头帧必须以 image/jpeg 发送")
+                    raise DataError("Frames must be sent as image/jpeg")
                 try:
                     length = int(self.headers.get("Content-Length", "0"))
                 except ValueError as exc:
-                    raise DataError("摄像头帧长度无效") from exc
+                    raise DataError("Invalid frame length") from exc
                 if length < 1 or length > _MAX_JPEG_BYTES:
-                    raise DataError(f"摄像头 JPEG 必须在 1 到 {_MAX_JPEG_BYTES} 字节之间")
+                    raise DataError(f"The JPEG frame must be between 1 and {_MAX_JPEG_BYTES} bytes")
                 raw = self.rfile.read(length)
                 if len(raw) != length:
-                    raise DataError("摄像头 JPEG 传输不完整")
+                    raise DataError("The JPEG frame was not received completely")
                 try:
                     with Image.open(io.BytesIO(raw)) as image:
                         width, height = image.size
                         if width > _MAX_IMAGE_SIDE or height > _MAX_IMAGE_SIDE:
-                            raise DataError("摄像头画面尺寸过大")
+                            raise DataError("The frame is too large")
                         frame = np.asarray(image.convert("RGB"))
                 except (UnidentifiedImageError, OSError) as exc:
-                    raise DataError("无法解码摄像头 JPEG") from exc
+                    raise DataError("Could not decode the JPEG frame") from exc
                 self._send(200, self.app.frame(session_id, frame, capture_time_s=capture_time_s))
                 return
-            self._send(404, {"error": "接口不存在"})
+            self._send(404, {"error": "Endpoint not found"})
         except HandwashError as exc:
+            # 下游模块的错误信息是中文；网页只显示英文，原文记在终端日志里。
+            log.warning("摄像头请求被拒绝：%s", exc)
             self._send(400, {"error": str(exc)})
         except Exception:
             log.exception("摄像头请求处理失败")
-            self._send(500, {"error": "服务处理失败，请查看终端日志"})
+            self._send(500, {"error": "The server failed to process the request. See the terminal log."})
 
 
 def serve_camera(

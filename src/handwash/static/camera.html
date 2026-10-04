@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>六步洗手评估</title>
+  <title>Six-Step Handwashing Assessment</title>
   <style>
     :root {
       --bg: #f3f6f7;
@@ -69,13 +69,13 @@
       margin: 0;
       background: var(--bg);
       color: var(--text);
-      font: 15px/1.55 -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+      font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
       -webkit-font-smoothing: antialiased;
     }
     button, select, input { font: inherit; color: inherit; }
     .num, .tabular { font-variant-numeric: tabular-nums; }
 
-    /* ---------- 顶栏 ---------- */
+    /* ---------- Top bar ---------- */
     .topbar {
       max-width: 1200px; margin: 0 auto; padding: 22px 24px 6px;
       display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
@@ -104,7 +104,7 @@
     .pill.done { background: var(--ok-soft); color: var(--ok); }
     @keyframes blink { 50% { opacity: .25; } }
 
-    /* ---------- 布局 ---------- */
+    /* ---------- Layout ---------- */
     .layout {
       max-width: 1200px; margin: 0 auto; padding: 14px 24px 28px;
       display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(320px, 1fr); gap: 18px;
@@ -119,7 +119,7 @@
     h3 { margin: 22px 0 10px; font-size: .92rem; color: var(--muted); font-weight: 600; }
     .muted { color: var(--muted); font-size: .86rem; }
 
-    /* ---------- 视频区 ---------- */
+    /* ---------- Video stage ---------- */
     .stage {
       position: relative; aspect-ratio: 4 / 3; border-radius: 12px; overflow: hidden;
       background: radial-gradient(120% 90% at 50% 40%, #1d3439, #0b1517);
@@ -196,7 +196,7 @@
       background: var(--warn-soft); color: var(--warn);
     }
 
-    /* ---------- 当前识别 ---------- */
+    /* ---------- Current step ---------- */
     .current { display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 12px; background: var(--surface-2); }
     .current-no {
       width: 56px; height: 56px; border-radius: 14px; flex: none; display: grid; place-items: center;
@@ -226,7 +226,7 @@
     .step.active { background: var(--surface-2); border-color: var(--c); }
     .hint { margin: 12px 0 0; font-size: .8rem; color: var(--faint); }
 
-    /* ---------- 时间轴 ---------- */
+    /* ---------- Timeline ---------- */
     .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: .78rem; color: var(--muted); }
     .legend span { display: inline-flex; align-items: center; gap: 5px; }
     .legend i { width: 10px; height: 10px; border-radius: 3px; background: var(--c); }
@@ -268,7 +268,7 @@
     .chip .tag { color: var(--danger); font-weight: 700; }
     .arrow { color: var(--faint); }
 
-    /* ---------- 报告 ---------- */
+    /* ---------- Report ---------- */
     .report-head { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
     .ring {
       --p: 0; --tone: var(--ok);
@@ -303,7 +303,7 @@
     .issue.info .ic { background: var(--info); } .issue.info .kind { background: var(--info-soft); color: var(--info); }
     .issue.pass .ic { background: var(--ok); } .issue.pass .kind { background: var(--ok-soft); color: var(--ok); }
     .bars { display: grid; gap: 8px; }
-    .bar-row { display: grid; grid-template-columns: 170px 1fr 92px; gap: 12px; align-items: center; font-size: .86rem; }
+    .bar-row { display: grid; grid-template-columns: 280px 1fr 92px; gap: 12px; align-items: center; font-size: .86rem; }
     .bar-row .label { display: flex; align-items: center; gap: 8px; min-width: 0; }
     .bar-row .label b {
       width: 22px; height: 22px; border-radius: 6px; flex: none; display: grid; place-items: center;
@@ -322,7 +322,7 @@
       .topbar { padding: 18px 16px 4px; }
       footer { padding: 0 16px 24px; }
       .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .bar-row { grid-template-columns: 120px 1fr 78px; }
+      .bar-row { grid-template-columns: 150px 1fr 78px; }
       .order { flex-direction: column; gap: 4px; }
       .actions .btn { padding: 11px 8px; font-size: .92rem; white-space: nowrap; }
     }
@@ -335,25 +335,25 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.7c3.6 4.3 6 7.7 6 10.8a6 6 0 0 1-12 0c0-3.1 2.4-6.5 6-10.8z"/><path d="M9.2 14.2a2.8 2.8 0 0 0 2.8 2.8"/></svg>
       </div>
       <div>
-        <h1>六步洗手评估</h1>
-        <p>WHO 六步洗手法 · 本机实时识别</p>
+        <h1>Six-Step Handwashing Assessment</h1>
+        <p>WHO six-step method · on-device recognition</p>
       </div>
     </div>
     <div class="top-meta">
       <span id="modelBadge" class="badge" hidden></span>
-      <span id="statusPill" class="pill">未开始</span>
+      <span id="statusPill" class="pill">Idle</span>
     </div>
   </header>
 
   <main class="layout">
-    <section class="card" aria-label="输入画面">
+    <section class="card" aria-label="Input video">
       <div class="stage">
         <video id="preview" autoplay muted playsinline></video>
         <div id="stageEmpty" class="stage-empty">
           <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="13" height="12" rx="2.5"/><path d="M15.5 10.5l6-3.5v10l-6-3.5"/></svg>
-          <span>开启摄像头，或载入一段本地视频</span>
+          <span>Turn on the camera or load a local video</span>
         </div>
-        <div id="liveChip" class="live-chip" hidden><span class="dot"></span>识别中 <span id="liveTime" class="tabular">0.0 s</span></div>
+        <div id="liveChip" class="live-chip" hidden><span class="dot"></span>Live <span id="liveTime" class="tabular">0.0 s</span></div>
         <div id="overlay" class="overlay" hidden>
           <span id="overlayNo" class="o-no">–</span>
           <span id="overlayName" class="o-name">—</span>
@@ -362,18 +362,18 @@
       </div>
 
       <div class="source">
-        <div class="segmented" role="tablist" aria-label="输入来源">
-          <button id="tabCamera" class="active" role="tab" aria-selected="true">摄像头</button>
-          <button id="tabVideo" role="tab" aria-selected="false">本地视频</button>
+        <div class="segmented" role="tablist" aria-label="Input source">
+          <button id="tabCamera" class="active" role="tab" aria-selected="true">Camera</button>
+          <button id="tabVideo" role="tab" aria-selected="false">Local video</button>
         </div>
         <div id="cameraPanel" class="source-row">
-          <select id="cameraSelect" aria-label="选择摄像头"><option value="">默认摄像头</option></select>
-          <button id="openButton" class="btn ghost">开启摄像头</button>
+          <select id="cameraSelect" aria-label="Choose a camera"><option value="">Default camera</option></select>
+          <button id="openButton" class="btn ghost">Turn on camera</button>
         </div>
         <div id="videoPanel" class="source-row" hidden>
           <label class="file">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
-            <span id="fileName">选择视频文件（mp4 等）</span>
+            <span id="fileName">Choose a video file (MP4, etc.)</span>
             <input id="videoFile" type="file" accept="video/*">
           </label>
         </div>
@@ -381,68 +381,68 @@
 
       <div class="actions">
         <button id="startButton" class="btn primary" disabled>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12.5-7.5z"/></svg>开始识别
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12.5-7.5z"/></svg>Start
         </button>
         <button id="stopButton" class="btn danger" disabled>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>结束并生成报告
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>Stop and generate report
         </button>
       </div>
-      <p id="message" class="message">选择输入来源：开启摄像头，或切换到“本地视频”选择文件。</p>
-      <p id="demoNotice" class="notice" hidden>当前使用 exp.pt 演示模型。离线验证结果与手机摄像头的实时泛化效果须分开报告。</p>
-      <p id="inputNotice" class="notice" hidden>当前输入为本地验证视频；结果用于展示公开数据上的离线推理流程，不应表述为实时摄像头泛化效果。</p>
+      <p id="message" class="message">Choose an input: turn on the camera, or switch to "Local video" and pick a file.</p>
+      <p id="demoNotice" class="notice" hidden>Using the exp.pt demo model. Report offline validation results separately from live camera generalization.</p>
+      <p id="inputNotice" class="notice" hidden>Input is a local validation video. Results show the offline inference workflow on public data and should not be presented as live camera generalization.</p>
     </section>
 
-    <section class="card" aria-label="当前识别">
+    <section class="card" aria-label="Current step">
       <div class="card-head">
-        <h2>当前识别</h2>
-        <span id="elapsed" class="muted tabular">已采样 0 帧</span>
+        <h2>Current step</h2>
+        <span id="elapsed" class="muted tabular">0 frames sampled</span>
       </div>
       <div class="current" aria-live="polite">
         <div id="currentNo" class="current-no">–</div>
         <div class="current-body">
-          <div id="current" class="current-name">等待开始</div>
-          <div class="conf"><div class="conf-bar"><i id="confBar"></i></div><span id="confidence" class="tabular">置信度 —</span></div>
+          <div id="current" class="current-name">Waiting to start</div>
+          <div class="conf"><div class="conf-bar"><i id="confBar"></i></div><span id="confidence" class="tabular">Confidence —</span></div>
         </div>
       </div>
       <ol id="steps" class="steps"></ol>
-      <p class="hint">识别过程中的结果为暂定；结束后按整段会话生成报告。</p>
+      <p class="hint">Results are provisional while running. The report is generated from the whole session when you stop.</p>
     </section>
 
-    <section class="card wide" aria-label="识别时间轴">
+    <section class="card wide" aria-label="Timeline">
       <div class="card-head">
-        <h2>识别时间轴</h2>
+        <h2>Timeline</h2>
         <div id="legend" class="legend"></div>
       </div>
-      <div id="track" class="track"><div class="track-empty">开始识别后，这里按时间显示每一段识别结果</div></div>
+      <div id="track" class="track"><div class="track-empty">Once you start, each recognized segment appears here in time order</div></div>
       <div id="axis" class="axis"></div>
       <div class="order">
-        <span class="order-label">识别顺序</span>
+        <span class="order-label">Sequence</span>
         <div id="orderChips" class="chips"><span class="empty">—</span></div>
       </div>
     </section>
 
-    <section id="report" class="card wide" aria-label="评估报告" hidden>
+    <section id="report" class="card wide" aria-label="Assessment report" hidden>
       <div class="report-head">
-        <div id="scoreRing" class="ring"><div><b id="scoreValue" class="tabular">0</b><small>综合得分</small></div></div>
+        <div id="scoreRing" class="ring"><div><b id="scoreValue" class="tabular">0</b><small>Overall score</small></div></div>
         <div style="flex: 1 1 260px; min-width: 0;">
-          <div id="reportTitle" class="eyebrow">最终报告</div>
+          <div id="reportTitle" class="eyebrow">Final report</div>
           <h2 id="verdict" class="verdict"></h2>
           <div class="metrics">
-            <div id="mWashBox" class="metric"><b id="mWash" class="tabular">–</b><span>搓洗时长（建议 ≥ 40 秒）</span></div>
-            <div id="mStepsBox" class="metric"><b id="mSteps" class="tabular">–</b><span>检出步骤</span></div>
-            <div id="mOrderBox" class="metric"><b id="mOrder">–</b><span>步骤顺序</span></div>
-            <div class="metric"><b id="mTotal" class="tabular">–</b><span>会话时长</span></div>
+            <div id="mWashBox" class="metric"><b id="mWash" class="tabular">–</b><span>Rubbing time (target ≥ 40 s)</span></div>
+            <div id="mStepsBox" class="metric"><b id="mSteps" class="tabular">–</b><span>Steps detected</span></div>
+            <div id="mOrderBox" class="metric"><b id="mOrder">–</b><span>Step order</span></div>
+            <div class="metric"><b id="mTotal" class="tabular">–</b><span>Session length</span></div>
           </div>
         </div>
       </div>
-      <h3>发现的问题</h3>
+      <h3>Issues found</h3>
       <ul id="violations" class="issues"></ul>
-      <h3>各步骤时长</h3>
+      <h3>Time per step</h3>
       <div id="stepBars" class="bars"></div>
     </section>
   </main>
 
-  <footer>画面在本机浏览器采集并送往本机推理服务；服务器保存步骤预测和报告，不保存原始视频。</footer>
+  <footer>Frames are captured in this browser and sent to the inference service on this computer. The server stores step predictions and reports, not the raw video.</footer>
   <canvas id="capture" hidden></canvas>
   <script id="labelsData" type="application/json">__HANDWASH_LABELS__</script>
   <script>
@@ -457,16 +457,18 @@
     const tabCamera = $("tabCamera");
     const tabVideo = $("tabVideo");
 
-    // 步骤名称由服务端从 core/labels.py 注入；直接打开文件时退回“第 N 步”。
+    // Step names are injected by the server from core/labels.py (STEP_EN); opening the file directly falls back to "Step N".
     let labelMeta = {};
     try { labelMeta = JSON.parse($("labelsData").textContent); } catch (error) { labelMeta = {}; }
     const STEPS = Object.entries(labelMeta)
       .filter(([, meta]) => meta.step_no > 0)
       .sort((a, b) => a[1].step_no - b[1].step_no)
       .map(([value, meta]) => ({step: value, step_no: meta.step_no, name: meta.name, detected: false, duration_s: 0}));
-    if (!STEPS.length) for (let i = 1; i <= 6; i++) STEPS.push({step: "step_" + i, step_no: i, name: "第 " + i + " 步", detected: false, duration_s: 0});
-    const KIND_ZH = {missing: "漏步", out_of_order: "顺序异常", insufficient_duration: "时长不足", repeated: "步骤重复",
-                     extra_activity: "额外动作", missing_faucet_event: "水龙头事件"};
+    if (!STEPS.length) for (let i = 1; i <= 6; i++) STEPS.push({step: "step_" + i, step_no: i, name: "Step " + i, detected: false, duration_s: 0});
+    const KIND_LABEL = {missing: "Missed step", out_of_order: "Order", insufficient_duration: "Too short", repeated: "Repeated",
+                        extra_activity: "Extra activity", missing_faucet_event: "Faucet event", pass: "Passed"};
+    // Server-side messages from deeper modules are in Chinese; the page shows English text only.
+    const CJK = /[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef]/;
     const SEVERITY_RANK = {error: 0, warning: 1, info: 2};
 
     let stream = null;
@@ -493,18 +495,22 @@
       $("message").className = "message" + (tone ? " " + tone : "");
     }
     function setStatus(state) {
-      const text = {idle: "未开始", ready: "就绪", running: "识别中", done: "已完成"}[state];
+      const text = {idle: "Idle", ready: "Ready", running: "Running", done: "Done"}[state];
       $("statusPill").className = "pill " + state;
       $("statusPill").textContent = text;
     }
     async function api(path, options) {
       const response = await fetch(path, options || {method: "POST"});
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "请求失败");
+      if (!response.ok) {
+        if (data.error && CJK.test(data.error)) console.warn(data.error);
+        throw new Error(data.error && !CJK.test(data.error) ? data.error
+          : "the server rejected the request (HTTP " + response.status + "); see the terminal log");
+      }
       return data;
     }
 
-    // ---------- 渲染：当前识别与六步清单 ----------
+    // ---------- Render: current step and six-step checklist ----------
     function renderLegend() {
       const root = $("legend");
       root.replaceChildren();
@@ -516,7 +522,7 @@
         root.append(span);
       }
       const other = el("span"); const sw = el("i"); sw.style.setProperty("--c", "var(--s-other)");
-      other.append(sw, document.createTextNode("其他"));
+      other.append(sw, document.createTextNode("Other"));
       root.append(other);
     }
     function renderChecklist(items, activeStep) {
@@ -527,8 +533,8 @@
         li.style.setProperty("--c", stepColor(item.step_no));
         li.append(
           el("span", "s-no", item.step_no),
-          el("span", "s-name", item.name),
-          el("span", "s-dur tabular", item.duration_s > 0 ? fmt(item.duration_s) + " s" : (item.detected ? "已检出" : "未检出")),
+          el("span", "s-name", labelName(item.step)),
+          el("span", "s-dur tabular", item.duration_s > 0 ? fmt(item.duration_s) + " s" : (item.detected ? "Detected" : "Not detected")),
         );
         root.append(li);
       }
@@ -539,21 +545,21 @@
       const conf = Math.round(data.confidence * 100);
       $("currentNo").textContent = number;
       $("currentNo").style.setProperty("--c", color);
-      $("current").textContent = data.label_zh;
+      $("current").textContent = labelName(data.label);
       $("confBar").style.width = conf + "%";
       $("confBar").style.setProperty("--c", color);
-      $("confidence").textContent = "置信度 " + conf + "%";
-      $("elapsed").textContent = "已采样 " + data.frame_count + " 帧 · " + fmt(data.elapsed_s) + " s";
+      $("confidence").textContent = "Confidence " + conf + "%";
+      $("elapsed").textContent = data.frame_count + " frames sampled · " + fmt(data.elapsed_s) + " s";
       $("overlay").hidden = false;
       $("overlayNo").textContent = number;
       $("overlayNo").style.setProperty("--c", color);
-      $("overlayName").textContent = data.label_zh;
+      $("overlayName").textContent = labelName(data.label);
       $("overlayConf").textContent = conf + "%";
       $("liveTime").textContent = fmt(data.elapsed_s) + " s";
     }
 
-    // ---------- 渲染：时间轴与识别顺序 ----------
-    // 与报告判定同一口径：只看六步；同一步被“其他/未识别”打断后继续，合并为一次。
+    // ---------- Render: timeline and step sequence ----------
+    // Same rule as the report: only the six steps count; a step interrupted by "other/unknown" and resumed is merged.
     function analyseOrder(timeline) {
       const chips = [];
       const segmentChip = timeline.map(() => -1);
@@ -570,8 +576,8 @@
       let maxSeen = 0;
       const seen = new Set();
       for (const chip of chips) {
-        if (chip.step_no < maxSeen) chip.issues.push("乱序");
-        if (seen.has(chip.step_no)) chip.issues.push("重复");
+        if (chip.step_no < maxSeen) chip.issues.push("Out of order");
+        if (seen.has(chip.step_no)) chip.issues.push("Repeated");
         maxSeen = Math.max(maxSeen, chip.step_no);
         seen.add(chip.step_no);
       }
@@ -585,7 +591,7 @@
       if (inputMode === "local_video" && Number.isFinite(video.duration) && video.duration > 0) {
         return Math.max(video.duration, elapsed);
       }
-      return Math.max(elapsed, 60);  // 摄像头：按 WHO 建议的 60 秒铺开，超出后自动拉长
+      return Math.max(elapsed, 60);  // Camera: lay out the WHO-recommended 60 s, extend beyond that automatically
     }
     function renderTimeline(timeline, scale, playhead) {
       const track = $("track");
@@ -593,7 +599,7 @@
       const axis = $("axis");
       axis.replaceChildren();
       if (!timeline.length) {
-        track.append(el("div", "track-empty", "开始识别后，这里按时间显示每一段识别结果"));
+        track.append(el("div", "track-empty", "Once you start, each recognized segment appears here in time order"));
         $("orderChips").replaceChildren(el("span", "empty", "—"));
         return;
       }
@@ -608,8 +614,8 @@
         node.style.width = width + "%";
         if (seg.step_no) node.style.setProperty("--c", stepColor(seg.step_no));
         if (seg.step_no && width > 2.5) node.textContent = seg.step_no;
-        node.title = labelName(seg.step) + "  " + fmt(seg.start_s) + "–" + fmt(seg.end_s) + " s  ·  置信度 " +
-          Math.round(seg.mean_confidence * 100) + "%" + (chip && chip.issues.length ? "  ·  " + chip.issues.join("、") : "");
+        node.title = labelName(seg.step) + "  " + fmt(seg.start_s) + "–" + fmt(seg.end_s) + " s  ·  confidence " +
+          Math.round(seg.mean_confidence * 100) + "%" + (chip && chip.issues.length ? "  ·  " + chip.issues.join(", ") : "");
         track.append(node);
       });
       if (playhead !== undefined) {
@@ -628,7 +634,7 @@
       const root = $("orderChips");
       root.replaceChildren();
       if (!chips.length) {
-        root.append(el("span", "empty", "尚未识别到六步动作"));
+        root.append(el("span", "empty", "No WHO step recognized yet"));
         return;
       }
       chips.forEach((chip, index) => {
@@ -638,15 +644,22 @@
         const badge = el("b", "", chip.step_no);
         badge.style.setProperty("--c", stepColor(chip.step_no));
         node.append(badge, el("small", "tabular", fmt(chip.start_s) + "–" + fmt(chip.end_s) + "s"));
-        if (chip.issues.length) node.append(el("span", "tag", chip.issues.join("·")));
+        if (chip.issues.length) node.append(el("span", "tag", chip.issues.join(" · ")));
         root.append(node);
       });
     }
 
-    // ---------- 渲染：报告 ----------
+    // ---------- Render: report ----------
+    // English issue text: the server adds detail_en; fall back to kind + step if it is missing.
+    function issueText(issue) {
+      if (issue.detail_en) return issue.detail_en;
+      const step = issue.step ? (labelMeta[issue.step] && labelMeta[issue.step].step_no
+        ? "Step " + labelMeta[issue.step].step_no + " (" + labelName(issue.step) + ")" : labelName(issue.step)) : "";
+      return (KIND_LABEL[issue.kind] || issue.kind) + (step ? ": " + step : "");
+    }
     function renderReport(report, demo) {
       $("report").hidden = false;
-      $("reportTitle").textContent = demo ? "演示报告" : "最终报告";
+      $("reportTitle").textContent = demo ? "Demo report" : "Final report";
       const score = Math.round(report.overall_score * 100);
       const ring = $("scoreRing");
       ring.style.setProperty("--p", score);
@@ -655,10 +668,10 @@
 
       const hasError = report.violations.some(v => v.severity === "error");
       let verdict, tone;
-      if (!report.is_complete) { verdict = "存在漏步"; tone = "bad"; }
-      else if (!report.is_in_order) { verdict = "六步已覆盖，但顺序待改进"; tone = "warn"; }
-      else if (hasError) { verdict = "六步完整、顺序正确，但时长不足"; tone = "warn"; }
-      else { verdict = "流程完整、顺序正确"; tone = "good"; }
+      if (!report.is_complete) { verdict = "Missed steps"; tone = "bad"; }
+      else if (!report.is_in_order) { verdict = "All six steps covered, but the order needs work"; tone = "warn"; }
+      else if (hasError) { verdict = "Complete and in order, but too short"; tone = "warn"; }
+      else { verdict = "Complete and in order"; tone = "good"; }
       $("verdict").textContent = verdict;
       $("verdict").className = "verdict " + tone;
 
@@ -667,19 +680,19 @@
       $("mWashBox").className = "metric " + (report.total_wash_duration_s >= 40 ? "good" : "bad");
       $("mSteps").textContent = detected + " / " + report.statistics.length;
       $("mStepsBox").className = "metric " + (report.is_complete ? "good" : "bad");
-      $("mOrder").textContent = report.is_in_order ? "正确" : "异常";
+      $("mOrder").textContent = report.is_in_order ? "Correct" : "Out of order";
       $("mOrderBox").className = "metric " + (report.is_in_order ? "good" : "bad");
       $("mTotal").textContent = fmt(report.total_duration_s) + " s";
 
       const list = $("violations");
       list.replaceChildren();
       const issues = [...report.violations].sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]);
-      if (!issues.length) issues.push({severity: "pass", kind: "pass", detail: "未发现漏步、乱序或时长不足。"});
+      if (!issues.length) issues.push({severity: "pass", kind: "pass", detail_en: "No missed steps, order problems or short durations found."});
       for (const issue of issues) {
         const li = el("li", "issue " + issue.severity);
         const icon = {error: "✕", warning: "!", info: "i", pass: "✓"}[issue.severity] || "•";
-        li.append(el("span", "ic", icon), el("span", "kind", KIND_ZH[issue.kind] || (issue.kind === "pass" ? "通过" : issue.kind)),
-                  el("span", "", issue.detail));
+        li.append(el("span", "ic", icon), el("span", "kind", KIND_LABEL[issue.kind] || issue.kind),
+                  el("span", "", issueText(issue)));
         list.append(li);
       }
 
@@ -690,20 +703,22 @@
         const row = el("div", "bar-row" + (stat.detected ? "" : " missing"));
         row.style.setProperty("--c", stepColor(stat.step_no));
         const label = el("div", "label");
-        label.append(el("b", "", stat.step_no), el("span", "", labelName(stat.step)));
+        const name = el("span", "", labelName(stat.step));
+        name.title = labelName(stat.step);
+        label.append(el("b", "", stat.step_no), name);
         const trackEl = el("div", "bar-track");
         const fill = el("i");
         fill.style.width = (stat.duration_s / longest * 100) + "%";
         trackEl.append(fill);
         row.append(label, trackEl,
-                   el("span", "val tabular", stat.detected ? fmt(stat.duration_s) + " s · " + Math.round(stat.ratio * 100) + "%" : "未检出"));
+                   el("span", "val tabular", stat.detected ? fmt(stat.duration_s) + " s · " + Math.round(stat.ratio * 100) + "%" : "Not detected"));
         bars.append(row);
       }
       renderTimeline(report.timeline || [], timelineScale(report.total_duration_s));
       $("report").scrollIntoView({behavior: "smooth", block: "start"});
     }
 
-    // ---------- 输入来源 ----------
+    // ---------- Input source ----------
     function selectTab(source) {
       const camera = source === "camera";
       tabCamera.classList.toggle("active", camera);
@@ -725,15 +740,15 @@
       devices.forEach((item, index) => {
         const option = document.createElement("option");
         option.value = item.deviceId;
-        option.textContent = item.label || "摄像头 " + (index + 1);
+        option.textContent = item.label || "Camera " + (index + 1);
         cameraSelect.append(option);
       });
-      if (!devices.length) cameraSelect.append(new Option("默认摄像头", ""));
+      if (!devices.length) cameraSelect.append(new Option("Default camera", ""));
       if (devices.some(item => item.deviceId === selected)) cameraSelect.value = selected;
     }
     async function openCamera() {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("此浏览器无法访问摄像头，请使用本机浏览器打开页面");
+        throw new Error("this browser cannot access the camera; open the page in a browser on this computer");
       }
       const selected = cameraSelect.value;
       const videoSettings = selected
@@ -748,7 +763,7 @@
       video.pause();
       video.removeAttribute("src");
       video.srcObject = nextStream;
-      video.classList.add("mirror");  // 自拍视角更直观；送去推理的画面不受镜像影响
+      video.classList.add("mirror");  // Selfie view feels natural; frames sent for inference are not mirrored
       try { await video.play(); }
       catch (error) {
         nextStream.getTracks().forEach(track => track.stop());
@@ -761,19 +776,19 @@
       if (previousStream) previousStream.getTracks().forEach(track => track.stop());
       await listCameras();
       inputReady();
-      showMessage("摄像头已连接，可以开始识别。", "ok");
+      showMessage("Camera connected. You can start.", "ok");
       const track = stream.getVideoTracks()[0];
       track.addEventListener("ended", () => {
         if (stream && stream.getVideoTracks()[0] !== track) return;
         clearInterval(timer);
         timer = null;
         startButton.disabled = true;
-        showMessage("摄像头已断开，请重新连接。", "error");
+        showMessage("Camera disconnected. Please reconnect.", "error");
       }, {once: true});
     }
     async function openLocalVideo() {
       const file = videoFile.files && videoFile.files[0];
-      if (!file) throw new Error("请先选择一个视频文件");
+      if (!file) throw new Error("choose a video file first");
       if (stream) stream.getTracks().forEach(track => track.stop());
       stream = null;
       if (localVideoUrl) URL.revokeObjectURL(localVideoUrl);
@@ -789,10 +804,10 @@
       $("fileName").textContent = file.name;
       $("inputNotice").hidden = false;
       inputReady();
-      showMessage("视频已载入，点击“开始识别”从头播放并识别；播放结束后自动生成报告。", "ok");
+      showMessage("Video loaded. Click Start to play it from the beginning; the report is generated when playback ends.", "ok");
     }
 
-    // ---------- 采集与会话 ----------
+    // ---------- Capture and session ----------
     function makeJpeg() {
       const width = Math.min(video.videoWidth, 640);
       const height = Math.round(video.videoHeight * width / video.videoWidth);
@@ -804,12 +819,12 @@
     async function sendFrame() {
       const validInput = inputMode === "local_video" || (stream && stream.active);
       if (!sessionId || pending || !video.videoWidth || !validInput || video.ended) return;
-      if (inputMode === "local_video" && (video.paused || video.currentTime <= lastCapture)) return;  // 暂停时不重复送同一时刻
+      if (inputMode === "local_video" && (video.paused || video.currentTime <= lastCapture)) return;  // Do not resend the same moment while paused
       const capturedAt = inputMode === "local_video" ? video.currentTime : performance.now() / 1000;
       lastCapture = capturedAt;
       pending = (async () => {
         const jpeg = await makeJpeg();
-        if (!jpeg) throw new Error("无法获取画面");
+        if (!jpeg) throw new Error("could not capture a frame");
         const path = "/api/frame?session_id=" + encodeURIComponent(sessionId) +
           "&capture_time_s=" + encodeURIComponent(capturedAt.toFixed(6));
         const data = await api(path, {method: "POST", headers: {"Content-Type": "image/jpeg"}, body: jpeg});
@@ -830,7 +845,7 @@
       lastCapture = -1;
       $("demoNotice").hidden = !state.demo;
       $("modelBadge").hidden = !state.model_name;
-      $("modelBadge").textContent = "模型：" + state.model_name;
+      $("modelBadge").textContent = "Model: " + state.model_name;
       $("report").hidden = true;
       renderChecklist(STEPS, null);
       renderTimeline([], 60);
@@ -843,8 +858,8 @@
       }
       $("liveChip").hidden = false;
       setStatus("running");
-      showMessage(inputMode === "local_video" ? "正在识别视频…" : "正在识别；请将双手保持在画面内。");
-      timer = setInterval(() => sendFrame().catch(error => showMessage("推理失败：" + error.message, "error")), 1000 / sampleFps);
+      showMessage(inputMode === "local_video" ? "Analyzing the video…" : "Running. Keep both hands in view.");
+      timer = setInterval(() => sendFrame().catch(error => showMessage("Inference failed: " + error.message, "error")), 1000 / sampleFps);
       await sendFrame();
     }
     async function finishSession() {
@@ -854,11 +869,11 @@
       timer = null;
       stopButton.disabled = true;
       if (inputMode === "local_video") video.pause();
-      showMessage("正在生成报告…");
+      showMessage("Generating the report…");
       try {
         if (pending) {
           try { await pending; }
-          catch (error) { showMessage("最后一帧推理失败，正在保存已收到的结果。", "error"); }
+          catch (error) { showMessage("The last frame failed; saving the results received so far.", "error"); }
         }
         const result = await api("/api/stop?session_id=" + encodeURIComponent(sessionId));
         const demo = !$("demoNotice").hidden;
@@ -867,15 +882,15 @@
         if (result.report) {
           renderReport(result.report, demo);
           setStatus("done");
-          showMessage("评估完成；可以重新开始。", "ok");
+          showMessage("Assessment complete. You can start again.", "ok");
         } else {
           setStatus("ready");
-          showMessage("会话已结束，未收到画面。");
+          showMessage("Session ended without receiving any frames.");
         }
         startButton.disabled = inputMode === "local_video" ? false : !(stream && stream.active);
         lockSources(false);
       } catch (error) {
-        showMessage("生成报告失败：" + error.message, "error");
+        showMessage("Could not generate the report: " + error.message, "error");
         stopButton.disabled = false;
       } finally {
         finishing = false;
@@ -886,16 +901,16 @@
     tabVideo.addEventListener("click", () => selectTab("video"));
     openButton.addEventListener("click", async () => {
       try { await openCamera(); }
-      catch (error) { showMessage("摄像头连接失败：" + error.message, "error"); }
+      catch (error) { showMessage("Could not connect to the camera: " + error.message, "error"); }
     });
     videoFile.addEventListener("change", async () => {
       try { await openLocalVideo(); }
-      catch (error) { showMessage("视频载入失败：" + error.message, "error"); }
+      catch (error) { showMessage("Could not load the video: " + error.message, "error"); }
     });
     cameraSelect.addEventListener("change", async () => {
       if (sessionId || !stream) return;
       try { await openCamera(); }
-      catch (error) { showMessage("切换摄像头失败：" + error.message, "error"); }
+      catch (error) { showMessage("Could not switch cameras: " + error.message, "error"); }
     });
     video.addEventListener("ended", () => {
       if (inputMode === "local_video" && sessionId) finishSession();
@@ -903,7 +918,7 @@
     startButton.addEventListener("click", async () => {
       try { await startSession(); }
       catch (error) {
-        showMessage("无法开始识别：" + error.message, "error");
+        showMessage("Could not start: " + error.message, "error");
         startButton.disabled = false;
         stopButton.disabled = true;
         lockSources(false);
