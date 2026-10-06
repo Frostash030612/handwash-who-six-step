@@ -186,8 +186,10 @@
     .btn.primary:not(:disabled):hover { background: var(--primary-strong); }
     .btn.danger { background: var(--danger-soft); color: var(--danger); border-color: transparent; }
     .btn.danger:not(:disabled):hover { border-color: var(--danger); }
-    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
-    .actions .btn { padding: 12px 16px; font-size: .98rem; }
+    .source-row .btn { min-width: 132px; }
+    .actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+    .actions.has-pause { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .actions .btn { min-width: 0; min-height: 46px; padding: 10px 12px; font-size: .94rem; line-height: 1.25; white-space: normal; }
     .message { margin: 12px 0 0; font-size: .86rem; color: var(--muted); min-height: 1.4em; }
     .message.error { color: var(--danger); }
     .message.ok { color: var(--ok); }
@@ -324,7 +326,14 @@
       .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .bar-row { grid-template-columns: 150px 1fr 78px; }
       .order { flex-direction: column; gap: 4px; }
-      .actions .btn { padding: 11px 8px; font-size: .92rem; white-space: nowrap; }
+      .actions .btn { padding: 10px 8px; font-size: .9rem; }
+    }
+    @media (max-width: 560px) {
+      .source-row { gap: 8px; }
+      .source-row > select { flex-basis: 100%; }
+      .source-row .btn { flex: 1 1 0; }
+      .actions.has-pause { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .actions.has-pause #stopButton { grid-column: 1 / -1; }
     }
   </style>
 </head>
@@ -369,6 +378,7 @@
         <div id="cameraPanel" class="source-row">
           <select id="cameraSelect" aria-label="Choose a camera"><option value="">Default camera</option></select>
           <button id="openButton" class="btn ghost">Turn on camera</button>
+          <button id="cameraOffButton" class="btn danger" hidden>Turn off camera</button>
         </div>
         <div id="videoPanel" class="source-row" hidden>
           <label class="file">
@@ -379,12 +389,13 @@
         </div>
       </div>
 
-      <div class="actions">
+      <div id="actions" class="actions">
         <button id="startButton" class="btn primary" disabled>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12.5-7.5z"/></svg>Start
         </button>
+        <button id="pauseVideoButton" class="btn ghost" disabled hidden>Pause video</button>
         <button id="stopButton" class="btn danger" disabled>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>Stop and generate report
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>Stop &amp; report
         </button>
       </div>
       <p id="message" class="message">Choose an input: turn on the camera, or switch to "Local video" and pick a file.</p>
@@ -442,7 +453,7 @@
     </section>
   </main>
 
-  <footer>Frames are captured in this browser and sent to the inference service on this computer. The server stores step predictions and reports, not the raw video.</footer>
+  <footer>Frames are captured in this browser and sent to the inference service on this computer. If your browser cannot play a selected video, the local service makes a temporary preview; the original file is unchanged, and the preview is deleted when the service stops. Reports and step predictions are saved separately.</footer>
   <canvas id="capture" hidden></canvas>
   <script id="labelsData" type="application/json">__HANDWASH_LABELS__</script>
   <script>
@@ -451,8 +462,10 @@
     const canvas = $("capture");
     const cameraSelect = $("cameraSelect");
     const openButton = $("openButton");
+    const cameraOffButton = $("cameraOffButton");
     const videoFile = $("videoFile");
     const startButton = $("startButton");
+    const pauseVideoButton = $("pauseVideoButton");
     const stopButton = $("stopButton");
     const tabCamera = $("tabCamera");
     const tabVideo = $("tabVideo");
@@ -731,6 +744,10 @@
     function inputReady() {
       $("stageEmpty").hidden = true;
       startButton.disabled = false;
+      pauseVideoButton.hidden = inputMode !== "local_video" || !sessionId;
+      $("actions").classList.toggle("has-pause", !pauseVideoButton.hidden);
+      pauseVideoButton.disabled = !sessionId;
+      pauseVideoButton.textContent = "Pause video";
       setStatus("ready");
     }
     async function listCameras() {
@@ -772,6 +789,8 @@
       }
       stream = nextStream;
       inputMode = "camera";
+      openButton.hidden = true;
+      cameraOffButton.hidden = false;
       $("inputNotice").hidden = true;
       if (previousStream) previousStream.getTracks().forEach(track => track.stop());
       await listCameras();
@@ -783,28 +802,77 @@
         clearInterval(timer);
         timer = null;
         startButton.disabled = true;
+        openButton.hidden = false;
+        cameraOffButton.hidden = true;
         showMessage("Camera disconnected. Please reconnect.", "error");
       }, {once: true});
+    }
+    async function closeCamera() {
+      if (sessionId) await finishSession();
+      if (stream) stream.getTracks().forEach(track => track.stop());
+      stream = null;
+      video.pause();
+      video.srcObject = null;
+      video.removeAttribute("src");
+      video.load();
+      video.classList.remove("mirror");
+      inputMode = null;
+      openButton.hidden = false;
+      cameraOffButton.hidden = true;
+      startButton.disabled = true;
+      pauseVideoButton.hidden = true;
+      $("actions").classList.remove("has-pause");
+      $("stageEmpty").hidden = false;
+      $("inputNotice").hidden = true;
+      setStatus("idle");
+      showMessage("Camera turned off.", "ok");
     }
     async function openLocalVideo() {
       const file = videoFile.files && videoFile.files[0];
       if (!file) throw new Error("choose a video file first");
       if (stream) stream.getTracks().forEach(track => track.stop());
       stream = null;
+      openButton.hidden = false;
+      cameraOffButton.hidden = true;
       if (localVideoUrl) URL.revokeObjectURL(localVideoUrl);
       localVideoUrl = URL.createObjectURL(file);
       video.srcObject = null;
       video.classList.remove("mirror");
       video.src = localVideoUrl;
       video.loop = false;
-      await video.play();
+      let usedTemporaryPreview = false;
+      try {
+        await video.play();
+      } catch (error) {
+        if (error.name === "NotSupportedError" || (video.error &&
+            (video.error.code === MediaError.MEDIA_ERR_DECODE || video.error.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED))) {
+          showMessage("Preparing a temporary browser preview from the original video on this computer…");
+          const preview = await api("/api/video", {
+            method: "POST",
+            headers: {"Content-Type": "application/octet-stream"},
+            body: file
+          });
+          URL.revokeObjectURL(localVideoUrl);
+          localVideoUrl = null;
+          video.removeAttribute("src");
+          video.load();
+          video.src = preview.url;
+          await video.play();
+          usedTemporaryPreview = true;
+        }
+        else if (error.name === "NotAllowedError") {
+          throw new Error("The browser blocked video playback. Check its media settings and select the file again.");
+        }
+        else throw error;
+      }
       video.pause();
       video.currentTime = 0;
       inputMode = "local_video";
       $("fileName").textContent = file.name;
       $("inputNotice").hidden = false;
       inputReady();
-      showMessage("Video loaded. Click Start to play it from the beginning; the report is generated when playback ends.", "ok");
+      showMessage((usedTemporaryPreview ? "Temporary preview ready; original video unchanged. " : "Video loaded. ") +
+        "Click Start to play from the beginning; the report is generated when playback ends.", "ok");
     }
 
     // ---------- Capture and session ----------
@@ -851,6 +919,10 @@
       renderTimeline([], 60);
       startButton.disabled = true;
       stopButton.disabled = false;
+      pauseVideoButton.hidden = inputMode !== "local_video";
+      $("actions").classList.toggle("has-pause", !pauseVideoButton.hidden);
+      pauseVideoButton.disabled = inputMode !== "local_video";
+      pauseVideoButton.textContent = "Pause video";
       lockSources(true);
       if (inputMode === "local_video") {
         video.currentTime = 0;
@@ -868,6 +940,7 @@
       clearInterval(timer);
       timer = null;
       stopButton.disabled = true;
+      pauseVideoButton.disabled = true;
       if (inputMode === "local_video") video.pause();
       showMessage("Generating the report…");
       try {
@@ -878,6 +951,10 @@
         const result = await api("/api/stop?session_id=" + encodeURIComponent(sessionId));
         const demo = !$("demoNotice").hidden;
         sessionId = null;
+        pauseVideoButton.disabled = true;
+        pauseVideoButton.hidden = true;
+        $("actions").classList.remove("has-pause");
+        pauseVideoButton.textContent = "Pause video";
         $("liveChip").hidden = true;
         if (result.report) {
           renderReport(result.report, demo);
@@ -903,6 +980,10 @@
       try { await openCamera(); }
       catch (error) { showMessage("Could not connect to the camera: " + error.message, "error"); }
     });
+    cameraOffButton.addEventListener("click", async () => {
+      try { await closeCamera(); }
+      catch (error) { showMessage("Could not turn off the camera: " + error.message, "error"); }
+    });
     videoFile.addEventListener("change", async () => {
       try { await openLocalVideo(); }
       catch (error) { showMessage("Could not load the video: " + error.message, "error"); }
@@ -921,10 +1002,26 @@
         showMessage("Could not start: " + error.message, "error");
         startButton.disabled = false;
         stopButton.disabled = true;
+        pauseVideoButton.disabled = true;
+        pauseVideoButton.hidden = true;
+        $("actions").classList.remove("has-pause");
         lockSources(false);
       }
     });
     stopButton.addEventListener("click", finishSession);
+    pauseVideoButton.addEventListener("click", () => {
+      if (!sessionId || inputMode !== "local_video") return;
+      if (video.paused) {
+        video.play().then(() => {
+          pauseVideoButton.textContent = "Pause video";
+          showMessage("Video resumed. Assessment continues.");
+        }).catch(error => showMessage("Could not resume the video: " + error.message, "error"));
+      } else {
+        video.pause();
+        pauseVideoButton.textContent = "Resume video";
+        showMessage("Video paused. Click Resume video to continue the assessment.");
+      }
+    });
 
     renderLegend();
     renderChecklist(STEPS, null);

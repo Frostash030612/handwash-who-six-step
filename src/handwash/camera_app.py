@@ -5,11 +5,16 @@ from __future__ import annotations
 import io
 import json
 import math
+import re
+import shutil
+import subprocess
+import tempfile
 import threading
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
 from pathlib import Path
+from typing import BinaryIO
 from urllib.parse import parse_qs, urlsplit
 
 import numpy as np
@@ -39,6 +44,19 @@ _LABELS_JSON = json.dumps(
 ).encode("utf-8")
 _MAX_JPEG_BYTES = 4 * 1024 * 1024
 _MAX_IMAGE_SIDE = 4096
+_MAX_VIDEO_BYTES = 128 * 1024 * 1024
+
+
+def _ffmpeg_executable() -> str:
+    try:
+        import imageio_ffmpeg
+
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except (ImportError, RuntimeError):
+        executable = shutil.which("ffmpeg")
+        if executable:
+            return executable
+        raise DataError("The local video decoder is unavailable. Install the project's video dependencies.") from None
 
 
 def _step_en(step: Step) -> str:
@@ -146,6 +164,74 @@ class CameraApp:
         self.demo_exp = demo_exp
         self._lock = threading.Lock()
         self._session: LiveSession | None = None
+        self._preview_dir = tempfile.TemporaryDirectory(prefix="handwash-preview-")
+        self._preview_id: str | None = None
+        self._preview_file: Path | None = None
+
+    def prepare_video_preview(self, source: BinaryIO, length: int) -> str:
+        """临时生成浏览器可播放预览；不改动用户原片，也不写入项目数据目录。"""
+        with self._lock:
+            if self._session is not None:
+                raise DataError("Stop the current session before loading another video")
+            preview_id = uuid.uuid4().hex
+            temporary_root = Path(self._preview_dir.name)
+            original = temporary_root / f"{preview_id}.source"
+            converted = temporary_root / f"{preview_id}.mp4"
+            try:
+                remaining = length
+                with original.open("wb") as target:
+                    while remaining:
+                        chunk = source.read(min(1024 * 1024, remaining))
+                        if not chunk:
+                            raise DataError("The selected video was not received completely")
+                        target.write(chunk)
+                        remaining -= len(chunk)
+                result = subprocess.run(
+                    [
+                        _ffmpeg_executable(),
+                        "-nostdin",
+                        "-hide_banner",
+                        "-loglevel",
+                        "error",
+                        "-i",
+                        str(original),
+                        "-map",
+                        "0:v:0",
+                        "-map",
+                        "0:a:0?",
+                        "-c:v",
+                        "libx264",
+                        "-preset",
+                        "veryfast",
+                        "-crf",
+                        "22",
+                        "-pix_fmt",
+                        "yuv420p",
+                        "-c:a",
+                        "aac",
+                        "-movflags",
+                        "+faststart",
+                        str(converted),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if result.returncode != 0 or not converted.is_file():
+                    log.warning("无法生成本机视频预览：%s", result.stderr.strip())
+                    raise DataError("The local service could not decode this video; see the terminal log")
+                self._preview_id = preview_id
+                self._preview_file = converted
+                return f"/api/video/{preview_id}"
+            finally:
+                original.unlink(missing_ok=True)
+
+    def preview_file(self, preview_id: str) -> Path | None:
+        with self._lock:
+            return self._preview_file if preview_id == self._preview_id else None
+
+    def close(self) -> None:
+        self._preview_dir.cleanup()
 
     def start(self) -> dict[str, object]:
         with self._lock:
@@ -218,8 +304,56 @@ class _CameraHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_video(self, path: Path) -> None:
+        size = path.stat().st_size
+        start, end = 0, size - 1
+        range_header = self.headers.get("Range")
+        if range_header:
+            match = re.fullmatch(r"bytes=(\d*)-(\d*)", range_header.strip())
+            if not match or not any(match.groups()):
+                self.send_error(416, "Invalid video range")
+                return
+            first, last = match.groups()
+            if first:
+                start = int(first)
+                end = min(int(last), size - 1) if last else size - 1
+            else:
+                count = int(last)
+                start = max(0, size - count)
+            if start > end or start >= size or (not first and count == 0):
+                self.send_error(416, "Invalid video range")
+                return
+        self.send_response(206 if range_header else 200)
+        self.send_header("Content-Type", "video/mp4")
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("Content-Length", str(end - start + 1))
+        self.send_header("Cache-Control", "no-store")
+        if range_header:
+            self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        self.end_headers()
+        with path.open("rb") as source:
+            source.seek(start)
+            remaining = end - start + 1
+            try:
+                while remaining:
+                    chunk = source.read(min(64 * 1024, remaining))
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    remaining -= len(chunk)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
     def do_GET(self) -> None:
-        if urlsplit(self.path).path != "/":
+        path = urlsplit(self.path).path
+        if path.startswith("/api/video/"):
+            preview = self.app.preview_file(path.removeprefix("/api/video/"))
+            if preview is None:
+                self._send(404, {"error": "Video preview not found"})
+            else:
+                self._send_video(preview)
+            return
+        if path != "/":
             self._send(404, {"error": "Page not found"})
             return
         body = files("handwash").joinpath("static/camera.html").read_bytes()
@@ -243,6 +377,17 @@ class _CameraHandler(BaseHTTPRequestHandler):
             origin = self.headers.get("Origin")
             if origin and origin != f"http://{host}":
                 raise DataError("The camera service does not accept requests from other websites")
+            if parsed.path == "/api/video":
+                if self.headers.get("Content-Type", "").split(";", 1)[0].strip() != "application/octet-stream":
+                    raise DataError("Video uploads must use application/octet-stream")
+                try:
+                    length = int(self.headers.get("Content-Length", "0"))
+                except ValueError as exc:
+                    raise DataError("Invalid video length") from exc
+                if length < 1 or length > _MAX_VIDEO_BYTES:
+                    raise DataError("The selected video must be between 1 byte and 128 MB")
+                self._send(200, {"url": self.app.prepare_video_preview(self.rfile, length)})
+                return
             if parsed.path == "/api/start":
                 self._send(200, self.app.start())
                 return
@@ -308,3 +453,4 @@ def serve_camera(
         server.serve_forever()
     finally:
         server.server_close()
+        app.close()

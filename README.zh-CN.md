@@ -73,7 +73,9 @@ python scripts/run_camera.py --demo-exp
 打开 `http://127.0.0.1:8765/`，连接并选择外接摄像头，然后点击“开始识别”。
 页面会标明“演示”，结果保存在 `outputs/exp_demo/camera/`。可用
 `--no-temporal-head` 查看纯帧模型对照。模型类别顺序已单独核对；演示报告不能当作
-正式准确率或最终实验结果。
+正式准确率或最终实验结果。若浏览器无法解码上传的视频，本地服务会临时生成
+H.264 播放预览；原始数据集文件不会修改，关闭服务后会删除临时预览。
+
 公开上传前用 `git add .` 和 `git status --short` 核对待提交文件；
 只允许根目录的演示权重 `exp.pt` 与 `exp_temporal_head.pt` 入库，NDJSON 导出清单、训练权重、
 `deliverables/` 和 `outputs/` 不应上传。`.gitignore` 不会清除已经提交的历史文件。

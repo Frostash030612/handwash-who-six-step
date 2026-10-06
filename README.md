@@ -76,8 +76,10 @@ python scripts/run_camera.py --demo-exp
 
 Open `http://127.0.0.1:8765/`, select a camera, and start recognition. Use
 `--no-temporal-head` to compare the frame-only path. The page marks this as a demo; its report
-is saved under `outputs/exp_demo/camera/` and is not a final result. Before publishing, use
-`git add .` and inspect `git status --short`. The root demo weights `exp.pt` and
+is saved under `outputs/exp_demo/camera/` and is not a final result. If the browser cannot decode
+an uploaded video, the local service creates a temporary H.264 preview for playback. The
+original dataset file is unchanged; the preview is removed when the service stops.
+Before publishing, use `git add .` and inspect `git status --short`. The root demo weights `exp.pt` and
 `exp_temporal_head.pt` are included; do not upload the NDJSON export, training weights,
 `deliverables/`, or `outputs/`. `.gitignore` does not remove files already present in Git history.
 

@@ -45,7 +45,7 @@ torch = ["torch>=2.2", "torchvision>=0.17"]
 # YOLO26 后端（主模型）。需要 torch。
 yolo = ["ultralytics>=8.3"]
 # 视频解码（缺省时 io/video.py 自动回退到 imageio-ffmpeg）
-video = ["opencv-python>=4.9"]
+video = ["opencv-python>=4.9", "imageio-ffmpeg>=0.4.9"]
 # 绘图 / notebook 实验
 viz = ["matplotlib>=3.8", "jupyterlab>=4.0"]
 # 开发与质量门禁
