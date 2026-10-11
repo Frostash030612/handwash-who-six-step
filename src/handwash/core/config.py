@@ -742,7 +742,7 @@ def _default_dataset_profiles() -> dict[str, dict[str, Any]]:
     # 注意：本函数是"配置默认值"的唯一定义处，这里的相对路径字面量
     # 已在 scripts/check_structure.py 的 LITERAL_EXCEPTIONS 中登记豁免
     # （配置默认值天然就是路径字符串，走 paths 常量反而会绕圈）。
-    names = ("kaggle", "pskuss", "metc", "jurmala", "selfrecorded", "synthetic")
+    names = ("kaggle", "pskuss", "metc", "jurmala", "hospitals_full", "selfrecorded", "synthetic")
     profiles: dict[str, dict[str, Any]] = {}
     for name in names:
         root = f"{DATA_RAW_DIRNAME}/{name}" if name != "synthetic" else SYNTHETIC_DIRNAME
@@ -754,6 +754,11 @@ def _default_dataset_profiles() -> dict[str, dict[str, Any]]:
             "manifest": f"{processed}/manifest.csv",
         }
     profiles["pskuss"]["root"] = f"{DATA_RAW_DIRNAME}/pskuss/extracted"
+    profiles["jurmala"]["root"] = f"{DATA_RAW_DIRNAME}/jurmala/extracted"
+    profiles["hospitals_full"]["root"] = f"{DATA_PROCESSED_DIRNAME}/hospitals_full_7class"
+    profiles["hospitals_full"]["processed_dir"] = f"{DATA_PROCESSED_DIRNAME}/hospitals_full_7class"
+    profiles["hospitals_full"]["frames_dir"] = f"{DATA_PROCESSED_DIRNAME}/hospitals_full_7class/frames"
+    profiles["hospitals_full"]["manifest"] = f"{DATA_PROCESSED_DIRNAME}/hospitals_full_7class/manifest.csv"
     profiles["metc"]["external_only"] = True
     return profiles
 

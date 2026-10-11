@@ -117,7 +117,7 @@ DATASETS: Final[dict[str, dict[str, Any]]] = {
         "always": ("statistics.csv", "summary.csv"),
     },
     # ---------------------------------------------------------------------
-    # Jurmala —— 可选扩展（约 15.8 GiB，作业不必要）
+    # Jurmala —— full-data 双标注训练扩展（约 15.8 GiB）
     # ---------------------------------------------------------------------
     "jurmala": {
         "record": 5808764,
@@ -125,7 +125,7 @@ DATASETS: Final[dict[str, dict[str, Any]]] = {
         "license": "CC-BY-4.0",
         "home": "https://zenodo.org/records/5808764",
         "paper": "",
-        "notes": "可选扩展数据（约 15.8 GiB）。时间与算力充足时再加，不是完成作业的必要条件。",
+        "notes": "全量训练扩展：几乎所有视频有双标注，按与 PSKUS 相同的双人一致规则清洗。",
         "extract_to": "extracted",
         "config_root": "data/raw/jurmala/extracted",
         "files": (
@@ -149,7 +149,7 @@ DATASETS: Final[dict[str, dict[str, Any]]] = {
         "mirror": "https://github.com/atiselsts/data/raw/master/kaggle-dataset-6classes.tar",
         "paper": "",
         "notes": (
-            "快速原型数据（约 300 MiB）。Zenodo 上没有，两条路："
+            "快速原型数据（GitHub 整理版实测约 1.2 GiB）。Zenodo 上没有，两条路："
             "(1) 装 kaggle CLI 并配置 API token，然后 "
             "`kaggle datasets download -d realtimear/hand-wash-dataset`；"
             "(2) 用 GitHub 镜像直链下载六分类整理版。下完解压到 data/raw/kaggle/。"

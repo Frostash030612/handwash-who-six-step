@@ -68,6 +68,7 @@ def _inspect(rc) -> int:
         _discover_source,
         _looks_like_image_tree,
         _records_from_frames_dir,
+        _records_from_jurmala,
         _records_from_metc,
         _records_from_pskuss,
         _records_from_video_dirs,
@@ -82,6 +83,8 @@ def _inspect(rc) -> int:
         frames, clips = _records_from_frames_dir(rc, base)
     elif name == "pskuss":
         frames, clips = _records_from_pskuss(rc, base)
+    elif name == "jurmala":
+        frames, clips = _records_from_jurmala(rc, base)
     elif name == "metc":
         frames, clips = _records_from_metc(rc, base)
     else:

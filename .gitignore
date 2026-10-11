@@ -59,9 +59,26 @@ data/raw/**
 # ---------------------------------------------------------------------------
 
 # --- 模型权重与导出 ---------------------------------------------------------
-# Ignore only the root-level runtime weight directory. A bare `models/` pattern
-# also ignores `src/handwash/models/`, which is application source code.
+# 根目录运行时模型默认忽略；项目明确归档的公平对照权重在下方白名单中例外。
+# 使用根路径，避免误忽略 src/handwash/models/ 里的应用代码。
 /models/
+!/models/
+models/*
+!/models/README.md
+!/models/pskuss_ds1234/
+models/pskuss_ds1234/*
+!/models/pskuss_ds1234/yolo/
+!/models/pskuss_ds1234/yolo_gru/
+!/models/pskuss_ds1234/videomae_center_stable/
+models/pskuss_ds1234/yolo/*
+!models/pskuss_ds1234/yolo/best.pt
+models/pskuss_ds1234/yolo_gru/*
+!models/pskuss_ds1234/yolo_gru/head.pt
+models/pskuss_ds1234/videomae_center_stable/*
+!models/pskuss_ds1234/videomae_center_stable/model.safetensors
+!models/pskuss_ds1234/videomae_center_stable/config.json
+!models/pskuss_ds1234/videomae_center_stable/preprocessor_config.json
+!models/pskuss_ds1234/videomae_center_stable/handwash_metadata.json
 *.pt
 !/exp.pt
 !/exp_temporal_head.pt
@@ -71,6 +88,9 @@ data/raw/**
 *.tflite
 *.mlpackage
 !**/configs/models/*.yaml
+# These three explicitly archived checkpoints are stored through Git LFS.
+!/models/pskuss_ds1234/yolo/best.pt
+!/models/pskuss_ds1234/yolo_gru/head.pt
 # 本地 Ultralytics 数据导出清单；公开仓库只保留获取和处理数据的说明。
 /pskus-dataset1-dataset4-high-confidence-ultralytics.ndjson
 

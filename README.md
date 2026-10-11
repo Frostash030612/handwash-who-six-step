@@ -79,11 +79,25 @@ Open `http://127.0.0.1:8765/`, select a camera, and start recognition. Use
 is saved under `outputs/exp_demo/camera/` and is not a final result. If the browser cannot decode
 an uploaded video, the local service creates a temporary H.264 preview for playback. The
 original dataset file is unchanged; the preview is removed when the service stops.
+For a repeatable local check of the same video files with frame smoothing and the GRU head, run:
+
+```bash
+python scripts/audit_demo.py --folder data/external/pskus_demo_validation
+```
+
+The summary is saved to `outputs/exp_demo/demo_audit/summary.csv`, alongside a report for each
+video and model variant. `handwash audit-demo --folder <video-directory>` is equivalent. This
+offline audit does not establish accuracy without video-level human ground truth; `metadata.json`
+records the configuration and weight fingerprints.
+
 Before publishing, use `git add .` and inspect `git status --short`. The root demo weights `exp.pt` and
 `exp_temporal_head.pt` are included; do not upload the NDJSON export, training weights,
 `deliverables/`, or `outputs/`. `.gitignore` does not remove files already present in Git history.
 
 ### Final dataset and cloud training
+
+The commands below are the PSKUS-only baseline. For the full dual-annotator
+PSKUS + Jurmala set, see [the full-data plan](docs/FULL_DATASET.zh-CN.md).
 
 ```bash
 # 1. Raw data is not bundled. Download PSKUS, then clean and audit the videos/labels.
@@ -238,6 +252,7 @@ dataset sources; provide a trained project checkpoint with `--checkpoint` for th
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | **Modification rules (required reading)**: Iron Rules, change levels, commit and PR flow |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Layer diagram, the five contracts, RFC process, extension guides |
 | [`docs/DATA.md`](docs/DATA.md) | The five public datasets: sources, layouts, downloads, preparation |
+| [`docs/FULL_DATASET.zh-CN.md`](docs/FULL_DATASET.zh-CN.md) | Full dual-annotator PSKUS + Jurmala training set (Chinese) |
 | [`docs/DATA_COLLABORATION.md`](docs/DATA_COLLABORATION.md) | **How four people share 2–17 GB without uploading it anywhere** |
 | [`docs/CONFIG.md`](docs/CONFIG.md) | Every configuration key, plus recipes for common changes |
 | [`docs/PROTOCOL.md`](docs/PROTOCOL.md) | Assessment criteria: exact definitions of missed / out-of-order / insufficient duration |

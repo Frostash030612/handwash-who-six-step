@@ -500,6 +500,8 @@ LABEL_SPACES: Final[Mapping[str, LabelSpace]] = {
     # Exact published METC label set: six WHO movements plus other (no faucet events).
     # Appended so existing label-space indices/checkpoints retain their meaning.
     "metc_public": LabelSpace("metc_public", (*CANONICAL_STEPS, Step.OTHER)),
+    # Full seven-class export matches the Ultralytics directory order: 0=other.
+    "who7": LabelSpace("who7", (Step.OTHER, *CANONICAL_STEPS)),
 }
 
 

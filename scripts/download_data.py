@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import http.client
 import json
 import os
 import re
@@ -301,6 +302,10 @@ def download_file(
             with urllib.request.urlopen(request, timeout=60, context=context) as response:
                 # 206 = 服务器接受了 Range，继续追加；200 = 服务器忽略 Range，从头写
                 mode = "ab" if resume_from and response.status == 206 else "wb"
+                if mode == "ab":
+                    content_range = response.headers.get("Content-Range", "")
+                    if not content_range.startswith(f"bytes {resume_from}-"):
+                        raise OSError(f"服务器返回了不匹配的续传范围：{content_range!r}")
                 if mode == "wb" and resume_from:
                     resume_from = 0
                 total = int(response.headers.get("Content-Length", 0)) + resume_from
@@ -327,9 +332,17 @@ def download_file(
                 if not quiet:
                     print()
 
+            # Some proxies close a large response cleanly before Content-Length
+            # is reached. Do not rename/delete that useful .part: retry with Range.
+            expected_size = int(item.get("size", 0))
+            if expected_size and written != expected_size:
+                raise OSError(
+                    f"响应提前结束：已收到 {human(written)} / 预期 {human(expected_size)}"
+                )
+
             # 原子改名：只有完整下载的文件才会出现在最终路径上
             part.replace(target)
-        except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as exc:
+        except (urllib.error.URLError, TimeoutError, ConnectionError, OSError, http.client.IncompleteRead) as exc:
             if attempt >= retries:
                 return False, f"下载失败（已重试 {retries} 次）：{type(exc).__name__}: {exc}"
             wait = min(2**attempt, 30)
@@ -399,9 +412,9 @@ def write_sources(
             for item in files
         },
     }
-    target.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n"
-    )
+    # ``Path.write_text(newline=...)`` was added in Python 3.10; keep this
+    # downloader usable with the Python 3.9 runtime common on student Macs.
+    target.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return target
 
 
@@ -463,7 +476,8 @@ def cmd_list(dataset: str, *, offline: bool) -> int:
     for item in files:
         path = destination / item["key"]
         if not path.exists():
-            status = "未下载"
+            part = path.with_suffix(path.suffix + PART_SUFFIX)
+            status = f"续传中 ({human(part.stat().st_size)})" if part.exists() else "未下载"
         else:
             ok, reason = verify_file(path, item.get("md5", ""))
             status = ("已验证 " if ok else "校验失败 ") + f"({human(path.stat().st_size)})"
@@ -609,6 +623,7 @@ def cmd_extract(dataset: str) -> int:
     entry = get_dataset(dataset)
     extract_to = destination / str(entry.get("extract_to", dataset))
     extract_to.mkdir(parents=True, exist_ok=True)
+    known_files = load_sources(dataset).get("files", {})
 
     zips = sorted(destination.glob("*.zip"))
     if not zips:
@@ -616,12 +631,24 @@ def cmd_extract(dataset: str) -> int:
 
     for archive in zips:
         done_marker = archive.with_suffix(archive.suffix + ".extracted")
-        if done_marker.exists():
-            print(f"跳过（已解压过）：{archive.name}")
-            continue
-        print(f"解压 {archive.name} -> {extract_to}")
+        expected_md5 = known_files.get(archive.name, {}).get("md5", "")
+        if expected_md5:
+            ok, reason = verify_file(archive, expected_md5)
+            if not ok:
+                raise SystemExit(f"拒绝解压未通过 MD5 校验的文件：{archive.name}（{reason}）")
         try:
             with zipfile.ZipFile(archive) as handle:
+                members = handle.namelist()
+                if any(
+                    Path(name).is_absolute() or ".." in Path(name).parts
+                    for name in members
+                ):
+                    raise SystemExit(f"拒绝解压含不安全路径的 zip：{archive.name}")
+                top_levels = {Path(name).parts[0] for name in members if Path(name).parts}
+                if done_marker.exists() and all((extract_to / name).exists() for name in top_levels):
+                    print(f"跳过（已解压过）：{archive.name}")
+                    continue
+                print(f"解压 {archive.name} -> {extract_to}")
                 handle.extractall(extract_to)
         except zipfile.BadZipFile as exc:
             print(f"  解压失败（文件可能损坏，重新下载该分片）：{exc}")
@@ -676,8 +703,12 @@ def cmd_status(*, offline: bool = True) -> int:
             used = sum(p.stat().st_size for p in directory.rglob("*") if p.is_file())
         grand_total += used
 
-        if name == "synthetic" or requires_manual_download(name):
-            state = "手工/自动生成，无需下载"
+        if name == "kaggle":
+            archive = directory / "kaggle-dataset-6classes.tar"
+            state = "GitHub 整理版已下载" if archive.is_file() else "需从 Kaggle/GitHub 另行下载"
+            registered = "—"
+        elif name == "synthetic" or requires_manual_download(name):
+            state = "本地生成，无需下载"
             registered = "—"
         else:
             try:
@@ -687,6 +718,10 @@ def cmd_status(*, offline: bool = True) -> int:
                 done = local_verified(name)
                 verified_count = sum(1 for key in done if done.get(key))
                 state = f"已校验 {verified_count}/{len(files)} 个文件"
+                partials = list(directory.glob(f"*{PART_SUFFIX}")) if directory.exists() else []
+                if partials:
+                    partial_bytes = sum(path.stat().st_size for path in partials)
+                    state += f"；续传中 {len(partials)} 个（{human(partial_bytes)}）"
             except SystemExit:
                 registered, state = "—", "查询失败"
         print(f"{name:<12}{registered:>10}{human(used):>11}   {state}")
@@ -750,6 +785,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.list:
         return cmd_list(args.dataset, offline=args.offline)
+
+    # Documented standalone extraction command must not require a download
+    # selection; it operates only on archives already present on disk.
+    if args.extract and not (args.all or args.files or args.share or args.verify_only):
+        return cmd_extract(args.dataset)
 
     files = [name for name in (args.files or "").split(",") if name.strip()]
     return cmd_download(

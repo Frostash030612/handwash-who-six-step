@@ -60,6 +60,7 @@ SOURCE_NAMES: tuple[str, ...] = ("kaggle", "pskuss", "metc", "jurmala", "selfrec
 #: 未登记的数据集走 ``_records_from_video_dirs`` 通用兜底。
 _SOURCE_ADAPTERS: dict[str, str] = {
     "pskuss": "_records_from_pskuss",
+    "jurmala": "_records_from_jurmala",
     "metc": "_records_from_metc",
 }
 
@@ -239,7 +240,14 @@ def _clip_from_frames(clip_id: str, recs: Sequence[FrameRecord], *, fps: float) 
     )
 
 
-def _records_from_pskuss(rc: ResolvedConfig, root: Path) -> tuple[list[FrameRecord], list[ClipRecord]]:
+def _records_from_jurmala(rc: ResolvedConfig, root: Path) -> tuple[list[FrameRecord], list[ClipRecord]]:
+    """Jurmala uses the same per-frame CSV format, but Location_* partitions."""
+    return _records_from_pskuss(rc, root, partition_glob="Location_*")
+
+
+def _records_from_pskuss(
+    rc: ResolvedConfig, root: Path, *, partition_glob: str = "DataSet*"
+) -> tuple[list[FrameRecord], list[ClipRecord]]:
     """PSKUS 真实结构适配器（已对着 DataSet4 的实际文件核对过）。
 
     解压后的真实结构（``<root>`` 指 ``data/raw/pskuss``）：:
@@ -280,12 +288,11 @@ def _records_from_pskuss(rc: ResolvedConfig, root: Path) -> tuple[list[FrameReco
     skipped_consensus = 0
     kept_consensus_frames = 0
 
-    dataset_dirs = sorted(p for p in root.rglob("DataSet*") if p.is_dir())
+    dataset_dirs = sorted(p for p in root.rglob(partition_glob) if p.is_dir())
     if not dataset_dirs:
         raise DataError(
-            f"在 {root} 下找不到 DataSet* 目录",
-            hint="PSKUS 分片解压后应当出现 pskuss/DataSet1 ... DataSet11；"
-            "先运行 python scripts/download_data.py --dataset pskuss --all --extract",
+            f"在 {root} 下找不到 {partition_glob} 目录",
+            hint=f"先运行 python scripts/download_data.py --dataset {rc.dataset.name} --all --extract",
         )
 
     for dataset_dir in dataset_dirs:
@@ -400,9 +407,12 @@ def _records_from_pskuss(rc: ResolvedConfig, root: Path) -> tuple[list[FrameReco
                     frame_count=len(clip_frames),
                     fps=rc.dataset.prep.fps,
                     duration_s=clip_duration,
-                    label_sequence=tuple(labels),
+                    # The extraction stage reads label_sequence, not the temporary
+                    # FrameRecords above. Preserve the consensus/boundary mask here
+                    # so rejected source frames cannot re-enter the manifest.
+                    label_sequence=tuple(rec.label for rec in clip_frames),
                     metadata={
-                        "pskuss_dataset": dataset_dir.name,
+                        "source_partition": dataset_dir.name,
                         "annotation": _portable_path(annotation),
                         "label_timestamps_s": tuple(rec.timestamp_s for rec in clip_frames),
                         "quality_filter": {
@@ -431,7 +441,8 @@ def _records_from_pskuss(rc: ResolvedConfig, root: Path) -> tuple[list[FrameReco
         )
 
     log.info(
-        "PSKUS 适配完成：%d 段视频 / %d 帧（标注者优先级 %s；高置信度清洗=%s，保留 %d 帧）",
+        "%s 适配完成：%d 段视频 / %d 帧（标注者优先级 %s；高置信度清洗=%s，保留 %d 帧）",
+        rc.dataset.name,
         len(clips),
         len(frames),
         list(annotators),

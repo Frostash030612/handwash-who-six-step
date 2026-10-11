@@ -1,0 +1,21 @@
+# Jurmala hospital extension (Zenodo 5808764). Same movement codes as PSKUS.
+# Only two-annotator agreement away from transition boundaries enters training.
+dataset:
+  name: jurmala
+  root: data/raw/jurmala/extracted
+  label_space: pskuss
+  include_non_wash: true
+  prep:
+    fps: 5.0
+    frame_step: 1
+    resize_hw: [224, 224]
+    image_ext: jpg
+    jpeg_quality: 85
+    min_frames_per_clip: 10
+
+datasets:
+  jurmala:
+    annotators: [Annotator_1, Annotator_2]
+    quality_filter:
+      enabled: true
+      stable_radius_frames: 7

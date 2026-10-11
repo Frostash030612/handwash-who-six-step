@@ -153,6 +153,10 @@ assess:  ## 对单段视频做 WHO 完整性评估（VIDEO=<路径>）
 assess-folder:  ## 评估整个目录的自采视频
 	$(PY) scripts/run_assess.py --config $(CONFIG) --folder data/external/self_recorded/full
 
+.PHONY: audit-demo
+audit-demo:  ## 批量对比 exp.pt 逐帧基线与 GRU 的本地视频报告
+	$(PY) scripts/audit_demo.py --folder data/external/pskus_demo_validation
+
 # --- 清理 ------------------------------------------------------------------
 .PHONY: clean
 clean:  ## 清理所有缓存（不动数据与权重）

@@ -676,15 +676,15 @@
       const score = Math.round(report.overall_score * 100);
       const ring = $("scoreRing");
       ring.style.setProperty("--p", score);
-      ring.style.setProperty("--tone", score >= 85 ? "var(--ok)" : score >= 60 ? "var(--warn)" : "var(--danger)");
       $("scoreValue").textContent = score;
 
-      const hasError = report.violations.some(v => v.severity === "error");
+      const hasDurationIssue = report.violations.some(v => v.kind === "insufficient_duration");
       let verdict, tone;
       if (!report.is_complete) { verdict = "Missed steps"; tone = "bad"; }
       else if (!report.is_in_order) { verdict = "All six steps covered, but the order needs work"; tone = "warn"; }
-      else if (hasError) { verdict = "Complete and in order, but too short"; tone = "warn"; }
+      else if (hasDurationIssue) { verdict = "Complete and in order, but some durations are short"; tone = "warn"; }
       else { verdict = "Complete and in order"; tone = "good"; }
+      ring.style.setProperty("--tone", tone === "good" ? "var(--ok)" : tone === "warn" ? "var(--warn)" : "var(--danger)");
       $("verdict").textContent = verdict;
       $("verdict").className = "verdict " + tone;
 
@@ -693,8 +693,8 @@
       $("mWashBox").className = "metric " + (report.total_wash_duration_s >= 40 ? "good" : "bad");
       $("mSteps").textContent = detected + " / " + report.statistics.length;
       $("mStepsBox").className = "metric " + (report.is_complete ? "good" : "bad");
-      $("mOrder").textContent = report.is_in_order ? "Correct" : "Out of order";
-      $("mOrderBox").className = "metric " + (report.is_in_order ? "good" : "bad");
+      $("mOrder").textContent = detected < 2 ? "Not enough evidence" : report.is_in_order ? "No reversal seen" : "Out of order";
+      $("mOrderBox").className = "metric " + (detected < 2 ? "" : report.is_in_order ? "good" : "bad");
       $("mTotal").textContent = fmt(report.total_duration_s) + " s";
 
       const list = $("violations");

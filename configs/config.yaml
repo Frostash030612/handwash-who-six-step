@@ -89,11 +89,17 @@ datasets:
     external_only: true
     notes: "METC（Zenodo 5808789）：跨场景测试，72 名参与者"
   jurmala:
-    root: data/raw/jurmala
+    root: data/raw/jurmala/extracted
     processed_dir: data/processed/jurmala
     frames_dir: data/processed/jurmala/frames
     manifest: data/processed/jurmala/manifest.csv
-    notes: "Jurmala（Zenodo 5808764）：可选扩展训练数据"
+    notes: "Jurmala（Zenodo 5808764）：双标注一致的全量训练扩展"
+  hospitals_full:
+    root: data/processed/hospitals_full_7class
+    processed_dir: data/processed/hospitals_full_7class
+    frames_dir: data/processed/hospitals_full_7class/frames
+    manifest: data/processed/hospitals_full_7class/manifest.csv
+    notes: "完整双标注训练集：PSKUS + Jurmala，七类投影，METC 单独外部测试"
   selfrecorded:
     root: data/external/self_recorded
     processed_dir: data/processed/self_recorded

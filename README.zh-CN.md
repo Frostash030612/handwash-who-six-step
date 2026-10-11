@@ -9,10 +9,13 @@
 > 连续预测再用于检查**漏步、顺序异常、动作时长不足**。
 > 项目不做疾病诊断，只做动作规范性分析。
 
+> DataSet1/2/3/4 的 YOLO 基线、YOLO+GRU 与 VideoMAE 整段视频公平对照见
+> [实验口径与进度](docs/FAIR_VIDEO_COMPARISON.zh-CN.md)；它与旧的 `exp.pt` 网页演示分开。
+
 - **主模型**：在云端用清洗后的数据训练 YOLO 分类模型，部署电脑逐帧实时推理
 - **实时展示**：仅用已到达帧的概率平均稳定显示；结束后按预测时间线判断六步
 - **可选实验**：MobileNetV2、GRU/TCN 与 PE 时序分段
-- **数据**：PSKUS（主）、METC（跨场景）、Kaggle（快速原型）、组员自采视频（最终验证）
+- **数据**：PSKUS + Jurmala（双标注全量训练）、METC（跨场景）、Kaggle（补充测试）、组员自采视频（最终验证）
 
 ---
 
@@ -76,11 +79,25 @@ python scripts/run_camera.py --demo-exp
 正式准确率或最终实验结果。若浏览器无法解码上传的视频，本地服务会临时生成
 H.264 播放预览；原始数据集文件不会修改，关闭服务后会删除临时预览。
 
+已有本地视频时，可一次核验同一批视频上的逐帧平滑版和 GRU 版：
+
+```bash
+python scripts/audit_demo.py --folder data/external/pskus_demo_validation
+```
+
+汇总表在 `outputs/exp_demo/demo_audit/summary.csv`，每段视频另有两份完整报告。
+也可运行 `handwash audit-demo --folder <视频目录>`。这是离线排错工具；没有逐段
+人工答案时，不从该汇总表计算正式准确率。配置和两份权重的指纹保存在同目录的
+`metadata.json`。
+
 公开上传前用 `git add .` 和 `git status --short` 核对待提交文件；
 只允许根目录的演示权重 `exp.pt` 与 `exp_temporal_head.pt` 入库，NDJSON 导出清单、训练权重、
 `deliverables/` 和 `outputs/` 不应上传。`.gitignore` 不会清除已经提交的历史文件。
 
 ### 正式数据与云端训练
+
+下面是 PSKUS 单源基线。PSKUS + Jurmala 的双标注全量训练方案见
+[`docs/FULL_DATASET.zh-CN.md`](docs/FULL_DATASET.zh-CN.md)。
 
 ```bash
 # ① 仓库不附带原始数据；下载并解压 PSKUS，再清洗、人工核对原视频/标注
@@ -225,6 +242,7 @@ python -m pre_commit run --all-files
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | **修改规则（必读）**：铁律、分级、提交与 PR 流程 |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | 分层图、五个契约、RFC 流程、扩展指南 |
 | [`docs/DATA.md`](docs/DATA.md) | 五个公开数据集的来源、结构、下载与准备 |
+| [`docs/FULL_DATASET.zh-CN.md`](docs/FULL_DATASET.zh-CN.md) | PSKUS + Jurmala 双标注全量训练的数据组成与构建命令 |
 | [`docs/DATA_COLLABORATION.md`](docs/zh/DATA_COLLABORATION.md) | **不上传任何东西，四个人怎么共用 2–17 GB 数据** |
 | [`docs/CONFIG.md`](docs/CONFIG.md) | 配置逐键说明与常见改法 |
 | [`docs/PROTOCOL.md`](docs/PROTOCOL.md) | 完整性判定口径：漏步/乱序/时长的精确定义 |

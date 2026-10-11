@@ -127,6 +127,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_camera.add_argument("--no-temporal-head", action="store_true", help="不加载时序头，只用 exp.pt 逐帧分类")
 
+    p_audit = sub.add_parser("audit-demo", help="本地视频核验：对比 exp.pt 逐帧基线与 GRU")
+    p_audit.add_argument("--folder", default="data/external/pskus_demo_validation", help="递归扫描的视频目录")
+    p_audit.add_argument("--checkpoint", default="exp.pt", help="七类 Ultralytics 分类权重")
+    p_audit.add_argument("--temporal-head", default="exp_temporal_head.pt", help="与 exp.pt 匹配的 GRU 权重")
+
     sub.add_parser("doctor", help="环境与配置自检")
     sub.add_parser("config", help="打印最终生效的配置（含 config_hash）")
     return parser
@@ -304,6 +309,17 @@ def _dispatch(args: argparse.Namespace, overrides: dict) -> int:
             demo_exp=args.demo_exp,
             temporal_head=temporal_head,
         )
+        return EXIT_OK
+
+    if command == "audit-demo":
+        from handwash.pipelines.demo_audit import audit_demo_videos
+
+        runtime = {"run_name": "exp_demo", **overrides.get("runtime", {})}
+        rc = _load(args, {**overrides, "runtime": runtime})
+        summary = audit_demo_videos(
+            rc, folder=args.folder, checkpoint=args.checkpoint, temporal_head=args.temporal_head
+        )
+        print(f"本地核验完成：{summary}")
         return EXIT_OK
 
     raise HandwashError(f"未实现的子命令：{command}")
