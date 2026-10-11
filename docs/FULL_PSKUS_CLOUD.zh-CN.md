@@ -20,17 +20,23 @@
 - YOLO 整段视频评估中，验证集选中“宽度 3 + 连续确认 3 帧”的滞回后处理。40 段测试视频共 1,895 个一致标注窗口中心，Macro-F1 从未平滑的 0.6914 提升到 0.7181；切换附近 Macro-F1 从 0.6499 提升到 0.6945。参数只由验证集选择，且不强制 WHO 顺序；这是离线指标，未接入摄像头实时路径。详见 `docs/EXPERIMENTS.md`。
 - DataSet2 已完成本地到云端的文件传输，但这版 1/3/4 试训没有纳入 DataSet2。其余分片齐备并校验前，不得把本轮结果称作 PSKUS 全量训练。
 
-## DataSet2 加入 YOLO（2026-10-11，进行中）
+## DataSet2 加入 YOLO 与 VideoMAE（2026-10-11，已完成）
 
 `DataSet2.zip` 已在 AutoDL 通过 MD5 校验并解压。新的七类分类数据使用 DataSet1/2/3/4，仍按双人标签一致、动作切换前后各 7 个原始帧稳定、按视频隔离划分。使用 `--split-reference data/processed/pskuss_ds134_yolo/video_splits.csv` 锁定旧 1/3/4 视频的划分，新增加的 DataSet2 视频另行哈希划分，避免拿已见过的旧视频当测试样本。
 
-云端 `data/processed/pskuss_ds1234_yolo/` 已构建完成：615 段双标注视频（train 430、val 92、test 93），共 93,118 张合格图像；新增 DataSet2 352 段，旧 263 段视频的划分和标注员配对核对后均未变化。`pskus_ds1234_yolo` 队列已用 1/3/4 YOLO 最佳权重开始微调（最多 30 轮、patience=5）。队列状态：`outputs/pskuss_ds1234_yolo_queue/status.json`；训练日志：同目录 `train.log`；测试结果：`outputs/pskuss_ds1234_yolo/test_metrics.json`。这仍不是 PSKUS 全 11 分片训练。
+云端 `data/processed/pskuss_ds1234_yolo/` 已构建完成：615 段双标注视频（train 430、val 92、test 93），共 93,118 张合格图像；新增 DataSet2 352 段，旧 263 段视频的划分和标注员配对核对后均未变化。YOLO 从 1/3/4 最佳权重继续微调已完成，稳定帧测试 Top-1 为 0.9581、Top-5 为 0.9995。帧级成绩不代表完整视频或六步合规准确率；本轮也不是 PSKUS 全 11 分片训练。
 
-VideoMAE 也已排在该 YOLO 任务之后：`pskus_ds1234_videomae` 队列复用同一个 `video_splits.csv`，从 1/3/4 修复版 VideoMAE 最佳权重继续微调。使用 16 帧窗口；双标注一致与边界稳定规则检查出 22,378 个窗口。训练集 `other` 窗口从 13,349 个按固定哈希抽到 2,194 个（与六步动作总数 1:1），验证和测试保持原始分布，总计进入本轮的窗口数为 11,223。队列状态在 `outputs/pskuss_ds1234_videomae_queue/status.json`，模型和最终测试在 `outputs/pskuss_ds1234_videomae/`；只有队列状态为 `complete` 才能引用最终结果。
+VideoMAE 使用同一个 `video_splits.csv`，从 1/3/4 修复版权重继续微调，训练已完成。使用 16 帧窗口；双标注一致与边界稳定规则检查出 22,378 个窗口。训练集 `other` 窗口从 13,349 个按固定哈希抽到 2,194 个（与六步动作总数 1:1），验证和测试保持原始分布，总计使用 11,223 个窗口。稳定窗口测试 Accuracy 为 0.9819、Macro-F1 为 0.9249（3,637 个测试窗口）；这不能替代完整视频指标。用于最终公平对照的改进版 VideoMAE 权重见 [`models/README.md`](../models/README.md)。
 
 ## AutoDL 后台任务
 
-四个 `screen` 会话 `pskus_dl1`～`pskus_dl4` 负责互不重叠的大文件。`pskus_pipeline` 等待它们完成，然后自动执行：全部文件再校验和补传 → 解压 → 构建七类 YOLO 图像 → 继续训练 YOLO → 完整视频测试 → 继续训练 VideoMAE → 完整视频测试。每一步失败即停止，不能拿不完整数据继续训练。
+### 当前状态（2026-10-12）
+
+DataSet1/2/3/4 的训练和公平整段视频对照已经完成，但这不代表 PSKUS 11 个分片的全量训练。四种方案的测试 Macro-F1 分别为 YOLO 单帧 0.9025、原 VideoMAE 0.7721、改进 VideoMAE 0.8745、YOLO+GRU 0.9271；评估使用同一组 93 段锁定测试视频和 5,599 个双标注一致的窗口中心。详细口径见[公平整段视频对照](FAIR_VIDEO_COMPARISON.zh-CN.md)。
+
+AutoDL 上的 11 分片任务目前仍未进入训练：数据目录约 7.1 GB，14 个登记文件中 4 个已校验、5 个有未完成的临时文件。检查时，`pskus_dl_handoff` 只运行空闲循环，没有实际下载进程；`pskus_pipeline` 因等待这个 screen 而持续报告 `parallel_downloads`。状态文件显示 `running` 并不代表正在传输。
+
+仓库中的 `scripts/run_pskuss_full_cloud.py` 已排除该占位 screen，避免新启动的任务再次被它卡住。已经在 AutoDL 运行的旧进程不会自动载入本地代码更新；截至本次状态检查，全量任务尚未开始构建或训练。完整流程为：下载并校验所有分片 → 解压 → 构建数据 → YOLO 训练与整段视频测试 → VideoMAE 训练与整段视频测试。
 
 ```bash
 # 登录 AutoDL 后查看进度

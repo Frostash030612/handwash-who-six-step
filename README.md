@@ -90,9 +90,13 @@ video and model variant. `handwash audit-demo --folder <video-directory>` is equ
 offline audit does not establish accuracy without video-level human ground truth; `metadata.json`
 records the configuration and weight fingerprints.
 
-Before publishing, use `git add .` and inspect `git status --short`. The root demo weights `exp.pt` and
-`exp_temporal_head.pt` are included; do not upload the NDJSON export, training weights,
-`deliverables/`, or `outputs/`. `.gitignore` does not remove files already present in Git history.
+Before committing, inspect `git status --short`. The root `exp.pt` and `exp_temporal_head.pt`
+are demo weights. The YOLO, GRU, and improved VideoMAE checkpoints used in the DataSet1/2/3/4
+full-video comparison are archived under `models/pskuss_ds1234/` with Git LFS; see
+[`models/README.md`](models/README.md) for hashes and roles. Install Git LFS and run `git lfs pull`
+after cloning to retrieve them. Other training weights, raw data, the NDJSON export,
+`deliverables/`, and `outputs/` should stay out of Git. `.gitignore` does not remove files already
+present in Git history.
 
 ### Final dataset and cloud training
 
@@ -236,9 +240,10 @@ Set `runtime.num_workers: 0`. Put it in `configs/local.yaml` rather than editing
 <details>
 <summary><b>Do I need to commit data or model weights?</b></summary>
 
-Do not commit data or training weights. The root `exp.pt` is the sole demo exception.
-`data/`, `models/`, `outputs/`, and other `*.pt` files are ignored. See `docs/DATA.md` for
-dataset sources; provide a trained project checkpoint with `--checkpoint` for the final workflow.
+Do not commit raw data or arbitrary training weights. The root `exp.pt` is for the browser demo;
+the reviewed comparison checkpoints under `models/pskuss_ds1234/` are tracked with Git LFS.
+`data/`, `outputs/`, and other model artifacts remain ignored. See `docs/DATA.md` for dataset
+sources; provide a trained project checkpoint with `--checkpoint` for the final workflow.
 </details>
 
 ## 6. Documentation index

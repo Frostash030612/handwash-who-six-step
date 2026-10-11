@@ -57,6 +57,9 @@ python scripts/evaluate_videomae_full_videos.py \
 ## 产物
 
 - `outputs/videomae_pskus/best_model/`：可移至本地加载的 VideoMAE 权重、配置、预处理器和类别映射。
+- DataSet1/2/3/4 公平对照选出的改进权重归档在
+  [`models/pskuss_ds1234/videomae_center_stable/`](../models/pskuss_ds1234/videomae_center_stable/)；其 SHA-256、配套 YOLO/GRU 权重和整段视频指标见
+  [`公平整段视频对照`](FAIR_VIDEO_COMPARISON.zh-CN.md)。该权重不是本页早期 DataSet1/4 测试所用的 `outputs/videomae_pskus/best_model/`。
 - `history.json`：每轮训练损失和验证指标。
 - `test_metrics.json`：按原始视频隔离的测试集 Accuracy、Macro-F1 和分类报告。
 - `frame_cache/`：按原始视频缓存抽取帧，避免每轮反复解码；可在确认模型和指标已备份后删除并重建。

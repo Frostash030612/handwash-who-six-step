@@ -90,9 +90,12 @@ python scripts/audit_demo.py --folder data/external/pskus_demo_validation
 人工答案时，不从该汇总表计算正式准确率。配置和两份权重的指纹保存在同目录的
 `metadata.json`。
 
-公开上传前用 `git add .` 和 `git status --short` 核对待提交文件；
-只允许根目录的演示权重 `exp.pt` 与 `exp_temporal_head.pt` 入库，NDJSON 导出清单、训练权重、
-`deliverables/` 和 `outputs/` 不应上传。`.gitignore` 不会清除已经提交的历史文件。
+提交前用 `git status --short` 核对待提交文件。根目录的 `exp.pt` 与
+`exp_temporal_head.pt` 是网页演示权重；DataSet1/2/3/4 公平对照使用的 YOLO、GRU 和
+改进 VideoMAE 权重单独归档在 `models/pskuss_ds1234/`，通过 Git LFS 管理，指纹和用途见
+[`models/README.md`](models/README.md)。克隆后如需取回这些模型，请安装 Git LFS 并运行
+`git lfs pull`。其他训练权重、原始数据、NDJSON 导出清单、`deliverables/` 和 `outputs/`
+仍不应上传。`.gitignore` 不会清除已经提交的历史文件。
 
 ### 正式数据与云端训练
 
