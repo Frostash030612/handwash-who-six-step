@@ -67,6 +67,24 @@ YOLO＋GRU 的验证集有 92 段视频、5,064 个双标注一致中心，当�
 
 这一轮没有稳定、全面的提升，因此**不替换当前正式候选，也不对锁定测试集反复试算**。候选权重与验证记录保留在 `outputs/pskuss_ds1234_boundary_*_20261012/`，配对与来源诊断在 `outputs/pskuss_ds1234_boundary_val_*.json`。这些 `outputs/` 产物为本地/AutoDL 实验记录，未作为正式发布权重。下一轮需要独立场景验证，而不是在同一验证集上继续挑微小波动。
 
+### 同一数据上的 YOLO 结构与解码探索（2026-10-12）
+
+当前逐帧基线实际上是 **YOLO26m-cls**。它的分类头对空间特征做全局平均，可能淡化手指与掌心的局部细节。因此试做了一个小型可学习空间池化层：初始化时与原全局平均完全一致，只训练池化权重及最终线性层，保留原骨干；第二版在训练损失中温和提高少数洗手步骤的权重。实验只使用原 DataSet1–4 的 430 段训练视频和 92 段验证视频，原始 YOLO 权重不覆盖。
+
+| YOLO 方案 | 稳定验证图像 Macro-F1（19,767 张） | 完整验证视频中心 Macro-F1（5,064 点） | 切换附近 Macro-F1 | 完整序列匹配 |
+| --- | ---: | ---: | ---: | ---: |
+| 原 YOLO26m | 0.9166 | 0.8926 | 0.8536 | 34/92 |
+| 空间注意力池化 | 0.9168 | 0.8927 | 0.8484 | 40/92 |
+| 空间注意力＋温和类别权重 | 0.9173 | 0.8910 | 0.8504 | 35/92 |
+
+注意力版相对原 YOLO 的完整视频 Macro-F1 差值仅 0.0001，按视频配对重采样的 95% 区间为 [-0.0053, 0.0051]；加类别权重后反而下降 0.0016，区间为 [-0.0064, 0.0028]。完整序列匹配的波动不能掩盖总体和切换指标的无提升。因此这两个注意力权重只作为实验记录，不替换 YOLO 基线，也不接入正式 GRU。代码为 `scripts/train_yolo_spatial_attention.py`、`scripts/evaluate_yolo_candidate_validation.py` 和 `src/handwash/pipelines/yolo_spatial_attention.py`。
+
+对现有边界 GRU，还试了同时考虑类别概率与切换概率的 Viterbi 解码。验证集最优 Macro-F1 为 0.9534，低于现行分段解码的 0.9537；五折视频级交叉验证也没有扭转这个结论。将改进版 VideoMAE 概率按 10%～50% 融入边界 GRU，验证集上最优权重为 **0%**，即不融合。这两项结果说明更复杂的解码或直接集成目前没有可靠收益。相关验证脚本均只读取验证视频；锁定测试集不用于这些实验选择。
+
+还完成了原 YOLO26m 最佳权重的同数据、低学习率短程续训：AdamW、初始学习率 `1e-4`、随机擦除概率 `0.15`、8 轮，保留原有 430/92/93 视频划分。最佳轮次的稳定验证图像 Top-1 为 **95.72%**，低于原权重约 **95.89%**。对 92 段完整验证视频、5,064 个双人一致中心重新推理后，续训权重的中心 Macro-F1 为 **0.8883**，低于原 YOLO 的 **0.8926**；切换附近 Macro-F1 为 **0.8428**，低于原版 **0.8536**。按视频配对重采样的 Macro-F1 差值为 -0.0043，95% 区间 [-0.0127, 0.0037]，不足以支持改善。续训权重仅保留为候选实验，不替换原 YOLO，也不以它重训 GRU；锁定测试集没有参与这轮选择。训练入口为 `scripts/finetune_yolo_validation_only.py`，完整视频对照入口为 `scripts/evaluate_yolo_candidate_validation.py`，远端实验记录在 `outputs/pskuss_ds1234_yolo_low_lr_nowarm_20261012/` 与 `outputs/pskuss_ds1234_yolo_low_lr_nowarm_validation_20261012/`。
+
+到目前为止，空间池化、类别轻微重权、低学习率续训、Viterbi 解码和 VideoMAE 概率融合均未形成可信的整体提升。**当前可辩护的改进仍是已完成的边界感知 YOLO＋GRU，而不是这些未通过验证的候选。** 同一验证集已用于多轮探索，继续在其上追逐微小分数差会增加选择偏差；后续优先做错误归因和独立验证，而不继续替换正式模型。
+
 ### 数据、算力与当前执行状态
 
 本机 checkout 仍缺少 `data/processed/pskuss_ds1234_yolo/video_splits.csv` 和完整的 DataSet2/3 解压数据，不能单独复现全数据训练。2026-10-12 已核验克隆到 AutoDL 的实例：RTX 3090 24GB、20 核 CPU、90GB 内存；50GB 数据盘已挂载，包含 DataSet1–4 压缩包及解压目录、锁定的 `video_splits.csv`、YOLO `best.pt`、原 YOLO+GRU `head.pt` 和 VideoMAE safetensors。锁定划分文件能直接复用，因此没有重新随机划分。
@@ -119,3 +137,5 @@ YOLO＋GRU 的验证集有 92 段视频、5,064 个双标注一致中心，当�
 
 - Ishikawa et al., [Alleviating Over-segmentation Errors by Detecting Action Boundaries](https://openaccess.thecvf.com/content/WACV2021/papers/Ishikawa_Alleviating_Over-segmentation_Errors_by_Detecting_Action_Boundaries_WACV_2021_paper.pdf), WACV 2021.
 - Li et al., [MS-TCN++: Multi-Stage Temporal Convolutional Network for Action Segmentation](https://arxiv.org/abs/2006.09220), 2020.
+- Woo et al., [CBAM: Convolutional Block Attention Module](https://openaccess.thecvf.com/content_ECCV_2018/html/Sanghyun_Woo_Convolutional_Block_Attention_ECCV_2018_paper), ECCV 2018。空间权重实验借鉴其问题动机，不等同于复现 CBAM。
+- [Ultralytics 分类任务文档](https://docs.ultralytics.com/tasks/classify/)与[训练参数文档](https://docs.ultralytics.com/modes/train/)：用于核对 YOLO26 分类模型规格和增强参数。
