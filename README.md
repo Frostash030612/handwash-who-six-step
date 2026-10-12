@@ -63,6 +63,24 @@ Once `doctor` is all green (a non-blocking WARN or two is fine), your environmen
 
 ## 2. From data to live camera
 
+### Compare the archived models on one local video
+
+From the repository directory, run:
+
+```bash
+conda activate handwash-demo
+python -m pip install -e ".[compare]"
+git lfs pull
+python scripts/run_compare.py
+```
+
+Open `http://127.0.0.1:8766/` and upload a short video. The page runs the archived
+YOLO, YOLO + GRU, and improved VideoMAE models on the same sampled frames and shows
+three clickable action timelines and completeness reports. The selected smoothing
+settings are saved in `models/pskuss_ds1234/web_inference.json`. A video without
+human action labels cannot yield an accuracy or Macro-F1 score from this page.
+The older live camera page below still uses `exp.pt`.
+
 ### Try the bundled exp.pt camera demo
 
 The repository includes the current seven-class Ultralytics frame classifier `exp.pt`. When

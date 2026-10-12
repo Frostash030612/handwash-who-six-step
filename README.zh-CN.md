@@ -62,6 +62,23 @@ python -m handwash.cli doctor
 
 ## 2. 从数据到实时摄像头
 
+### 用网页对照最新三个模型
+
+在项目目录中启动本地视频对照页（推荐使用已有的 `handwash-demo` 环境）：
+
+```bash
+conda activate handwash-demo
+python -m pip install -e ".[compare]"
+git lfs pull
+python scripts/run_compare.py
+```
+
+打开 `http://127.0.0.1:8766/`，选择一段本机视频并点击“分析视频”。页面会对同一段视频依次运行归档的 YOLO、YOLO＋GRU、改进 VideoMAE，给出三条可点击的动作时间线、漏步/顺序/时长报告，还可以下载 JSON。建议先试 10–30 秒的视频。本机 8 GB 内存下 VideoMAE 可能需要几分钟。输入视频最高 256 MB、约 4 分钟；服务器仅监听 `127.0.0.1`，上传临时文件在分析后删除。
+
+三个模型统一使用 5 fps 抽帧、16 帧窗口和每 4 帧一个对齐中心；各自的平滑规则固定为原验证集选出的参数，记录在 `models/pskuss_ds1234/web_inference.json`。对自录视频，页面给的是模型预测与规则判定；若没有人工标注，不能从页面直接计算准确率或 Macro-F1。旧摄像头演示仍用下面的 `run_camera.py --demo-exp`。
+
+若上传的文件与本机 `data/external/pskus_demo_validation/` 中的原视频完全一致，且 `data/raw/pskuss/extracted/` 内有对应的两人标注，页面还会显示人工参考顺序，以及每个模型在两位标注员一致的时间中心上的单视频正确率。动作切换区可能没有双人一致标签：它仍显示在整段时间线里，也可能触发模型预测的乱序提示，但不进入离线正确率分母。预测流程分数不是视频的人工真实评分。
+
 ### 直接体验 exp.pt 演示
 
 根目录的 `exp.pt` 是当前七类 Ultralytics 帧分类模型；若同目录存在

@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>洗手动作 · 同视频模型对照</title>
+  <style>
+    :root { color-scheme: light; --ink:#17313a; --muted:#63767b; --line:#dce7e5; --teal:#086b70; --bg:#f4f8f7; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui,-apple-system,"PingFang SC",sans-serif; }
+    main { max-width:1260px; margin:0 auto; padding:28px 20px 60px; }
+    h1 { font-size:clamp(24px,3vw,34px); margin:0 0 4px; letter-spacing:-.025em; }
+    h2 { font-size:19px; margin:0 0 14px; }
+    p { margin:0 0 14px; }
+    .muted { color:var(--muted); }
+    .panel,.card { background:white; border:1px solid var(--line); border-radius:18px; box-shadow:0 5px 24px #123d3e09; }
+    .panel { padding:22px; margin-top:22px; }
+    .upload { display:flex; gap:15px; align-items:center; flex-wrap:wrap; }
+    input[type=file] { max-width:100%; }
+    button { border:0; background:var(--teal); color:white; border-radius:9px; padding:10px 17px; font:inherit; font-weight:650; cursor:pointer; }
+    button:disabled { opacity:.5; cursor:wait; }
+    button.secondary { background:#e7f0ef; color:var(--ink); }
+    video { width:100%; max-height:420px; background:#162525; border-radius:12px; display:block; margin-top:16px; }
+    #status { min-height:24px; margin:12px 0 0; color:var(--teal); font-weight:600; }
+    #status.error { color:#ad3b32; }
+    .grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:15px; margin-top:18px; }
+    .card { padding:18px; min-width:0; }
+    .card h3 { margin:0 0 4px; font-size:19px; }
+    .badge { display:inline-block; border-radius:20px; background:#e6f1ed; padding:3px 9px; font-size:13px; }
+    .bad { background:#faeee9; color:#923a2d; }
+    .steps { display:flex; gap:4px; margin:13px 0; }
+    .steps span { flex:1; text-align:center; border-radius:6px; padding:5px 0; background:#edf1f0; color:#8a9999; font-weight:700; }
+    .steps span.on { background:#c9e6df; color:#075b5e; }
+    .timeline { display:flex; width:100%; height:32px; overflow:hidden; border-radius:7px; background:#edf1f0; margin:12px 0; }
+    .timeline button { padding:0; border-radius:0; min-width:2px; opacity:.92; }
+    .timeline button.active { outline:3px solid #17313a; outline-offset:-3px; opacity:1; }
+    .sequence { word-break:break-word; color:#314e53; min-height:46px; }
+    details { margin-top:10px; border-top:1px solid var(--line); padding-top:9px; }
+    summary { cursor:pointer; font-weight:600; }
+    ul { padding-left:20px; margin:9px 0 0; }
+    li { margin:4px 0; }
+    .foot { margin-top:20px; font-size:13px; color:var(--muted); }
+    .reference { border-color:#a9d5c9; background:#f7fcf9; }
+    @media(max-width:900px) { .grid { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>同一段视频，三种模型</h1>
+  <p class="muted">YOLO · YOLO＋GRU · VideoMAE。上传一次，本机依次推理，点击时间线可跳到对应动作。</p>
+  <section class="panel">
+    <div class="upload">
+      <input id="file" type="file" accept="video/*,.mp4,.mov,.avi,.mkv">
+      <button id="run">分析视频</button>
+      <button id="download" class="secondary" hidden>下载结果 JSON</button>
+    </div>
+    <p id="status" role="status">请选择视频。建议先用 10–30 秒的片段；VideoMAE 在本机可能需要几分钟。</p>
+    <video id="video" controls playsinline hidden></video>
+  </section>
+  <div id="summary" class="foot" hidden></div>
+  <section id="reference" class="panel reference" hidden></section>
+  <div id="results" class="grid"></div>
+  <p class="foot">页面报告反映模型的推断，不是人工标注的真值；自录视频无法直接计算准确率或 Macro-F1。三模型使用相同采样时刻和训练验证集选定的平滑参数。时间线两端为窗口预测的近似外推。</p>
+</main>
+<script>
+  const labels = ["其他／非标准", "掌心相对", "手背对掌心", "十指交叉", "指背互扣", "拇指旋转", "指尖旋转"];
+  const colors = ["#aab8b7", "#197e83", "#3f9ca6", "#6a86aa", "#9b77ae", "#cf8b5c", "#cd6477"];
+  const fileInput = document.getElementById("file");
+  const run = document.getElementById("run");
+  const download = document.getElementById("download");
+  const status = document.getElementById("status");
+  const video = document.getElementById("video");
+  const results = document.getElementById("results");
+  const summary = document.getElementById("summary");
+  const referencePanel = document.getElementById("reference");
+  let objectUrl = null;
+  let currentResult = null;
+
+  function state(message, error=false) { status.textContent = message; status.classList.toggle("error", error); }
+  function el(tag, cls, text) { const node=document.createElement(tag); if(cls) node.className=cls; if(text!==undefined) node.textContent=text; return node; }
+  function formatTime(seconds) { const s=Math.floor(seconds); return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; }
+  function visibleViolations(report) {
+    const missing = new Set(report.violations.filter(item=>item.kind==="missing").map(item=>item.step));
+    return report.violations.filter(item=>!(item.kind==="insufficient_duration"&&item.step&&missing.has(item.step)));
+  }
+  function draw(data) {
+    currentResult = data;
+    download.hidden = false;
+    summary.hidden = false;
+    summary.textContent = `视频 ${data.duration_s} 秒 · 采样 ${data.sampled_frames} 帧 · 对齐比较 ${data.aligned_centres} 个时间中心`;
+    referencePanel.hidden = !data.reference;
+    referencePanel.replaceChildren();
+    if(data.reference) {
+      const ref=data.reference;
+      referencePanel.append(el("h2","","原始双人标注参考"));
+      referencePanel.append(el("p","",`人工标注顺序：${ref.sequence.join(" → ")}。两位标注员一致的时间中心：${ref.valid_centres}/${ref.total_centres}。`));
+      referencePanel.append(el("p","muted","下面的流程警告由模型预测触发；标注员未达成一致的动作切换区域，不计入离线准确率，却仍显示在整段视频时间线上。"));
+    }
+    results.replaceChildren();
+    for (const key of ["yolo", "yolo_gru", "videomae"]) {
+      const model = data.models[key], report = model.report;
+      const issues = visibleViolations(report);
+      const card = el("section", "card");
+      card.append(el("h3", "", model.model));
+      card.append(el("span", `badge ${report.violations.length ? "bad" : ""}`,
+        report.violations.length ? "模型预测出现规则异常" : "模型预测未见规则异常"));
+      const steps = el("div", "steps");
+      for(let n=1;n<=6;n++) steps.append(el("span", model.steps_seen.includes(n)?"on":"", String(n)));
+      card.append(steps);
+      const timeline = el("div", "timeline");
+      for(const part of model.timeline) {
+        const b=el("button");
+        b.type="button";
+        b.style.width=`${Math.max(.1,(part.end_s-part.start_s)/data.duration_s*100)}%`;
+        b.style.background=colors[part.step_no];
+        b.title=`${labels[part.step_no]} · ${formatTime(part.start_s)}–${formatTime(part.end_s)} · ${Math.round(part.confidence*100)}%`;
+        b.setAttribute("aria-label", b.title);
+        b.dataset.start=part.start_s; b.dataset.end=part.end_s;
+        b.addEventListener("click",()=>{video.currentTime=part.start_s; video.play().catch(()=>{});});
+        timeline.append(b);
+      }
+      card.append(timeline);
+      const sequence=model.timeline.filter(x=>x.step_no>0).map(x=>x.step_no).filter((x,i,a)=>i===0||x!==a[i-1]);
+      card.append(el("div", "sequence", `识别顺序：${sequence.length?sequence.join(" → "):"未识别到六步动作"}`));
+      card.append(el("div", "muted", `搓洗时长估计 ${report.total_wash_duration_s.toFixed(1)} 秒 · 预测流程分数 ${Math.round(report.overall_score*100)}%`));
+      if(data.reference && model.consensus_accuracy!==undefined) {
+        card.append(el("div", "muted", `本视频双标注一致中心：${model.consensus_correct}/${data.reference.valid_centres} 预测正确（${Math.round(model.consensus_accuracy*100)}%）`));
+      }
+      const details=el("details"), title=el("summary","",`查看分段与问题（${issues.length}）`), list=el("ul");
+      details.append(title);
+      for(const issue of issues) list.append(el("li","",issue.detail));
+      if(!issues.length) list.append(el("li","","未发现规则问题"));
+      for(const part of model.timeline) list.append(el("li","",`${formatTime(part.start_s)}–${formatTime(part.end_s)}  ${labels[part.step_no]}  ${Math.round(part.confidence*100)}%`));
+      details.append(list); card.append(details); results.append(card);
+    }
+  }
+  video.addEventListener("timeupdate",()=>{
+    for(const block of results.querySelectorAll(".timeline button")) {
+      block.classList.toggle("active",video.currentTime>=Number(block.dataset.start)&&video.currentTime<Number(block.dataset.end));
+    }
+  });
+  run.addEventListener("click",async()=>{
+    const file=fileInput.files?.[0];
+    if(!file){state("请先选择视频。",true);return;}
+    if(file.size>256*1024*1024){state("视频超过 256 MB，请裁短后上传。",true);return;}
+    run.disabled=true; download.hidden=true; currentResult=null; results.replaceChildren(); summary.hidden=true; referencePanel.hidden=true;
+    if(objectUrl)URL.revokeObjectURL(objectUrl);
+    objectUrl=URL.createObjectURL(file); video.src=objectUrl; video.hidden=false;
+    try {
+      state("上传到本机分析服务…");
+      const response=await fetch("/api/compare",{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:file});
+      const submitted=await response.json();
+      if(!response.ok)throw new Error(submitted.error||"上传失败");
+      while(true){
+        await new Promise(resolve=>setTimeout(resolve,1000));
+        const poll=await fetch(`/api/status?id=${encodeURIComponent(submitted.id)}`);
+        const job=await poll.json();
+        if(!poll.ok)throw new Error(job.error||"无法读取任务状态");
+        state(job.progress);
+        if(job.state==="error")throw new Error(job.error||"分析失败");
+        if(job.state==="done"){draw(job.result);state("三种模型分析完成。点击彩色时间线查看对应视频片段。");break;}
+      }
+    } catch(error){state(error.message||String(error),true);}
+    finally {run.disabled=false;}
+  });
+  download.addEventListener("click",()=>{
+    if(!currentResult)return;
+    const blob=new Blob([JSON.stringify(currentResult,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob), link=el("a");
+    link.href=url; link.download="handwash-model-comparison.json"; link.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  });
+</script>
+</body>
+</html>

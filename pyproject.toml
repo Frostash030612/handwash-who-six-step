@@ -46,6 +46,8 @@ torch = ["torch>=2.2", "torchvision>=0.17"]
 yolo = ["ultralytics>=8.3"]
 # 视频解码（缺省时 io/video.py 自动回退到 imageio-ffmpeg）
 video = ["opencv-python>=4.9", "imageio-ffmpeg>=0.4.9"]
+# 本机上传视频，依次运行归档的 YOLO、GRU 与 VideoMAE。
+compare = ["handwash[torch,yolo,video]", "transformers>=4.40,<5", "safetensors>=0.4"]
 # 绘图 / notebook 实验
 viz = ["matplotlib>=3.8", "jupyterlab>=4.0"]
 # 开发与质量门禁

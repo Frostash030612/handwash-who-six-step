@@ -70,6 +70,7 @@ models/pskuss_ds1234/*
 !/models/pskuss_ds1234/yolo/
 !/models/pskuss_ds1234/yolo_gru/
 !/models/pskuss_ds1234/videomae_center_stable/
+!/models/pskuss_ds1234/web_inference.json
 models/pskuss_ds1234/yolo/*
 !models/pskuss_ds1234/yolo/best.pt
 models/pskuss_ds1234/yolo_gru/*

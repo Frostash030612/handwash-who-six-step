@@ -13,3 +13,5 @@ The source videos and annotations are not included in this repository.
 VideoMAE configuration and preprocessing metadata are stored beside its weights.
 The model comparison uses the fixed DataSet1–4 video split; see the report for
 the split fingerprint, annotation policy, evaluation metrics, and limitations.
+`pskuss_ds1234/web_inference.json` records the validation-selected smoothing settings
+used by the local comparison page (`python scripts/run_compare.py`).
