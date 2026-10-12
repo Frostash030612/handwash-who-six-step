@@ -2,6 +2,8 @@
 
 这里的 YOLO 是逐帧七类分类基线；YOLO+GRU 用同一 YOLO 权重提取逐帧特征，再训练独立的时序头。VideoMAE 直接看连续 16 帧。旧演示权重 `exp.pt` 和 `exp_temporal_head.pt` 保留，但不能把旧 GRU 头接到新 YOLO 权重上。
 
+后续方法设计和公平测速计划见[视频模型改进计划](VIDEO_MODEL_OPTIMIZATION_PLAN.zh-CN.md)：保留 YOLO 与 VideoMAE 两个基线，将现有 YOLO＋GRU 作为中间对照，并验证切换感知的改进方案。
+
 ## 共同口径
 
 - 数据仅为 PSKUS DataSet1/2/3/4，原始视频按 `data/processed/pskuss_ds1234_yolo/video_splits.csv` 锁定：430/92/93 段 train/val/test。不能重新计算视频划分。
