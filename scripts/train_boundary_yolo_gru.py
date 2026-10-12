@@ -38,8 +38,9 @@ from scripts.train_current_yolo_gru import _read_or_extract
 
 
 def _crop_batch(
-    batch: list[dict], rng: random.Random, *, min_length: int = 64, max_length: int = 160
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, list[tuple[int, int, int]]]:
+    batch: list[dict], rng: random.Random, *, min_length: int = 64, max_length: int = 160,
+    transition_supervision_weight: float = 0.0,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, list[tuple[int, int, int]]]:
     crops: list[tuple[dict, int, int]] = []
     for item in batch:
         length = len(item["features"])
@@ -66,13 +67,22 @@ def _crop_batch(
     feature_dim = int(batch[0]["features"].shape[1])
     features = torch.zeros(len(batch), longest, feature_dim)
     class_targets = torch.full((len(batch), longest), -1, dtype=torch.long)
+    class_supervision = torch.zeros(len(batch), longest, dtype=torch.float32)
     edge_targets = torch.zeros(len(batch), longest, dtype=torch.float32)
     edge_mask = torch.zeros(len(batch), longest, dtype=torch.bool)
     weak_intervals_in_crop: list[tuple[int, int, int]] = []
     for row, (item, start, size) in enumerate(crops):
         end = start + size
         features[row, :size] = torch.from_numpy(item["features"][start:end].astype(np.float32))
-        class_targets[row, :size] = torch.from_numpy(item["stable"][start:end].astype(np.int64))
+        stable = item["stable"][start:end].astype(np.int64)
+        consensus = item["consensus"][start:end].astype(np.int64)
+        class_targets[row, :size] = torch.from_numpy(
+            np.where(stable >= 0, stable, consensus if transition_supervision_weight > 0 else -1)
+        )
+        class_supervision[row, :size] = torch.from_numpy(
+            np.where(stable >= 0, 1.0,
+                     np.where(consensus >= 0, transition_supervision_weight, 0.0)).astype(np.float32)
+        )
         edge_targets[row, :size] = torch.from_numpy(item["boundary_targets"][start:end].astype(np.float32))
         edge_mask[row, :size] = torch.from_numpy(item["boundary_mask"][start:end])
         # The start of a random crop is not necessarily a true sequence start.
@@ -80,7 +90,7 @@ def _crop_batch(
         for left, right in item.get("weak_boundary_intervals", []):
             if start < left and right <= end:
                 weak_intervals_in_crop.append((row, left - start, right - start))
-    return features, class_targets, edge_targets, edge_mask, weak_intervals_in_crop
+    return features, class_targets, class_supervision, edge_targets, edge_mask, weak_intervals_in_crop
 
 
 def _prepare_eval_templates(data: list[dict], video_by_id: dict[str, object]) -> list[dict]:
@@ -189,6 +199,31 @@ def _copy_baseline_state(head: BoundaryAwareGRU, state: dict) -> None:
         raise ValueError(f"Unexpected baseline GRU checkpoint structure: missing={missing}, unexpected={unexpected}")
 
 
+def _segment_consistency_loss(class_logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+    """Reduce within-action flicker, without coupling across unknown gaps or boundaries.
+
+    Only contiguous, two-annotator-agreed stable runs are regularized. Short
+    runs are left intact, so the loss cannot encode a minimum action duration.
+    """
+    probabilities = class_logits.softmax(dim=-1)
+    total = class_logits.new_zeros(())
+    count = 0
+    for row in range(targets.shape[0]):
+        start = 0
+        while start < targets.shape[1]:
+            label = int(targets[row, start])
+            end = start + 1
+            while end < targets.shape[1] and int(targets[row, end]) == label:
+                end += 1
+            if label >= 0 and end - start >= 2:
+                run = probabilities[row, start:end]
+                centre = run.mean(dim=0, keepdim=True).detach()
+                total = total + (run - centre).square().sum()
+                count += end - start
+            start = end
+    return total / max(count, 1)
+
+
 def _train(
     data: list[dict], val_templates: list[dict], *, epochs: int, batch_size: int,
     patience: int, seed: int, device: str, boundary_weight: float,
@@ -197,6 +232,8 @@ def _train(
     gap_weak_loss_weight: float,
     repeat_minority_sources: bool,
     temporal_consistency_weight: float,
+    segment_consistency_weight: float,
+    transition_supervision_weight: float,
     baseline_hparams: dict, baseline_state: dict,
 ) -> tuple[BoundaryAwareGRU, list[dict], int, float]:
     rng = random.Random(seed)
@@ -243,12 +280,15 @@ def _train(
         boundary_losses: list[float] = []
         weak_losses: list[float] = []
         consistency_losses: list[float] = []
+        segment_losses: list[float] = []
         for offset in range(0, len(order), batch_size):
-            features, class_target, edge_target, edge_mask, weak_intervals = _crop_batch(
-                order[offset:offset + batch_size], rng
+            features, class_target, class_supervision, edge_target, edge_mask, weak_intervals = _crop_batch(
+                order[offset:offset + batch_size], rng,
+                transition_supervision_weight=transition_supervision_weight,
             )
             features = features.to(device)
             class_target = class_target.to(device)
+            class_supervision = class_supervision.to(device)
             edge_target = edge_target.to(device)
             edge_mask = edge_mask.to(device)
             class_logits, edge_logits, _state = head(features)
@@ -260,7 +300,7 @@ def _train(
                 class_logits.reshape(-1, 7), class_target.clamp_min(0).reshape(-1),
                 weight=class_weights, reduction="none",
             ).reshape_as(class_target)
-            class_loss = (class_loss_values * valid_class).sum() / valid_class.sum()
+            class_loss = (class_loss_values * class_supervision).sum() / class_supervision.sum().clamp_min(1)
             edge_loss_values = nn.functional.binary_cross_entropy_with_logits(
                 edge_logits, edge_target,
                 pos_weight=torch.tensor(edge_pos_weight, dtype=torch.float32, device=device),
@@ -276,8 +316,10 @@ def _train(
             consistency_loss = (
                 (consistency_values * same_known).sum() / same_known.sum().clamp_min(1)
             )
+            segment_loss = _segment_consistency_loss(class_logits, class_target)
             loss = (class_loss + boundary_weight * (edge_loss + gap_weak_loss_weight * weak_loss)
-                    + temporal_consistency_weight * consistency_loss)
+                    + temporal_consistency_weight * consistency_loss
+                    + segment_consistency_weight * segment_loss)
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             nn.utils.clip_grad_norm_(head.parameters(), 1.0)
@@ -287,6 +329,7 @@ def _train(
             boundary_losses.append(float(edge_loss.detach().item()))
             weak_losses.append(float(weak_loss.detach().item()))
             consistency_losses.append(float(consistency_loss.detach().item()))
+            segment_losses.append(float(segment_loss.detach().item()))
 
         validation = _score_predictions(_predict_items(head, val_templates, device), {"method": "raw"})
         entry = {
@@ -296,6 +339,7 @@ def _train(
             "boundary_loss": float(np.mean(boundary_losses)) if boundary_losses else None,
             "weak_boundary_loss": float(np.mean(weak_losses)) if weak_losses else None,
             "temporal_consistency_loss": (float(np.mean(consistency_losses)) if consistency_losses else None),
+            "segment_consistency_loss": (float(np.mean(segment_losses)) if segment_losses else None),
             "val_accuracy": validation["accuracy"],
             "val_macro_f1": validation["macro_f1"],
             "val_transition_macro_f1": validation["transition_macro_f1"],
@@ -348,6 +392,10 @@ def main() -> int:
                         help="Repeat non-majority source videos once per epoch without dropping any video")
     parser.add_argument("--temporal-consistency-weight", type=float, default=0.0,
                         help="Penalize output changes only between adjacent, agreed same-class labels")
+    parser.add_argument("--segment-consistency-weight", type=float, default=0.0,
+                        help="Penalize within-action probability flicker on agreed stable runs")
+    parser.add_argument("--transition-supervision-weight", type=float, default=0.0,
+                        help="Give agreed but boundary-near class labels this relative training weight")
     args = parser.parse_args()
     if args.epochs < 1 or args.patience < 1 or args.batch_size < 1:
         parser.error("epochs, patience and batch-size must be positive")
@@ -355,8 +403,11 @@ def main() -> int:
         parser.error("boundary-weight must be in (0, 2]")
     if args.boundary_positive_weight is not None and args.boundary_positive_weight <= 0:
         parser.error("boundary-positive-weight must be positive")
-    if args.gap_max < 1 or args.gap_weak_loss_weight < 0 or args.temporal_consistency_weight < 0:
+    if (args.gap_max < 1 or args.gap_weak_loss_weight < 0 or args.temporal_consistency_weight < 0
+            or args.segment_consistency_weight < 0):
         parser.error("gap-max must be positive; weak and consistency weights must be nonnegative")
+    if not 0 <= args.transition_supervision_weight <= 1:
+        parser.error("transition-supervision-weight must be in [0, 1]")
     if args.output.exists() and any(args.output.iterdir()):
         parser.error(f"Refusing to overwrite non-empty output directory: {args.output}")
     for required in (args.split_reference, args.model, args.baseline_head):
@@ -415,6 +466,8 @@ def main() -> int:
         gap_weak_loss_weight=args.gap_weak_loss_weight,
         repeat_minority_sources=args.repeat_minority_sources,
         temporal_consistency_weight=args.temporal_consistency_weight,
+        segment_consistency_weight=args.segment_consistency_weight,
+        transition_supervision_weight=args.transition_supervision_weight,
         baseline_hparams=baseline_hparams, baseline_state=baseline_state,
     )
     val_predictions = _predict_items(boundary_head.to(device), val_templates, device)
@@ -442,6 +495,8 @@ def main() -> int:
         "weak_boundary_interval_count_train": sum(len(item["weak_boundary_intervals"]) for item in train_data),
         "repeat_minority_sources": args.repeat_minority_sources,
         "temporal_consistency_weight": args.temporal_consistency_weight,
+        "segment_consistency_weight": args.segment_consistency_weight,
+        "transition_supervision_weight": args.transition_supervision_weight,
         "boundary_transition_count_train": sum(int(item["boundary_targets"].sum()) for item in train_data),
         "yolo_model_sha256": model_sha,
         "baseline_gru": str(args.baseline_head),

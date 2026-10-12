@@ -13,6 +13,7 @@ import numpy as np
 
 from handwash.core.labels import STEP_ORDER, Step
 from handwash.core.protocol import build_report
+from handwash.core.sequence_review import sequence_edit_distance
 from handwash.errors import DataError, ModelError
 from handwash.paths import ensure_dir, project_path
 from handwash.pipelines.video_smoothing import predict_labels
@@ -173,6 +174,19 @@ def _result(name: str, probs: np.ndarray, setting: dict, positions: np.ndarray,
             if reference is not None else
             "Actions and completeness are model estimates. Accuracy requires human labels for this video."
         ),
+    }
+    predicted_sequence: list[int] = []
+    for part in timeline:
+        step_no = int(part["step_no"])
+        if step_no > 0 and (not predicted_sequence or predicted_sequence[-1] != step_no):
+            predicted_sequence.append(step_no)
+    target_sequence = list(reference["sequence"]) if reference is not None else list(range(1, 7))
+    result["sequence_review"] = {
+        "predicted": predicted_sequence,
+        "reference_kind": "two_annotator" if reference is not None else "who_order",
+        "reference": target_sequence,
+        "edit_distance": sequence_edit_distance(predicted_sequence, target_sequence),
+        "note": "Sequence differences are descriptive; no predicted action or rule warning is removed.",
     }
     if reference is not None and reference["valid_centres"]:
         valid = [(int(predicted), target) for predicted, target in zip(chosen, reference["targets"], strict=True)

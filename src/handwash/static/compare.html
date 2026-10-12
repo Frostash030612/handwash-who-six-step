@@ -28,6 +28,7 @@
     .card h3 { margin:0 0 4px; font-size:19px; }
     .badge { display:inline-block; border-radius:20px; background:#e6f1ed; padding:3px 9px; font-size:13px; }
     .bad { background:#faeee9; color:#923a2d; }
+    .review { background:#fff1d8; color:#805509; }
     .steps { display:flex; gap:4px; margin:13px 0; }
     .steps span { flex:1; text-align:center; border-radius:6px; padding:5px 0; background:#edf1f0; color:#8a9999; font-weight:700; }
     .steps span.on { background:#c9e6df; color:#075b5e; }
@@ -100,10 +101,15 @@
     for (const key of ["yolo", "yolo_gru", "videomae"]) {
       const model = data.models[key], report = model.report;
       const issues = visibleViolations(report);
+      const review = model.sequence_review;
+      const oneSequenceDifference = review && review.edit_distance === 1
+        && issues.length > 0 && issues.every(issue=>["missing","out_of_order","repeated"].includes(issue.kind));
       const card = el("section", "card");
       card.append(el("h3", "", model.model));
-      card.append(el("span", `badge ${report.violations.length ? "bad" : ""}`,
-        report.violations.length ? "模型预测出现规则异常" : "模型预测未见规则异常"));
+      const badgeClass = report.violations.length ? (oneSequenceDifference ? "review" : "bad") : "";
+      const badgeText = !report.violations.length ? "模型预测未见规则异常"
+        : oneSequenceDifference ? "模型提示一处序列差异，需复核" : "模型预测出现规则异常";
+      card.append(el("span", `badge ${badgeClass}`, badgeText));
       const steps = el("div", "steps");
       for(let n=1;n<=6;n++) steps.append(el("span", model.steps_seen.includes(n)?"on":"", String(n)));
       card.append(steps);
@@ -122,6 +128,10 @@
       card.append(timeline);
       const sequence=model.timeline.filter(x=>x.step_no>0).map(x=>x.step_no).filter((x,i,a)=>i===0||x!==a[i-1]);
       card.append(el("div", "sequence", `识别顺序：${sequence.length?sequence.join(" → "):"未识别到六步动作"}`));
+      if(review) {
+        const basis = review.reference_kind === "two_annotator" ? "双人标注动作序列" : "六步标准顺序";
+        card.append(el("div", "muted", `与${basis}相差 ${review.edit_distance} 处（仅比较步骤次序，不评价动作质量或时长）`));
+      }
       card.append(el("div", "muted", `搓洗时长估计 ${report.total_wash_duration_s.toFixed(1)} 秒 · 预测流程分数 ${Math.round(report.overall_score*100)}%`));
       if(data.reference && model.consensus_accuracy!==undefined) {
         card.append(el("div", "muted", `本视频双标注一致中心：${model.consensus_correct}/${data.reference.valid_centres} 预测正确（${Math.round(model.consensus_accuracy*100)}%）`));

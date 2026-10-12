@@ -85,6 +85,44 @@ YOLO＋GRU 的验证集有 92 段视频、5,064 个双标注一致中心，当�
 
 到目前为止，空间池化、类别轻微重权、低学习率续训、Viterbi 解码和 VideoMAE 概率融合均未形成可信的整体提升。**当前可辩护的改进仍是已完成的边界感知 YOLO＋GRU，而不是这些未通过验证的候选。** 同一验证集已用于多轮探索，继续在其上追逐微小分数差会增加选择偏差；后续优先做错误归因和独立验证，而不继续替换正式模型。
 
+### 验证集错误归因与切换区间消融（2026-10-13）
+
+只读取原有 92 段验证视频的缓存预测，按相同双人一致时间中心对齐。YOLO 的 296 个错误中，156 个位于动作切换附近的 1,054 个时间中心；离切换较远的 4,010 个中心有 140 个错误。边界感知 YOLO＋GRU 分别降至 78 和 46 个错误。因此切换附近仍是剩余误差的主要来源。YOLO 错误中有 155/296 个的最大类概率至少为 0.9；简单提高置信度阈值不能解决全部问题。逐类报告、混淆矩阵和最难视频由 `scripts/analyze_pskuss_validation_errors.py` 生成，远端结果在 `outputs/pskuss_ds1234_validation_error_analysis_20261013.json`。
+
+据此试了两种小改动，均使用原有 YOLO 特征和相同训练/验证划分：在检测到切换的局部区间混入未分段的 GRU 概率，最优验证 Macro-F1 为 **0.9532**，低于原来的 **0.9537**；五折视频交叉验证为 **0.9522**。另在冻结现有边界 GRU 的基础上增加零初始化的局部时序卷积修正层，先用旧稳定标签、再用切换附近的双人一致标签训练，两次最佳权重均为初始化状态，训练后没有超过现行模型。这些候选不接入正式推理。实验入口分别是 `scripts/compare_boundary_local_blend_validation.py` 和 `scripts/train_temporal_conv_refiner.py`。
+
+下一项模型容量对照使用相同 DataSet1–4 划分训练 YOLO26l-cls。需要单独注明：当前 YOLO26m 曾从旧 DataSet1/3/4 权重续训，而新 l 版从官方预训练分类器开始，两者除模型大小外还有初始化路径差异；单次结果只能作为容量是否值得继续研究的线索。完整视频仍以原 92 段验证视频评分，不在本轮用锁定测试集选模。
+
+该容量对照现已完成 30 轮：YOLO26l 的最佳稳定图像 Top-1 为 **95.963%**，比原 YOLO26m 的约 **95.887%** 略高；但同 92 段完整验证视频上的原始中心 Macro-F1 为 **0.8886**，低于原 m 版 **0.8926**，切换附近 Macro-F1 为 **0.8504**，也低于原版 **0.8536**。因此 l 权重不替换正式 YOLO，也不据此重训 GRU；锁定测试集未用于这个新候选的选择。AutoDL 验证摘要：`outputs/pskuss_ds1234_yolo26l_validation_20261013/summary.json`。
+
+### 序列评分口径核查（2026-10-13）
+
+原有严格序列匹配把可评分中心的 WHO 标签去掉 `other`、折叠连续重复后，要求预测与参考列表完全相同；**没有应用网页报告约 1 秒最短动作规则**。一个孤立错误中心就可能让整个视频计错。测试集中 39 段严格序列不匹配的视频，有 20 段的中心准确率仍至少 95%，其中 12 段仅错一个中心。另一方面，误增与漏检步骤都存在，不能统一删除短动作：将最短预测片段设为两个中心后，边界感知模型验证 Macro-F1 从 0.9537 降到 0.9404，严格匹配从 68/92 降到 52/92。
+
+为避免把片段识别说成完整洗手合规，增加一个**不改写历史成绩**的统一时序评估脚本，分别报告中心 Macro-F1、WHO 片段 F1@50、严格序列匹配（含有步骤子集）及无步骤视频误报。四模型在同一中心、同一双人一致标签上评分；边界感知模型的 WHO 片段 F1@50 为验证 **0.9167**、既有测试 **0.8800**。完整定义、四模型表格和局限见 [视频步骤序列统一评估口径](SEQUENCE_EVALUATION_PROTOCOL.zh-CN.md)。这是**新增指标**，不是原 54/93 被优化成 88%；没有更改任何权重。
+
+针对单步抖动，另在原 5 fps 预测轴上试验短段过滤、三点均值和迟滞确认，再重新采样到**原来相同的 0.8 秒中心**评分。过滤短于 0.4～0.6 秒的片段及迟滞确认均没有改变统一中心指标（片段 F1@50 仍 0.9167、Macro-F1 仍 0.9537、严格匹配仍 68/92）；更强的平滑会下降。5 fps 轴本身可观察到更多短时错误，不能把它的成绩直接和稀疏中心成绩混比。本轮不替换正式后处理。验证脚本为 `scripts/evaluate_dense_boundary_validation.py`，远端结果为 `outputs/pskuss_ds1234_dense_boundary_sparse_validation_20261013.json`。
+
+下一项独立候选借鉴动作边界分支与片段内一致性思路：在原边界 GRU 的双人一致、稳定动作段内增加轻量概率一致性损失；**不对不同动作之间、未知区间或真实短动作强行平滑**。训练入口 `scripts/train_boundary_yolo_gru.py --segment-consistency-weight 0.2`，默认值仍为 0，以保证旧实验可复现。该候选独立保存，并以相同 92 段验证视频检查 Macro-F1、F1@50、严格序列和切换附近指标；未达标不替换正式权重。由于已多次使用该验证集，微小增益仍须独立数据验证。
+
+该候选已在 RTX 3090 上完成。相较既有边界 GRU，验证集中心 Macro-F1 从 **0.9537 降为 0.9503**，WHO 片段 F1@50 从 **0.9167 降为 0.9139**，严格序列从 **68/92 降为 66/92**，切换附近 Macro-F1 从 **0.9278 降为 0.9231**。片段误增 FP 从 29 降至 24，但漏检 FN 从 29 增至 35；也就是说，压住抖动的代价是漏掉真实短动作。新权重只保留作负面消融，**不替换正式模型，不对测试集评估以追逐参数**。候选权重和逐轮记录在远端 `outputs/pskuss_ds1234_boundary_gru_segment_consistency_20261013/`，同口径对照在 `outputs/pskuss_ds1234_boundary_gru_segment_consistency_validation_20261013.json`。
+
+另将既有边界解码器的 15 个原定候选（5 个切换阈值 × 3 个最小间隔）按片段 F1@50 重新排序；最高者仍是当前 `threshold=0.25, min_gap=3`，片段 F1@50 **0.9167**，没有发现“换一个选模目标就能少错一步”的隐藏配置。这个检查只用验证集，结果保存在 `outputs/pskuss_ds1234_boundary_decoder_segment_validation_20261013.json`，正式参数不变。
+
+### 两条针对性优化候选（2026-10-13）
+
+先更正监督范围：`stable_radius=7` 在 `scripts/train_current_yolo_gru.py` 中按**原视频帧号**计算，不是 5 fps 抽样帧。DataSet1–4 的本轮特征缓存均记录为 30 fps，因此原版在切换两侧约 **7/30≈0.23 秒**内要求标注持续一致；之前将其说成 1.4 秒是不正确的。
+
+**候选一：边界附近的软监督。** 在两个标注员一致、但未达到原稳定标签条件的抽样点上加入相对权重 `0.25` 的分类损失；不一致点仍完全屏蔽，边界头与原 YOLO 特征不变。独立 RTX 3090 训练后，92 段验证视频的 Macro-F1 为 **0.9515**（原 0.9537），WHO 片段 F1@50 为 **0.9037**（原 0.9167），严格序列为 **65/92**（原 68/92）。片段 TP 同为 319，FP 从 29 升至 39，因此不替换正式权重。入口 `scripts/train_boundary_yolo_gru.py --transition-supervision-weight 0.25`；远端权重 `outputs/pskuss_ds1234_boundary_gru_soft_transition_20261013/`，验证对照 `outputs/pskuss_ds1234_boundary_gru_soft_transition_validation_20261013.json`。
+
+**候选二：短片段复核器。** 冻结当前边界 GRU，仅对 1–2 个评估中心长的预测片段提取时长、类别概率、置信边距、邻近步骤和边界概率，用训练集的双人一致片段匹配生成“真/假短片段”标签。用按视频分折的训练集交叉验证选择拒绝阈值，之后才在验证集评分。初版训练集中可标注的短片段有 504 个，其中误报仅 27 个；增加原始 GRU 输出中的难负例后，共 628 个，其中误报 49 个。两版的训练内交叉验证都选择阈值 **0（不拒绝任何片段）**，所以验证集成绩保持原样，没有识别提升。这是原训练视频上基础模型预测已近乎饱和、可用真实误报样本不足的证据；不能为了在验证集抬分而临时调阈值。入口 `scripts/train_short_segment_verifier.py`，初版加 `--disable-raw-hard-negatives` 可复现；远端记录分别为 `outputs/pskuss_ds1234_short_segment_verifier_20261013/` 和 `outputs/pskuss_ds1234_short_segment_hardneg_20261013/`。两版均不接入正式推理，也不读取锁定测试视频。
+
+进一步做了**时序头五折留出预测**，避免短片段复核器只学习到原时序模型对训练视频的“过于容易”的错误。430 段训练视频按视频 ID 哈希分为五折；每折只用另外四折训练新的 GRU 分类头和边界头，其中再留一小组作早停，随后只导出该折视频的预测。五折各有 84、87、85、96、78 段，共覆盖 430 段且每段仅预测一次。解码仍使用既有固定阈值 `0.25` 和最小间隔 `3`，没有读取测试视频或为该候选重调验证阈值。**这只是时序头的留出预测，不是端到端 OOF**：YOLO 主干仍是曾用全部 430 段训练视频得到的既有权重，因此训练折分数不可与独立验证分数等同。
+
+留出预测加原始 GRU 难负例后，训练复核器可标注 642 个短片段，其中真实片段 559、误报 83。按视频五折交叉验证选择拒绝阈值，最佳仍为 **0**：训练折 WHO 片段 F1@50 为 **0.9619**；阈值 `0.1` 虽使 FP 从 64 降到 54，但 FN 从 66 升到 76，F1 略降为 **0.9617**，更高阈值下降更多。固定 92 段验证视频上，候选保持旧结果：片段 F1@50 **0.9167**（TP 319、FP 29、FN 29）、中心 Macro-F1 **0.9537**、严格序列 **68/92**。因此**没有可验证的提升，不发布复核器，也不覆盖旧权重**。生成与训练入口分别是 `scripts/build_oof_boundary_predictions.py`、`scripts/train_short_segment_verifier.py --oof-root ...`；远端记录在 `outputs/pskuss_ds1234_temporal_oof_20261013/` 和 `outputs/pskuss_ds1234_short_segment_oof_verifier_20261013/`。该实验说明简单“删除不可信短片段”会把真实短动作一并删掉；下一步应优先定位漏检与错序的来源，而不是继续提高删除阈值。
+
+展示逻辑另做了一项不影响预测和评分的改进：网页保留所有原始规则警告，同时计算预测步骤序列相对双标注序列（已知原视频）或六步标准顺序（自录视频）的最小编辑距离。仅当**纯序列类警告且恰好一处差异**时，页面提示“需复核”，而不是简单把整段视频描述成完全失败；缺步仍然是缺步，时长与动作质量另行呈现。这不是识别准确率提高，也不能据此把 F1@50 说成合规率。实现位于 `src/handwash/core/sequence_review.py`、`src/handwash/pipelines/compare_local.py` 和 `src/handwash/static/compare.html`。
+
 ### 数据、算力与当前执行状态
 
 本机 checkout 仍缺少 `data/processed/pskuss_ds1234_yolo/video_splits.csv` 和完整的 DataSet2/3 解压数据，不能单独复现全数据训练。2026-10-12 已核验克隆到 AutoDL 的实例：RTX 3090 24GB、20 核 CPU、90GB 内存；50GB 数据盘已挂载，包含 DataSet1–4 压缩包及解压目录、锁定的 `video_splits.csv`、YOLO `best.pt`、原 YOLO+GRU `head.pt` 和 VideoMAE safetensors。锁定划分文件能直接复用，因此没有重新随机划分。
@@ -136,6 +174,7 @@ YOLO＋GRU 的验证集有 92 段视频、5,064 个双标注一致中心，当�
 ## 参考文献
 
 - Ishikawa et al., [Alleviating Over-segmentation Errors by Detecting Action Boundaries](https://openaccess.thecvf.com/content/WACV2021/papers/Ishikawa_Alleviating_Over-segmentation_Errors_by_Detecting_Action_Boundaries_WACV_2021_paper.pdf), WACV 2021.
+- Mitsuoka and Hotta, [Combining Boundary Supervision and Segment-Level Regularization for Fine-Grained Action Segmentation](https://openaccess.thecvf.com/content/CVPR2026W/SAUAFG/html/Mitsuoka_Combining_Boundary_Supervision_and_Segment-Level_Regularization_for_Fine-Grained_Action_Segmentation_CVPRW_2026_paper.html), CVPR Workshops 2026. 本项目只借鉴“片段内一致性”动机，未复现论文的 CDF 正则。
 - Li et al., [MS-TCN++: Multi-Stage Temporal Convolutional Network for Action Segmentation](https://arxiv.org/abs/2006.09220), 2020.
 - Woo et al., [CBAM: Convolutional Block Attention Module](https://openaccess.thecvf.com/content_ECCV_2018/html/Sanghyun_Woo_Convolutional_Block_Attention_ECCV_2018_paper), ECCV 2018。空间权重实验借鉴其问题动机，不等同于复现 CBAM。
 - [Ultralytics 分类任务文档](https://docs.ultralytics.com/tasks/classify/)与[训练参数文档](https://docs.ultralytics.com/modes/train/)：用于核对 YOLO26 分类模型规格和增强参数。
