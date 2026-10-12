@@ -70,9 +70,15 @@ models/pskuss_ds1234/*
 !/models/pskuss_ds1234/yolo/
 !/models/pskuss_ds1234/yolo_gru/
 !/models/pskuss_ds1234/videomae_center_stable/
+!/models/pskuss_ds1234/boundary_gru/
 !/models/pskuss_ds1234/web_inference.json
 models/pskuss_ds1234/yolo/*
 !models/pskuss_ds1234/yolo/best.pt
+models/pskuss_ds1234/boundary_gru/*
+!models/pskuss_ds1234/boundary_gru/head.pt
+!models/pskuss_ds1234/boundary_gru/metadata.json
+!models/pskuss_ds1234/boundary_gru/validation.json
+!models/pskuss_ds1234/boundary_gru/test_summary.json
 models/pskuss_ds1234/yolo_gru/*
 !models/pskuss_ds1234/yolo_gru/head.pt
 models/pskuss_ds1234/videomae_center_stable/*
@@ -92,6 +98,7 @@ models/pskuss_ds1234/videomae_center_stable/*
 # These three explicitly archived checkpoints are stored through Git LFS.
 !/models/pskuss_ds1234/yolo/best.pt
 !/models/pskuss_ds1234/yolo_gru/head.pt
+!/models/pskuss_ds1234/boundary_gru/head.pt
 # 本地 Ultralytics 数据导出清单；公开仓库只保留获取和处理数据的说明。
 /pskus-dataset1-dataset4-high-confidence-ultralytics.ndjson
 

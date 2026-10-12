@@ -13,16 +13,16 @@ import argparse
 import csv
 import hashlib
 import json
-import sys
 import time
 from pathlib import Path
 
 import numpy as np
 
-if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from _bootstrap import PROJECT_ROOT
+try:  # Direct script execution and ``python -m scripts.compare_full_video_models``.
+    from _bootstrap import PROJECT_ROOT
+except ImportError:  # pragma: no cover - exercised by module-style imports
+    from ._bootstrap import PROJECT_ROOT
+from handwash.pipelines.boundary_gru import decode_boundaries, load_boundary_gru, score_boundaries
 from scripts.evaluate_videomae_full_videos import (
     _decode_sampled_frames, _ground_truth, _predict_windows, _window_starts,
 )
@@ -209,8 +209,102 @@ def _run_gru(videos: list[VideoInfo], head_path: Path, yolo_path: Path,
                      elapsed_s=time.perf_counter() - started)
 
 
+def _run_boundary_gru(videos: list[VideoInfo], head_path: Path, yolo_path: Path,
+                      feature_cache: Path, output: Path, *, reference: Path) -> dict:
+    import torch
+
+    from handwash.pipelines.exp_demo import ExpFeatureExtractor
+    from scripts.train_current_yolo_gru import _read_or_extract
+
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    head, payload = load_boundary_gru(head_path)
+    if payload.get("exp_sha256") != _sha256(yolo_path):
+        raise ValueError("Boundary-GRU checkpoint was trained from a different YOLO model")
+    decoder = payload.get("decoder", {"method": "raw"})
+    head = head.to(device).eval()
+    checkpoint_sha = _sha256(yolo_path)
+    items: dict[str, list[dict]] = {"val": [], "test": []}
+    edge_scores: dict[str, list[np.ndarray]] = {"val": [], "test": []}
+    edge_targets: dict[str, list[np.ndarray]] = {"val": [], "test": []}
+    edge_masks: dict[str, list[np.ndarray]] = {"val": [], "test": []}
+    started = time.perf_counter()
+    extractor: ExpFeatureExtractor | None = None
+    for number, video in enumerate(videos, start=1):
+        path = feature_cache / f"{video.source}__{video.stem}.npz"
+        if not path.is_file():
+            cache_item, extractor = _read_or_extract(
+                video, extractor, yolo_path, checkpoint_sha, feature_cache, 5.0, 7, device
+            )
+            features = cache_item["features"].astype(np.float32)
+            frame_ids = np.asarray(cache_item["frame_ids"], dtype=np.int64).tolist()
+            fps = float(cache_item["source_fps"])
+            consensus = np.asarray(cache_item["consensus"], dtype=np.int64)
+        else:
+            with np.load(path, allow_pickle=False) as cached:
+                if str(cached["model_sha256"]) != checkpoint_sha or float(cached["sample_fps"]) != 5.0:
+                    raise ValueError(f"Boundary-GRU feature cache does not match YOLO checkpoint: {path}")
+                features = cached["features"].astype(np.float32)
+                frame_ids = cached["frame_ids"].astype(np.int64).tolist()
+                fps = float(cached["source_fps"])
+                consensus = cached["consensus"].astype(np.int64)
+        _starts, positions = _centres(frame_ids, num_frames=16, window_stride=4)
+        if not len(positions):
+            raise ValueError(f"Too short for common centres: {video.source}/{video.stem}")
+        with torch.inference_mode():
+            values = torch.from_numpy(features).unsqueeze(0).to(device)
+            logits, edge_logits, _state = head(values)
+            probs = logits[0].softmax(dim=-1).cpu().numpy()
+            edge_probs = edge_logits[0].sigmoid().cpu().numpy()
+        edge_target = np.zeros(len(consensus), dtype=bool)
+        edge_mask = np.zeros(len(consensus), dtype=bool)
+        if len(consensus) > 1:
+            valid_pairs = (consensus[:-1] >= 0) & (consensus[1:] >= 0)
+            edge_mask[1:] = valid_pairs
+            edge_target[1:] = valid_pairs & (consensus[1:] != consensus[:-1])
+        edge_scores[video.split].append(edge_probs)
+        edge_targets[video.split].append(edge_target)
+        edge_masks[video.split].append(edge_mask)
+        if decoder.get("method") == "boundary_segment":
+            probs = decode_boundaries(
+                probs, edge_probs, threshold=float(decoder["threshold"]),
+                min_gap=int(decoder["min_gap"]),
+            )
+        item = _item(video, probs[positions], frame_ids, positions, fps)
+        items[video.split].append(item)
+        _save_raw(output / "raw_probabilities", item)
+        print(f"YOLO+GRU+boundary {number}/{len(videos)} {video.split} {item['video_id']} "
+              f"centres={len(positions)} agreed={int(item['usable'].sum())}", flush=True)
+    del head, extractor
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    summary = _evaluate("boundary_gru", items, output, model=head_path,
+                        reference=reference, elapsed_s=time.perf_counter() - started)
+    summary["boundary_decoder"] = decoder
+    boundary_threshold = (float(decoder["threshold"])
+                          if decoder.get("method") == "boundary_segment" else 0.5)
+    summary["boundary_head_metrics"] = {
+        split: score_boundaries(
+            np.concatenate(edge_scores[split]),
+            np.concatenate(edge_targets[split]),
+            np.concatenate(edge_masks[split]),
+            threshold=boundary_threshold,
+        )
+        for split in ("val", "test")
+    }
+    summary["boundary_evaluation_note"] = (
+        "Boundary F1 uses adjacent 5 fps centres where both annotators agree; "
+        "the threshold is selected on validation videos only (0.5 if the class decoder chose raw output). "
+        "The boundary decoder itself was selected on validation videos only. "
+        "The standard smoothing grid is then selected on validation, as for every model."
+    )
+    (output / "summary.json").write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return summary
+
+
 def _compare_existing(output: Path, reference: Path) -> None:
-    names = ("yolo", "videomae", "videomae_center", "yolo_gru")
+    names = ("yolo", "videomae", "videomae_center", "yolo_gru", "boundary_gru")
     summaries = {}
     for name in names:
         path = output / name / "summary.json"
@@ -270,6 +364,7 @@ def _compare_existing(output: Path, reference: Path) -> None:
         }
 
     pairs = [("yolo", "videomae"), ("yolo_gru", "yolo"),
+             ("boundary_gru", "yolo_gru"), ("boundary_gru", "yolo"),
              ("videomae_center", "videomae"), ("videomae_center", "yolo_gru")]
     videomae_candidates = [name for name in ("videomae", "videomae_center") if name in summaries]
     selected_videomae = (max(videomae_candidates,
@@ -282,6 +377,10 @@ def _compare_existing(output: Path, reference: Path) -> None:
         "common_test_centres": summaries[baseline]["test_raw"]["evaluated_centres"],
         "metrics": {name: {"raw": summary["test_raw"], "selected": summary["test_smoothed"]}
                     for name, summary in summaries.items()},
+        "boundary_detection": {
+            name: summary["boundary_head_metrics"]
+            for name, summary in summaries.items() if "boundary_head_metrics" in summary
+        },
         "paired_test_macro_f1_deltas": [paired_delta(left, right) for left, right in pairs
                                         if left in summaries and right in summaries],
         "selected_videomae_by_validation": selected_videomae,
@@ -307,8 +406,10 @@ def main() -> int:
     parser.add_argument("--gru-head", type=Path, default=PROJECT_ROOT / "outputs/pskuss_ds1234_yolo_gru/head.pt")
     parser.add_argument("--gru-feature-cache", type=Path,
                         default=PROJECT_ROOT / "outputs/pskuss_ds1234_yolo_gru/features")
+    parser.add_argument("--boundary-head", type=Path,
+                        default=PROJECT_ROOT / "outputs/pskuss_ds1234_boundary_gru/head.pt")
     parser.add_argument("--output", type=Path, default=PROJECT_ROOT / "outputs/pskuss_ds1234_fair_video_comparison")
-    parser.add_argument("--models", default="yolo,videomae", help="Comma-separated subset of yolo,videomae,videomae_center,yolo_gru")
+    parser.add_argument("--models", default="yolo,videomae", help="Comma-separated subset of yolo,videomae,videomae_center,yolo_gru,boundary_gru")
     parser.add_argument("--yolo-batch", type=int, default=32)
     parser.add_argument("--videomae-batch", type=int, default=4)
     parser.add_argument("--compare-only", action="store_true",
@@ -318,8 +419,8 @@ def main() -> int:
         _compare_existing(args.output, args.split_reference)
         return 0
     chosen = [name.strip() for name in args.models.split(",") if name.strip()]
-    if not chosen or set(chosen) - {"yolo", "videomae", "videomae_center", "yolo_gru"} or len(set(chosen)) != len(chosen):
-        parser.error("--models must be yolo, videomae, videomae_center, or yolo_gru without duplicates")
+    if not chosen or set(chosen) - {"yolo", "videomae", "videomae_center", "yolo_gru", "boundary_gru"} or len(set(chosen)) != len(chosen):
+        parser.error("--models must be yolo, videomae, videomae_center, yolo_gru, or boundary_gru without duplicates")
     videos = [video for video in videos_from_reference(args.root, args.split_reference)
               if video.split in {"val", "test"}]
     counts = {split: sum(video.split == split for video in videos) for split in ("val", "test")}
@@ -339,9 +440,14 @@ def main() -> int:
             model_path = args.videomae_model if name == "videomae" else args.videomae_center_model
             summaries[name] = _run_videomae(videos, model_path, output, name=name,
                                             batch=args.videomae_batch, reference=args.split_reference)
-        else:
+        elif name == "yolo_gru":
             summaries[name] = _run_gru(videos, args.gru_head, args.yolo_model,
                                        args.gru_feature_cache, output, reference=args.split_reference)
+        else:
+            summaries[name] = _run_boundary_gru(
+                videos, args.boundary_head, args.yolo_model, args.gru_feature_cache,
+                output, reference=args.split_reference,
+            )
     _compare_existing(args.output, args.split_reference)
     return 0
 
