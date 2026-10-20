@@ -360,21 +360,21 @@ def test_build_report_accepts_a_fully_compliant_sequence() -> None:
     assert report.total_wash_duration_s == pytest.approx(6 * STEP_SECONDS)
 
 
-def test_atec_is_used_only_for_boundary_gru_reports() -> None:
-    """ATEC combines one-second smoothing with video-relative outlier review."""
+def test_adaptive_chain_is_used_only_for_boundary_gru_reports() -> None:
+    """Adaptive segment confirmation is restricted to the integrated model."""
     labels = full_sequence() + seq((B, 10))
     confidences = [0.95] * len(full_sequence()) + [0.6] * 10
-    atec = build_report(
-        clip_id="atec", labels=labels, confidences=confidences, fps=FPS,
+    adaptive = build_report(
+        clip_id="adaptive", labels=labels, confidences=confidences, fps=FPS,
         cfg=AssessConfig(), model_name="boundary_gru",
     )
     legacy = build_report(
         clip_id="legacy", labels=labels, confidences=confidences, fps=FPS,
         cfg=AssessConfig(), model_name="yolo_gru",
     )
-    assert atec.is_in_order is True
-    assert atec.timeline[-1].step is Step.UNKNOWN
-    assert any("ATEC 未确认片段" in note for note in atec.notes)
+    assert adaptive.is_in_order is True
+    assert adaptive.timeline[-1].step is Step.UNKNOWN
+    assert any("自适应边界感知 GRU 未确认片段" in note for note in adaptive.notes)
     assert legacy.timeline[-1].step is Step.STEP_2
 
 

@@ -1,4 +1,4 @@
-"""ATEC: Adaptive Temporal Evidence Confirmation for action chains."""
+"""Adaptive segment confirmation used by the combined YOLO + GRU model."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import numpy as np
 from handwash.errors import ProtocolError
 
 
-def atec_action_chain(
+def adaptive_boundary_gru_chain(
     labels: Sequence[int], *, fps: float, smoothing_window_seconds: float,
     background_class: int, class_probabilities: Sequence[Sequence[float]] | None = None,
     winner_confidences: Sequence[float] | None = None,
@@ -123,4 +123,4 @@ def atec_action_chain(
     return {'order': order, 'segments': segments, 'smoothed_labels': smoothed,
             'smoothing_window_frames': window, 'comparable_segments': len(action_segments),
             'duration_comparison_available': comparable, 'median_action_confidence': median_confidence,
-            'method': 'ATEC/1'}
+            'method': 'adaptive_boundary_gru/1'}

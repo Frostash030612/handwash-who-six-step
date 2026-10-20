@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate ATEC on the boundary GRU and compare frozen frame predictions."""
+"""Compare YOLO, YOLO + GRU, and YOLO + Adaptive Boundary-Aware GRU."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from pathlib import Path
 
 import numpy as np
 
-from handwash.core.action_chain import atec_action_chain
+from handwash.core.action_chain import adaptive_boundary_gru_chain
 from handwash.core.boundary_metrics import (
     BoundaryScore,
     predicted_boundaries,
@@ -22,7 +22,11 @@ from handwash.core.boundary_metrics import (
 
 
 MODELS = ("yolo", "yolo_gru", "boundary_gru")
-MODEL_NAMES = {"yolo": "YOLO", "yolo_gru": "YOLO+GRU", "boundary_gru": "边界感知 GRU"}
+MODEL_NAMES = {
+    "yolo": "YOLO",
+    "yolo_gru": "YOLO+GRU",
+    "boundary_gru": "YOLO+自适应边界感知 GRU",
+}
 
 
 def collapse(values):
@@ -63,8 +67,8 @@ def main():
             videos[row["video_id"]].append(row)
 
     result = {
-        "method": "ATEC/1",
-        "applied_to": "boundary_gru_only",
+        "method": "adaptive_boundary_gru/1",
+        "applied_to": "yolo_adaptive_boundary_gru_only",
         "analysis_type": "retrospective reanalysis of previously inspected videos",
         "frame_predictions_changed": False,
         "input_sha256": source_hash,
@@ -98,7 +102,7 @@ def main():
             aggregate_boundaries[model].add(boundary_score)
             item = {"raw_order": raw_order, "raw_order_match": raw_order == gt_order}
             if model == "boundary_gru":
-                chain = atec_action_chain(
+                chain = adaptive_boundary_gru_chain(
                     prediction, fps=5.0, smoothing_window_seconds=1.0,
                     background_class=0, winner_confidences=confidence,
                     outlier_z=-2.0, minimum_comparable_segments=4,
@@ -142,7 +146,7 @@ def main():
                 for video in videos
             ),
         }
-    result["models"]["boundary_gru"]["atec_order_matches"] = sum(
+    result["models"]["boundary_gru"]["adaptive_chain_order_matches"] = sum(
         result["videos"][video]["models"]["boundary_gru"]["confirmed_order_match"]
         for video in videos
     )
@@ -150,31 +154,31 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     (args.output/"result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2)+"\n")
     lines = [
-        "# 边界感知 GRU：ATEC 自适应动作链",
+        "# YOLO＋自适应边界感知 GRU：十段测试集结果",
         "",
-        "ATEC（Adaptive Temporal Evidence Confirmation，自适应时序证据确认）"
-        "将 1 秒多数平滑与基于视频内时长、置信度的片段确认融合。只对边界感知 GRU 应用；"
-        "YOLO 与 YOLO+GRU 使用原始逐帧顺序。模型输出和逐帧指标未改变。",
+        "YOLO＋自适应边界感知 GRU 把 YOLO 特征、边界感知 GRU 分类与边界预测、"
+        "以及自适应动作片段确认作为一个完整方案。确认步骤将 1 秒多数平滑与视频内时长、"
+        "置信度判断结合；YOLO 与 YOLO+GRU 不使用这一步。模型输出和逐帧指标未改变。",
         "",
         "这十段及错误区间此前已经检查，当前结果属于回顾性复算，不是新的独立测试。",
         "",
-        "| 模型 | 帧准确率 | 宏 F1 | 边界 F1 | 原始顺序正确 | ATEC 确认链正确 |",
+        "| 模型 | 帧准确率 | 宏 F1 | 边界 F1 | 原始顺序正确 | 最终动作链正确 |",
         "|---|---:|---:|---:|---:|---:|",
     ]
     for model in MODELS:
         item = result["models"][model]
-        atec = f"{item['atec_order_matches']}/{len(videos)}" if model == "boundary_gru" else "未使用"
+        confirmed = f"{item['adaptive_chain_order_matches']}/{len(videos)}" if model == "boundary_gru" else "—"
         lines.append(
             f"| {MODEL_NAMES[model]} | {item['accuracy']:.2%} | {item['macro_f1']:.2%} | "
-            f"{item['boundary_f1']:.2%} | {item['raw_order_matches']}/{len(videos)} | {atec} |"
+            f"{item['boundary_f1']:.2%} | {item['raw_order_matches']}/{len(videos)} | {confirmed} |"
         )
     lines += [
         "",
-        f"边界感知 GRU 的 ATEC 确认链为 {result['models']['boundary_gru']['atec_order_matches']}/{len(videos)}；"
+        f"YOLO＋自适应边界感知 GRU 的最终动作链为 {result['models']['boundary_gru']['adaptive_chain_order_matches']}/{len(videos)}；"
         f"原始顺序为 {result['models']['boundary_gru']['raw_order_matches']}/{len(videos)}。",
-        "ATEC 不能提升帧准确率、宏 F1 或边界 F1，因为它只确认动作链，不重写模型预测。",
+        "自适应片段确认不改写逐帧分类，因此不会改变帧准确率、宏 F1 或边界 F1。",
         "",
-        "| 视频 | 标注 | 边界 GRU 原始 | ATEC 确认 | 匹配 | 未确认片段 |",
+        "| 视频 | 标注 | 模型原始顺序 | 最终动作链 | 匹配 | 未确认片段 |",
         "|---|---|---|---|:---:|---|",
         *markdown_rows,
         "",

@@ -54,11 +54,13 @@
 
 ---
 
-### 3.1 ATEC（自适应时序证据确认）
+### 3.1 YOLO＋自适应边界感知 GRU
 
-正式报告配置 `assess.action_chain_method: atec_boundary_gru` 时，模型名包含
-`boundary_gru` 的预测改用 ATEC 确认动作链；其他模型继续走上面的通用分段规则。
-ATEC 将 1 秒居中多数平滑与片段确认合为一条路径，不设置固定动作秒数门槛：
+本项目把 YOLO 特征提取、边界感知 GRU 分类与边界预测，以及下列自适应片段确认合称为
+**YOLO＋自适应边界感知 GRU**。它与 YOLO、YOLO＋GRU 是三个独立的模型对照方案。
+配置 `assess.action_chain_method: adaptive_boundary_gru` 后，只有模型标识含
+`boundary_gru` 的方案使用这套完整动作链；YOLO 与 YOLO＋GRU 仍走通用分段规则。
+自适应片段确认将 1 秒居中多数平滑与片段确认合为一条路径，不设固定动作秒数门槛：
 
 - 用本视频动作段对数时长的中位数和 MAD 衡量某片段是否明显偏短。
 - 只有偏短程度超过稳健异常界限、且该段均值置信度低于本视频动作段置信度中位数，才将它标为未确认。
@@ -66,8 +68,9 @@ ATEC 将 1 秒居中多数平滑与片段确认合为一条路径，不设置固
 - 未确认段保留在时间轴并显示为 `unknown`，不计入六步顺序与覆盖；逐帧预测和模型置信度不改写。
 - 支持任意顺序与重复步骤，不使用“正确洗手顺序”补全模型输出。
 
-方法实现：`src/handwash/core/action_chain.py`；参数在 `configs/config.yaml` 的 `assess` 段。
-ATEC 使用未来帧统计整段时长分布，属于离线确认；实时页面中的临时结果可能随视频继续录制而更新。
+实现位置：边界感知 GRU 在 `src/handwash/pipelines/boundary_gru.py`，片段确认在
+`src/handwash/core/action_chain.py`；参数在 `configs/config.yaml` 的 `assess` 段。
+确认过程使用整段视频统计时长分布，属于离线步骤；实时页面中的临时结果可能随视频继续录制而更新。
 
 ## 4. 三类判定
 

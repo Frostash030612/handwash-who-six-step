@@ -1,5 +1,5 @@
-"""Public pipeline entry point for the ATEC action-chain algorithm."""
+"""Public pipeline entry point for adaptive boundary-GRU chain confirmation."""
 
-from handwash.core.action_chain import atec_action_chain
+from handwash.core.action_chain import adaptive_boundary_gru_chain
 
-__all__ = ["atec_action_chain"]
+__all__ = ["adaptive_boundary_gru_chain"]

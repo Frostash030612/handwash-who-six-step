@@ -63,12 +63,15 @@ Processing chain: **smoothing → segmentation → three classes of judgement �
 
 ---
 
-### 3.1 ATEC (Adaptive Temporal Evidence Confirmation)
+### 3.1 YOLO + Adaptive Boundary-Aware GRU
 
-When `assess.action_chain_method: atec_boundary_gru` is configured, predictions
-whose model name contains `boundary_gru` use ATEC; other models keep the general
-segmentation rule above. ATEC combines one-second centred majority smoothing
-with segment confirmation and has no fixed action-duration cutoff:
+This project calls the combined pipeline **YOLO + Adaptive Boundary-Aware GRU**:
+YOLO feature extraction, a boundary-aware GRU classification and boundary head, and
+the adaptive segment confirmation below. It is compared as a complete model beside
+YOLO and YOLO + GRU. With `assess.action_chain_method: adaptive_boundary_gru`, only
+model identifiers containing `boundary_gru` use this pipeline; other models keep the
+general segmentation rule above. Segment confirmation combines one-second centred
+majority smoothing with duration evidence and has no fixed action-duration cutoff:
 
 - Compare log segment durations with the within-video median and MAD.
 - Mark a segment unconfirmed only when it is a strong short-duration outlier
@@ -79,10 +82,11 @@ with segment confirmation and has no fixed action-duration cutoff:
 - Preserve arbitrary and repeated step order; do not fill predictions from a
   canonical handwashing sequence.
 
-Implementation: `src/handwash/core/action_chain.py`; parameters live in the
-`assess` section of `configs/config.yaml`. ATEC uses the completed video's
-duration distribution, so it is an offline confirmation method; provisional
-results in a live session can update as more frames arrive.
+Implementation: the GRU head is in `src/handwash/pipelines/boundary_gru.py`; segment
+confirmation is in `src/handwash/core/action_chain.py`. Parameters live in the
+`assess` section of `configs/config.yaml`. Confirmation uses the completed video's
+duration distribution, so it is offline; provisional results in a live session can
+update as more frames arrive.
 
 ## 4. Three classes of judgement
 

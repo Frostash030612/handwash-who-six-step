@@ -1,12 +1,12 @@
 import unittest
 
 from handwash.errors import ProtocolError
-from handwash.pipelines.action_chain import atec_action_chain
+from handwash.pipelines.action_chain import adaptive_boundary_gru_chain
 
 
-class ATECActionChainTests(unittest.TestCase):
+class AdaptiveBoundaryGRUChainTests(unittest.TestCase):
     def chain(self, labels, confidences=None):
-        return atec_action_chain(labels, fps=5, smoothing_window_seconds=0,
+        return adaptive_boundary_gru_chain(labels, fps=5, smoothing_window_seconds=0,
                                  background_class=0, winner_confidences=confidences)
 
     def test_relative_short_outlier_is_unconfirmed(self):
@@ -33,7 +33,7 @@ class ATECActionChainTests(unittest.TestCase):
 
     def test_invalid_fps_is_rejected(self):
         with self.assertRaises(ProtocolError):
-            atec_action_chain([1], fps=0, smoothing_window_seconds=1,
+            adaptive_boundary_gru_chain([1], fps=0, smoothing_window_seconds=1,
                               background_class=0)
 
 

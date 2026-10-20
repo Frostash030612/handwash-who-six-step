@@ -25,7 +25,7 @@ import numpy as np
 from handwash.core.config import AssessConfig
 from handwash.core.labels import CANONICAL_STEPS, NON_WASH_STEPS, STEP_ORDER, STEP_ZH, Step
 from handwash.core.schema import ProtocolReport, ProtocolViolation, StepStatistic, TimelineSegment
-from handwash.core.action_chain import atec_action_chain
+from handwash.core.action_chain import adaptive_boundary_gru_chain
 from handwash.errors import ProtocolError
 
 __all__ = [
@@ -367,16 +367,16 @@ def build_report(
         )
 
     model_key = model_name.lower().replace("-", "_").replace(" ", "_")
-    use_atec = (
-        cfg.action_chain_method == "atec_boundary_gru"
+    use_adaptive_chain = (
+        cfg.action_chain_method == "adaptive_boundary_gru"
         and "boundary_gru" in model_key
         and not any(label in (Step.FAUCET_ON, Step.FAUCET_OFF) for label in labels)
     )
-    atec_unconfirmed: list[tuple[Step, int, int]] = []
-    if use_atec:
+    adaptive_unconfirmed: list[tuple[Step, int, int]] = []
+    if use_adaptive_chain:
         raw_conf = [1.0] * len(labels) if confidences is None else list(confidences)
         class_ids = [STEP_ORDER.index(label) + 1 if label in STEP_ORDER else 0 for label in labels]
-        result = atec_action_chain(
+        result = adaptive_boundary_gru_chain(
             class_ids,
             fps=fps,
             smoothing_window_seconds=cfg.action_chain_smoothing_seconds,
@@ -394,11 +394,11 @@ def build_report(
                 non_wash = [x for x in labels[start:end] if x not in STEP_ORDER]
                 label = Counter(non_wash).most_common(1)[0][0] if non_wash else Step.OTHER
             if item["status"] == "unconfirmed_outlier":
-                atec_unconfirmed.append((label, start, end))
+                adaptive_unconfirmed.append((label, start, end))
                 label = Step.UNKNOWN
             segments.append(Segment(label, start, end, float(np.mean(raw_conf[start:end]))))
         # Keep the source labels for event checks, while the report timeline
-        # reflects ATEC's one-second smoothing and abstentions.
+        # reflects adaptive boundary-GRU smoothing and abstentions.
         smoothed = labels
         smoothed_conf = raw_conf
         confirmed_steps = {seg.label for seg in segments if seg.label in STEP_ORDER}
@@ -436,7 +436,7 @@ def build_report(
         statistics.append(
             StepStatistic(
                 step=step,
-                detected=(step in confirmed_steps if use_atec else duration >= cfg.min_segment_s),
+                detected=(step in confirmed_steps if use_adaptive_chain else duration >= cfg.min_segment_s),
                 duration_s=duration,
                 ratio=(duration / total_wash_s) if total_wash_s > 0 else 0.0,
                 num_frames=frames_by_step[step],
@@ -531,8 +531,8 @@ def build_report(
     total_frames = len(smoothed)
     notes = _notes(detected_steps, action_sequence)
     notes.extend(
-        f"ATEC 未确认片段：第 {step.order_index} 步，{start/fps:.1f}–{end/fps:.1f} 秒。"
-        for step, start, end in atec_unconfirmed
+        f"自适应边界感知 GRU 未确认片段：第 {step.order_index} 步，{start/fps:.1f}–{end/fps:.1f} 秒。"
+        for step, start, end in adaptive_unconfirmed
     )
     report = ProtocolReport(
         clip_id=clip_id,
