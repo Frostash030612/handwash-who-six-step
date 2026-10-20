@@ -1,7 +1,0 @@
-# Recognition confirmation rule requested for the self-recorded scene.
-# This is not a medical minimum or a change to the trained frame classifier.
-sample_fps: 5.0
-min_action_seconds: 3.0
-smoothing_window_seconds: 1.0
-background_class: 0
-evaluation_policy: preserve_raw_frame_predictions

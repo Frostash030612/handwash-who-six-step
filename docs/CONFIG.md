@@ -225,6 +225,10 @@ results aligned with the inference settings used for a demo.
 | `missing_tolerance` | 0 | How many missed steps still count as "essentially complete" |
 | `duration_check` | ratio | `seconds` / `ratio` / `none` |
 | `order_check` | true | Whether the order is checked |
+| `action_chain_method` | atec_boundary_gru | Apply ATEC only to predictions whose model name contains `boundary_gru`; or `legacy` |
+| `action_chain_smoothing_seconds` | 1.0 | ATEC centred majority smoothing window (seconds) |
+| `action_chain_outlier_z` | -2.0 | Robust short-duration outlier cutoff used by ATEC |
+| `action_chain_min_comparable_segments` | 4 | Skip duration-outlier checks below this many action segments |
 | `require_faucet_events` | false | Whether tap on/off events must be detected |
 | `report_language` | zh | Report language |
 

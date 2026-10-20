@@ -25,6 +25,7 @@ import numpy as np
 from handwash.core.config import AssessConfig
 from handwash.core.labels import CANONICAL_STEPS, NON_WASH_STEPS, STEP_ORDER, STEP_ZH, Step
 from handwash.core.schema import ProtocolReport, ProtocolViolation, StepStatistic, TimelineSegment
+from handwash.core.action_chain import atec_action_chain
 from handwash.errors import ProtocolError
 
 __all__ = [
@@ -365,21 +366,58 @@ def build_report(
             f"confidences 长度 {len(confidences)} 与 labels 长度 {len(labels)} 不一致"
         )
 
-    if apply_smoothing:
-        smoothed, smoothed_conf = smooth_labels(
-            labels, confidences, window=cfg.smooth_window, min_confidence=cfg.min_confidence
-        )
-    else:
-        smoothed = labels
-        smoothed_conf = [1.0] * len(labels) if confidences is None else list(confidences)
-
-    segments = segment(
-        smoothed,
-        smoothed_conf,
-        fps=fps,
-        min_segment_frames=cfg.min_segment_frames,
-        min_segment_s=cfg.min_segment_s,
+    model_key = model_name.lower().replace("-", "_").replace(" ", "_")
+    use_atec = (
+        cfg.action_chain_method == "atec_boundary_gru"
+        and "boundary_gru" in model_key
+        and not any(label in (Step.FAUCET_ON, Step.FAUCET_OFF) for label in labels)
     )
+    atec_unconfirmed: list[tuple[Step, int, int]] = []
+    if use_atec:
+        raw_conf = [1.0] * len(labels) if confidences is None else list(confidences)
+        class_ids = [STEP_ORDER.index(label) + 1 if label in STEP_ORDER else 0 for label in labels]
+        result = atec_action_chain(
+            class_ids,
+            fps=fps,
+            smoothing_window_seconds=cfg.action_chain_smoothing_seconds,
+            background_class=0,
+            winner_confidences=raw_conf,
+            outlier_z=cfg.action_chain_outlier_z,
+            minimum_comparable_segments=cfg.action_chain_min_comparable_segments,
+        )
+        segments = []
+        for item in result["segments"]:
+            start, end = item["start_index"], item["end_index_exclusive"]
+            if item["class"]:
+                label = STEP_ORDER[item["class"] - 1]
+            else:
+                non_wash = [x for x in labels[start:end] if x not in STEP_ORDER]
+                label = Counter(non_wash).most_common(1)[0][0] if non_wash else Step.OTHER
+            if item["status"] == "unconfirmed_outlier":
+                atec_unconfirmed.append((label, start, end))
+                label = Step.UNKNOWN
+            segments.append(Segment(label, start, end, float(np.mean(raw_conf[start:end]))))
+        # Keep the source labels for event checks, while the report timeline
+        # reflects ATEC's one-second smoothing and abstentions.
+        smoothed = labels
+        smoothed_conf = raw_conf
+        confirmed_steps = {seg.label for seg in segments if seg.label in STEP_ORDER}
+    else:
+        if apply_smoothing:
+            smoothed, smoothed_conf = smooth_labels(
+                labels, confidences, window=cfg.smooth_window, min_confidence=cfg.min_confidence
+            )
+        else:
+            smoothed = labels
+            smoothed_conf = [1.0] * len(labels) if confidences is None else list(confidences)
+        segments = segment(
+            smoothed,
+            smoothed_conf,
+            fps=fps,
+            min_segment_frames=cfg.min_segment_frames,
+            min_segment_s=cfg.min_segment_s,
+        )
+        confirmed_steps = set()
 
     # --- 逐步骤统计 -------------------------------------------------------
     duration_by_step: dict[Step, float] = dict.fromkeys(STEP_ORDER, 0.0)
@@ -398,7 +436,7 @@ def build_report(
         statistics.append(
             StepStatistic(
                 step=step,
-                detected=duration >= cfg.min_segment_s,
+                detected=(step in confirmed_steps if use_atec else duration >= cfg.min_segment_s),
                 duration_s=duration,
                 ratio=(duration / total_wash_s) if total_wash_s > 0 else 0.0,
                 num_frames=frames_by_step[step],
@@ -491,6 +529,11 @@ def build_report(
         )
 
     total_frames = len(smoothed)
+    notes = _notes(detected_steps, action_sequence)
+    notes.extend(
+        f"ATEC 未确认片段：第 {step.order_index} 步，{start/fps:.1f}–{end/fps:.1f} 秒。"
+        for step, start, end in atec_unconfirmed
+    )
     report = ProtocolReport(
         clip_id=clip_id,
         is_complete=is_complete,
@@ -508,7 +551,7 @@ def build_report(
             cfg=cfg,
         ),
         model_name=model_name,
-        notes=tuple(_notes(detected_steps, action_sequence)),
+        notes=tuple(notes),
         timeline=tuple(
             TimelineSegment(
                 step=seg.label,

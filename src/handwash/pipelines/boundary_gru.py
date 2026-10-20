@@ -82,6 +82,8 @@ class BoundaryAwareGRU(nn.Module):
     features, but its loss cannot change the encoder, GRU, or classifier.
     """
 
+    arch_name = "boundary_gru"
+
     def __init__(
         self,
         feature_dim: int = 1280,

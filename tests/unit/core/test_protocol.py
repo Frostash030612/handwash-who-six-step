@@ -360,6 +360,24 @@ def test_build_report_accepts_a_fully_compliant_sequence() -> None:
     assert report.total_wash_duration_s == pytest.approx(6 * STEP_SECONDS)
 
 
+def test_atec_is_used_only_for_boundary_gru_reports() -> None:
+    """ATEC combines one-second smoothing with video-relative outlier review."""
+    labels = full_sequence() + seq((B, 10))
+    confidences = [0.95] * len(full_sequence()) + [0.6] * 10
+    atec = build_report(
+        clip_id="atec", labels=labels, confidences=confidences, fps=FPS,
+        cfg=AssessConfig(), model_name="boundary_gru",
+    )
+    legacy = build_report(
+        clip_id="legacy", labels=labels, confidences=confidences, fps=FPS,
+        cfg=AssessConfig(), model_name="yolo_gru",
+    )
+    assert atec.is_in_order is True
+    assert atec.timeline[-1].step is Step.UNKNOWN
+    assert any("ATEC 未确认片段" in note for note in atec.notes)
+    assert legacy.timeline[-1].step is Step.STEP_2
+
+
 def test_build_report_statistics_match_the_given_timeline() -> None:
     """每一步的帧数/时长/占比必须与输入时间轴一致，这是报告的数字基础。"""
     report = build_report(clip_id="stats", labels=full_sequence(), fps=FPS, cfg=AssessConfig())

@@ -63,6 +63,27 @@ Processing chain: **smoothing → segmentation → three classes of judgement �
 
 ---
 
+### 3.1 ATEC (Adaptive Temporal Evidence Confirmation)
+
+When `assess.action_chain_method: atec_boundary_gru` is configured, predictions
+whose model name contains `boundary_gru` use ATEC; other models keep the general
+segmentation rule above. ATEC combines one-second centred majority smoothing
+with segment confirmation and has no fixed action-duration cutoff:
+
+- Compare log segment durations with the within-video median and MAD.
+- Mark a segment unconfirmed only when it is a strong short-duration outlier
+  and its mean confidence is below the video's median action confidence.
+- Skip duration-outlier rejection when fewer than four action segments exist.
+- Keep unconfirmed spans on the timeline as `unknown`; they do not count toward
+  six-step order or coverage. Frame predictions and model confidences are kept.
+- Preserve arbitrary and repeated step order; do not fill predictions from a
+  canonical handwashing sequence.
+
+Implementation: `src/handwash/core/action_chain.py`; parameters live in the
+`assess` section of `configs/config.yaml`. ATEC uses the completed video's
+duration distribution, so it is an offline confirmation method; provisional
+results in a live session can update as more frames arrive.
+
 ## 4. Three classes of judgement
 
 ### 4.1 Missed step (missing)

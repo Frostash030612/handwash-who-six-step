@@ -214,6 +214,10 @@ clip 训练时，同一视频同一轮内的随机增强参数会在所有帧间
 | `missing_tolerance` | 0 | 允许漏几步仍判"基本完整" |
 | `duration_check` | ratio | `seconds` / `ratio` / `none` |
 | `order_check` | true | 是否检查顺序 |
+| `action_chain_method` | atec_boundary_gru | ATEC 仅应用于模型名含 `boundary_gru` 的预测，也可设 `legacy` |
+| `action_chain_smoothing_seconds` | 1.0 | ATEC 的居中多数平滑窗口（秒） |
+| `action_chain_outlier_z` | -2.0 | ATEC 的短时长稳健异常界限 |
+| `action_chain_min_comparable_segments` | 4 | 少于此动作段数时跳过时长异常判断 |
 | `require_faucet_events` | false | 是否要求检出开关水龙头 |
 | `report_language` | zh | 报告语言 |
 

@@ -675,6 +675,10 @@ class AssessConfig(_ConfigBase):
     missing_tolerance: int = 0  # 允许漏几步仍判"基本完整"
     duration_check: str = "ratio"  # seconds | ratio | none
     order_check: bool = True
+    action_chain_method: str = "atec_boundary_gru"
+    action_chain_smoothing_seconds: float = 1.0
+    action_chain_outlier_z: float = -2.0
+    action_chain_min_comparable_segments: int = 4
     require_faucet_events: bool = False
     report_language: str = "zh"
 
@@ -703,6 +707,17 @@ class AssessConfig(_ConfigBase):
                 f"assess.duration_check 取值非法：{self.duration_check!r}",
                 hint=f"允许：{list(_DURATION_UNITS)}",
             )
+        if self.action_chain_method not in ("legacy", "atec_boundary_gru"):
+            raise ConfigError("assess.action_chain_method 只能是 legacy 或 atec_boundary_gru")
+        if (
+            not math.isfinite(self.action_chain_smoothing_seconds)
+            or self.action_chain_smoothing_seconds < 0
+        ):
+            raise ConfigError("assess.action_chain_smoothing_seconds 必须为非负有限数值")
+        if not math.isfinite(self.action_chain_outlier_z) or self.action_chain_outlier_z >= 0:
+            raise ConfigError("assess.action_chain_outlier_z 必须为负的有限数值")
+        if self.action_chain_min_comparable_segments < 3:
+            raise ConfigError("assess.action_chain_min_comparable_segments 必须至少为 3")
         if self.missing_tolerance < 0:
             raise ConfigError("assess.missing_tolerance 不能为负")
         if self.report_language != "zh":
