@@ -56,6 +56,27 @@ def test_bidirectional_boundary_gru_uses_two_recurrent_directions() -> None:
     assert state.shape == (2, 2, 8)
 
 
+def test_detached_boundary_loss_cannot_change_the_classification_branch() -> None:
+    torch.manual_seed(0)
+    features = torch.randn(1, 12, 4)
+    for detach, expect_gradient in ((False, True), (True, False)):
+        model = BoundaryAwareGRU(feature_dim=4, hidden=8, dropout=0.0, detach_boundary_input=detach)
+        _class_logits, boundary_logits, _state = model(features)
+        boundary_logits.sum().backward()
+
+        branch = [model.rnn.weight_ih_l0.grad, model.encoder[1].weight.grad]
+        assert all((grad is not None and grad.abs().sum() > 0) == expect_gradient for grad in branch)
+        assert model.boundary_classifier[0].weight.grad.abs().sum() > 0
+
+
+def test_old_boundary_checkpoints_without_detach_flag_still_build() -> None:
+    old_hparams = {"feature_dim": 4, "hidden": 8, "num_classes": 7, "dropout": 0.3, "bidirectional": False}
+
+    model = BoundaryAwareGRU(**old_hparams)
+
+    assert model.hparams["detach_boundary_input"] is False
+
+
 def test_boundary_decoder_averages_only_inside_detected_segments() -> None:
     probabilities = np.asarray([
         [0.9, 0.1], [0.6, 0.4], [0.1, 0.9], [0.2, 0.8],

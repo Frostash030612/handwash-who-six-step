@@ -9,6 +9,13 @@ import numpy as np
 import torch
 from torch import nn
 
+# Decoders live in the torch-free core layer; re-exported so existing imports keep working.
+from handwash.core.boundary_decoding import (  # noqa: F401
+    DECODER_METHODS,
+    apply_decoder,
+    decode_boundaries,
+    decode_boundary_blend,
+)
 from handwash.errors import DataError, ModelError
 from handwash.pipelines.exp_demo import EXP_CLASS_NAMES
 
@@ -70,6 +77,9 @@ class BoundaryAwareGRU(nn.Module):
     The feature normalization, encoder, GRU, and action classifier intentionally
     keep the same parameter names as :class:`ExpTemporalHead`, so a trained
     YOLO+GRU checkpoint can initialize this model without replacing it.
+
+    With ``detach_boundary_input`` the boundary head still reads the GRU
+    features, but its loss cannot change the encoder, GRU, or classifier.
     """
 
     def __init__(
@@ -79,6 +89,7 @@ class BoundaryAwareGRU(nn.Module):
         num_classes: int = len(EXP_CLASS_NAMES),
         dropout: float = 0.3,
         bidirectional: bool = False,
+        detach_boundary_input: bool = False,
     ) -> None:
         super().__init__()
         self.hparams = {
@@ -87,7 +98,9 @@ class BoundaryAwareGRU(nn.Module):
             "num_classes": int(num_classes),
             "dropout": float(dropout),
             "bidirectional": bool(bidirectional),
+            "detach_boundary_input": bool(detach_boundary_input),
         }
+        self.detach_boundary_input = bool(detach_boundary_input)
         self.register_buffer("feature_mean", torch.zeros(feature_dim))
         self.register_buffer("feature_std", torch.ones(feature_dim))
         self.encoder = nn.Sequential(
@@ -112,50 +125,11 @@ class BoundaryAwareGRU(nn.Module):
         """Return action logits, boundary logits, and the recurrent state."""
         normalized = (features - self.feature_mean) / self.feature_std
         encoded, state = self.rnn(self.encoder(normalized), state)
-        previous = torch.cat((encoded[:, :1], encoded[:, :-1]), dim=1)
-        change = torch.abs(encoded - previous)
-        boundary = self.boundary_classifier(torch.cat((encoded, change), dim=-1)).squeeze(-1)
+        source = encoded.detach() if self.detach_boundary_input else encoded
+        previous = torch.cat((source[:, :1], source[:, :-1]), dim=1)
+        change = torch.abs(source - previous)
+        boundary = self.boundary_classifier(torch.cat((source, change), dim=-1)).squeeze(-1)
         return self.classifier(encoded), boundary, state
-
-
-def decode_boundaries(
-    class_probs: np.ndarray,
-    boundary_probs: np.ndarray,
-    *,
-    threshold: float,
-    min_gap: int,
-) -> np.ndarray:
-    """Use confident boundary peaks to average class probabilities per segment.
-
-    ``min_gap`` is measured in sampled frames (at the project default of 5 fps,
-    two frames represent about 0.4 s). No class order is imposed.
-    """
-    probs = np.asarray(class_probs, dtype=np.float32)
-    edges_score = np.asarray(boundary_probs, dtype=np.float32).reshape(-1)
-    if probs.ndim != 2 or len(probs) != len(edges_score):
-        raise ValueError("Expected class probabilities [T, C] and boundary scores [T]")
-    if not np.isfinite(probs).all() or not np.isfinite(edges_score).all():
-        raise ValueError("Probabilities must be finite")
-    if not 0.0 <= threshold <= 1.0 or min_gap < 1:
-        raise ValueError("threshold must be in [0, 1] and min_gap must be positive")
-    if len(probs) < 2:
-        return probs.copy()
-
-    left = np.r_[-np.inf, edges_score[:-1]]
-    right = np.r_[edges_score[1:], -np.inf]
-    peaks = np.flatnonzero((edges_score >= threshold) & (edges_score >= left) & (edges_score > right))
-    chosen: list[int] = []
-    for position in sorted(peaks.tolist(), key=lambda index: float(edges_score[index]), reverse=True):
-        if position == 0 or position >= len(probs):
-            continue
-        if all(abs(position - other) >= min_gap for other in chosen):
-            chosen.append(position)
-    boundaries = sorted(chosen)
-    result = probs.copy()
-    for begin, end in zip([0, *boundaries], [*boundaries, len(probs)], strict=True):
-        if end > begin:
-            result[begin:end] = probs[begin:end].mean(axis=0, keepdims=True)
-    return result
 
 
 def score_boundaries(

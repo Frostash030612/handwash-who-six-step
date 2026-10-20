@@ -1,0 +1,65 @@
+# Boundary-aware YOLO+GRU optimisation on the self-recorded scene (2026-10-20).
+# Research protocol read only by scripts/train_self_scene_boundary_v2.py; it is not an
+# AppConfig overlay, so it lives outside configs/experiments/.
+# Paths below are relative to --scene-root (the self-scene working directory on the GPU host).
+format: self-scene-boundary-v2/1
+
+splits:
+  fit: [1, 2, 3, 5, 6, 7, 9, 11, 13, 15, 17, 19, 21, 23]  # the only clips that train heads
+  validation: [10, 12, 14, 16, 18, 20, 22, 24]            # checkpoint and decoder selection only
+  regression: [4, 8]                                      # never used for selection
+  # Video 8 was visually re-reviewed (65 samples, steps 4<->5); its original labels stay a sensitivity check.
+  reviewed_labels:
+    8: retest_visual_labels_v1/video8_frame_labels_visual_review.csv
+
+features:
+  yolo_checkpoint: models/yolo_best.pt  # YOLO26m-cls trained from scratch on the 14 fit clips; frozen
+  frames_dir: prepared                  # 1080 px squares; Ultralytics runs them at 1088 (stride 32)
+  batch_size: 2
+  sample_fps: 5.0
+
+training:
+  seeds: [20261018, 20261019, 20261020]
+  hidden: 128
+  dropout: 0.3
+  learning_rate: 0.001      # AdamW, identical for all three heads
+  weight_decay: 0.0001
+  max_epochs: 50
+  patience: 10              # epochs without a better validation selection score
+  grad_clip_norm: 1.0
+  boundary:
+    warmup_epochs: 5        # classification loss only; these checkpoints are not eligible
+    direct_loss_weight: 0.2
+    interval_loss_weight: 0.2
+    interval_max_gap: 3     # unlabelled samples allowed inside a weak "change happened here" interval
+    positive_weight_cap: 20.0  # direct positives weighted sqrt(train negatives / positives), capped
+  candidates:
+    gru: {model: gru}
+    joint: {model: boundary, detach_boundary_input: false}    # candidate A
+    detached: {model: boundary, detach_boundary_input: true}  # candidate B
+
+decoder:
+  method: boundary_blend
+  protect_min_seconds: 0.6   # sustained confident raw runs keep their own class evidence
+  protect_confidence: 0.9
+  grid:
+    threshold: [0.3, 0.5, 0.7]
+    min_gap: [3, 5]
+    raw_weight: [0.5, 0.75, 1.0]  # 1.0 = no segment averaging (control)
+
+action_chain:  # same rule as configs/experiments/self_scene_action_chain.yaml
+  sample_fps: 5.0
+  min_action_seconds: 3.0
+  smoothing_window_seconds: 1.0
+  background_class: 0
+
+evaluation:
+  boundary_tolerance_s: 0.4
+  selection_weights: {macro_f1: 0.4, continuous_chain_match_rate: 0.3, boundary_f1: 0.3}
+  brief_error_max_seconds: 1.0
+  brief_error_min_confidence: 0.9
+  hand_switch_steps: [2, 4, 5, 6]  # WHO steps performed once per hand
+
+legacy_checkpoints:  # 2026-10-19 heads (refit on fit+validation); compared on regression videos only
+  yolo_gru: models/yolo_gru.pt
+  boundary_gru: models/boundary_gru.pt
