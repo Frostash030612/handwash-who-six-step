@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-
 from scripts.evaluate_yolo_full_videos import smooth_hysteresis
 
 

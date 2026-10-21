@@ -77,10 +77,10 @@ jobs:
           echo "仓库卫生检查通过"
 
   # ---------------------------------------------------------------------------
-  # 单元测试：契约层必须秒级完成，不许 import torch
+  # 单元测试：包含契约层及新增的 CPU 时序模型检查
   # ---------------------------------------------------------------------------
   unit-tests:
-    name: 单元测试（契约层）
+    name: 单元测试（契约与 CPU 模型）
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -94,7 +94,8 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install numpy pyyaml pytest pytest-cov
-          pip install -e . --no-deps
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[torch]"
 
       - name: 运行单元测试
         run: python -m pytest -m "not integration and not slow and not gpu" --cov --cov-report=term-missing

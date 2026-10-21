@@ -9,9 +9,11 @@ from handwash.errors import ModelError, ModelNotFoundError
 
 def register_all() -> None:
     # import 用于触发装饰器注册；YOLO 的第三方依赖仍在模型初始化时延迟加载。
-    from handwash.models import mobilenet as _mobilenet  # noqa: F401
-    from handwash.models import torchvision_baselines as _torchvision_baselines  # noqa: F401
-    from handwash.models import yolo26_cls as _yolo26_cls  # noqa: F401
+    from handwash.models import (
+        mobilenet as _mobilenet,  # noqa: F401
+        torchvision_baselines as _torchvision_baselines,  # noqa: F401
+        yolo26_cls as _yolo26_cls,  # noqa: F401
+    )
 
 
 def build_model(rc, *, pretrained: bool | str | None = None):

@@ -24,11 +24,19 @@ except ImportError:  # pragma: no cover - exercised by module-style imports
     from ._bootstrap import PROJECT_ROOT
 from handwash.pipelines.boundary_gru import decode_boundaries, load_boundary_gru, score_boundaries
 from scripts.evaluate_videomae_full_videos import (
-    _decode_sampled_frames, _ground_truth, _predict_windows, _window_starts,
+    _decode_sampled_frames,
+    _ground_truth,
+    _predict_windows,
+    _window_starts,
 )
 from scripts.evaluate_yolo_full_videos import decode as decode_yolo, predict as predict_yolo
 from scripts.full_video_eval_common import (
-    RAW_SETTING, _predictions, choose_smoothing, public_metrics, score, videos_from_reference,
+    RAW_SETTING,
+    _predictions,
+    choose_smoothing,
+    public_metrics,
+    score,
+    videos_from_reference,
 )
 from scripts.train_videomae_pskus import LABELS, VideoInfo
 
@@ -177,6 +185,7 @@ def _run_videomae(videos: list[VideoInfo], model_path: Path, output: Path, *, na
 def _run_gru(videos: list[VideoInfo], head_path: Path, yolo_path: Path,
              feature_cache: Path, output: Path, *, reference: Path) -> dict:
     import torch
+
     from handwash.pipelines.exp_demo import load_temporal_head
 
     device = "cuda:0" if torch.cuda.is_available() else "cpu"

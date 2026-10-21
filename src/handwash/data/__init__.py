@@ -14,13 +14,13 @@
 from __future__ import annotations
 
 __all__ = [
+    "NORMALIZE_PRESETS",
     "FrameManifestDataset",
+    "NormalizeSpec",
     "SyntheticFrameDataset",
     "build_dataset",
     "build_transforms",
     "write_synthetic_dataset",
-    "NormalizeSpec",
-    "NORMALIZE_PRESETS",
 ]
 
 from handwash.data.synthetic import SyntheticFrameDataset, write_synthetic_dataset

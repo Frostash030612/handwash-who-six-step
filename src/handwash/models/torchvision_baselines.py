@@ -8,7 +8,7 @@ import torch
 from torch import nn
 
 from handwash.core.registry import register_model
-from handwash.errors import BackendUnavailableError, ModelError
+from handwash.errors import BackendUnavailableError
 from handwash.models.base import BaseClassifier
 
 

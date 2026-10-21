@@ -16,7 +16,10 @@ from typing import Any
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _bootstrap import PROJECT_ROOT  # noqa: F401  （副作用：注册导入路径）
+if __package__ in (None, ""):
+    from _bootstrap import PROJECT_ROOT
+else:
+    from ._bootstrap import PROJECT_ROOT  # noqa: F401
 from handwash.core.config import ResolvedConfig, load_config, parse_overrides
 from handwash.logging import setup_logging
 

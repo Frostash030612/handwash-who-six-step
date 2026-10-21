@@ -201,7 +201,9 @@ def _check_literals(path: Path, lines: list[str]) -> list[Violation]:
         if in_docstring or stripped.startswith("#"):
             continue
         for literal in FORBIDDEN_DIR_LITERALS:
-            if f'"{literal}"' in line or f"'{literal}'" in line:
+            # A dictionary key (e.g. the JSON response key "models") is not a path.
+            pattern = r"[\"']" + re.escape(literal) + r"[\"'](?!\s*:)"
+            if re.search(pattern, line):
                 out.append(
                     Violation(
                         path,

@@ -29,7 +29,7 @@ from handwash.io.video import save_frame
 from handwash.logging import get_logger
 from handwash.paths import ensure_dir
 
-__all__ = ["render_step_frame", "SyntheticFrameDataset", "write_synthetic_dataset"]
+__all__ = ["SyntheticFrameDataset", "render_step_frame", "write_synthetic_dataset"]
 
 log = get_logger(__name__)
 

@@ -20,6 +20,7 @@ from PIL import Image
 
 from handwash.core.action_chain import adaptive_boundary_gru_chain
 from handwash.logging import get_logger
+from handwash.paths import MODELS_DIRNAME
 from handwash.pipelines.boundary_gru import BoundaryAwareGRU, decode_boundaries
 from handwash.pipelines.exp_demo import ExpFeatureExtractor, ExpTemporalHead
 from handwash.self_scene_assessment import MINIMUM_WASH_SECONDS, assess, collapse_order, make_segments
@@ -48,7 +49,7 @@ def synchronize():
 
 
 def vm_ready():
-    folder = ROOT / "models/videomae"
+    folder = ROOT / MODELS_DIRNAME / "videomae"
     try:
         # Both configuration files must be readable; a partially downloaded weight is unavailable.
         for name in ("config.json", "preprocessor_config.json"):
@@ -73,8 +74,8 @@ def catalog():
             "name": name,
             "available": vm_ready()
             if key == "videomae"
-            else (ROOT / "models/yolo_best.pt").is_file()
-            and (key == "yolo" or (ROOT / "models" / f"{key}.pt").is_file()),
+            else (ROOT / MODELS_DIRNAME / "yolo_best.pt").is_file()
+            and (key == "yolo" or (ROOT / MODELS_DIRNAME / f"{key}.pt").is_file()),
         }
         for key, name in MODEL_NAMES.items()
     ]
@@ -99,7 +100,7 @@ class SelectedModel:
         self.key = key
         self.ext = self.head = self.vm = None
         self.sha = {}
-        modelroot = ROOT / "models"
+        modelroot = ROOT / MODELS_DIRNAME
         if key == "videomae":
             if not vm_ready():
                 raise ValueError("VideoMAE 权重或预处理配置尚未完整就绪")

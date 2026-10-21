@@ -20,7 +20,6 @@ from handwash.core.boundary_metrics import (
     score_boundaries,
 )
 
-
 MODELS = ("yolo", "yolo_gru", "boundary_gru")
 MODEL_NAMES = {
     "yolo": "YOLO",

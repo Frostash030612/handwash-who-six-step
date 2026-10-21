@@ -19,7 +19,10 @@ import numpy as np
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _bootstrap import PROJECT_ROOT
+if __package__ in (None, ""):
+    from _bootstrap import PROJECT_ROOT
+else:
+    from ._bootstrap import PROJECT_ROOT
 from scripts.evaluate_videomae_full_videos import _ground_truth, _window_starts
 from scripts.train_videomae_pskus import LABELS, VideoInfo, _discover_videos
 

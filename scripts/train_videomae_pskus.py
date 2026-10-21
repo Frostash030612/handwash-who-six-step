@@ -25,7 +25,10 @@ import torch
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _bootstrap import PROJECT_ROOT
+if __package__ in (None, ""):
+    from _bootstrap import PROJECT_ROOT
+else:
+    from ._bootstrap import PROJECT_ROOT
 
 LABELS = (
     "0_other",
@@ -324,9 +327,8 @@ class ClipDataset:
 
 
 def _metrics(model, loader, device, amp: bool) -> tuple[float, float, list[int], list[int]]:
-    import numpy as np
-    from sklearn.metrics import accuracy_score, f1_score
     import torch
+    from sklearn.metrics import accuracy_score, f1_score
 
     model.eval()
     targets, predictions = [], []
@@ -443,7 +445,7 @@ def main() -> int:
         for split, dataset in datasets.items() if len(dataset)
     }
 
-    id2label = {i: label for i, label in enumerate(LABELS)}
+    id2label = dict(enumerate(LABELS))
     label2id = {label: i for i, label in id2label.items()}
     model = VideoMAEForVideoClassification.from_pretrained(
         args.checkpoint, num_labels=len(LABELS), label2id=label2id, id2label=id2label,

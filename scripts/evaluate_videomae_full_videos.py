@@ -22,7 +22,11 @@ import numpy as np
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _bootstrap import PROJECT_ROOT
+if __package__ in (None, ""):
+    from _bootstrap import PROJECT_ROOT
+else:
+    from ._bootstrap import PROJECT_ROOT
+
 # ``_bootstrap`` puts the repository root ahead of ``scripts/`` on sys.path.
 # Some cloud checkouts also contain a legacy top-level
 # ``train_videomae_pskus.py`` with an older helper signature, so explicitly

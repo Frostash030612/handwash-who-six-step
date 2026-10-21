@@ -27,7 +27,7 @@ import numpy as np
 from handwash.core.config import AugmentConfig, ModelConfig
 from handwash.errors import ConfigError
 
-__all__ = ["NORMALIZE_PRESETS", "NormalizeSpec", "build_transforms", "Compose", "to_tensor_chw"]
+__all__ = ["NORMALIZE_PRESETS", "Compose", "NormalizeSpec", "build_transforms", "to_tensor_chw"]
 
 
 @dataclass(frozen=True, slots=True)
