@@ -51,6 +51,7 @@ function englishReason(value) {
 let stream = null, session = null, timer = null, pending = null, startedAt = 0;
 let recording = false, starting = false, stopping = false, pollBusy = false, connected = false;
 let state = {}, minimumSeconds = 40, available = {}, renderedSession = null;
+let hidePreviousSession = true;
 const activePhases = ['preparing', 'recording', 'flushing', 'analyzing'];
 const milliseconds = x => Number.isFinite(x) ? `${Math.round(x)} ms` : '—';
 const seconds = x => Number(x || 0).toFixed(1);
@@ -148,6 +149,8 @@ function renderResult(result) {
 function updateState(data) {
   state = data; connected = data.api_version === 2;
   if (!connected) { say('This page requires an updated local service. Please restart it.', 'error'); controls(); return; }
+  if (activePhases.includes(data.phase)) hidePreviousSession = false;
+  const clearingPreviousResult = hidePreviousSession && data.phase === 'done';
   minimumSeconds = data.minimum_wash_seconds;
   for (const label of document.querySelectorAll('[data-minimum]')) {
     const text = String(minimumSeconds);
@@ -163,7 +166,16 @@ function updateState(data) {
     if (option.textContent !== label) option.textContent = label;
   }
   const matching = data.model === selected();
-  if (matching) {
+  if (clearingPreviousResult) {
+    $('report').hidden = true;
+    renderedSession = null;
+    resetCurrent();
+    showWash(0, false);
+    $('device').textContent = '—';
+    $('frames').textContent = '0';
+    $('infer').textContent = '—';
+    $('return').textContent = '—';
+  } else if (matching) {
     if (data.label != null) current(data.label, data.confidence);
     showWash(data.live_wash_seconds || 0, data.phase === 'done');
     $('device').textContent = data.device;
@@ -171,12 +183,13 @@ function updateState(data) {
     $('infer').textContent = milliseconds(data.inference_ms);
     $('return').textContent = milliseconds(data.capture_to_result_ms);
   }
-  if (data.phase === 'done' && matching && data.result) renderResult(data.result);
+  if (data.phase === 'done' && matching && data.result && !clearingPreviousResult) renderResult(data.result);
   if (data.phase === 'error') { pill('Error'); say(english(data.message), 'error'); }
   else if (data.phase === 'preparing') { pill('Loading model', 'ready'); say(english(data.message)); }
   else if (data.phase === 'recording') { pill('Live', 'running'); say(!recording && !starting ? 'A previous session is still running. Finish it to save the frames already received.' : english(data.message)); }
   else if (['flushing', 'analyzing'].includes(data.phase)) { pill('Finalizing', 'ready'); say(english(data.message)); }
-  else if (data.phase === 'done' && matching) { pill('Complete', 'done'); say('Session complete. Select a model to begin another.', 'ok'); }
+  else if (data.phase === 'done' && matching && !clearingPreviousResult) { pill('Complete', 'done'); say('Session complete. Select a model to begin another.', 'ok'); }
+  else if (clearingPreviousResult) { pill('Ready', 'ready'); say('Previous session cleared. Select a model and start a new session.'); }
   else { pill('Ready', 'ready'); if (!starting) say(stream?.active ? 'Camera connected. Start when ready.' : 'Choose a model and enable the camera preview to begin.'); }
   controls();
 }
@@ -233,6 +246,7 @@ async function startSession() {
     if (!stream?.active) throw Error('请先开启摄像头');
     const response = await post('/start', {model: selected()}, true);
     session = response.session;
+    hidePreviousSession = false;
     $('report').hidden = true; renderedSession = null; resetCurrent(); showWash(0, false);
     // Wait for only the chosen model to load before the recording clock starts.
     for (;;) {
