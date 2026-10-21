@@ -309,3 +309,8 @@ sources; provide a trained project checkpoint with `--checkpoint` for the final 
 `make self-scene-camera` 启动单模型识别页面：YOLO、YOLO + GRU、自适应边界感知 GRU、VideoMAE 四选一。
 支持实时动作、累计洗手时长、结束后缓存汇总和动作时间线。
 部署与权重目录说明见 [自采摄像头部署](docs/SELF_SCENE_CAMERA.zh-CN.md)。
+
+
+### VideoMAE and live use
+
+VideoMAE ranked first in our internal comparison (99.53% accuracy, 99.02% macro F1 on 632 aligned points across 10 clips). The internal set is small and is not a generalization claim. Its 16-frame temporal window needs about 3 seconds before the first prediction and about 1.4 seconds of future context for a centered label. It can update periodically, but the output trails the action on camera; use it as an offline accuracy benchmark rather than an immediate live coach. See [the camera deployment notes](docs/SELF_SCENE_CAMERA.zh-CN.md).
