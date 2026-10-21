@@ -1,0 +1,123 @@
+{
+  "release": "handwash-final-20261022",
+  "status": "frozen existing models; no retraining during packaging",
+  "primary_model": "boundary_gru",
+  "offline_reference": "videomae",
+  "input_sizes": {
+    "yolo": 1088,
+    "yolo_gru": 1088,
+    "boundary_gru": 1088,
+    "videomae": 224
+  },
+  "fps": 5,
+  "minimum_wash_seconds": 40,
+  "required_chain": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "adaptive_chain": {
+    "applies_to": [
+      "boundary_gru"
+    ],
+    "smoothing_window_seconds": 1.0,
+    "outlier_z": -2.0,
+    "minimum_comparable_segments": 4
+  },
+  "videomae": {
+    "num_frames": 16,
+    "stride": 4,
+    "pretraining": "MCG-NJU/videomae-base-finetuned-kinetics",
+    "first_window_seconds": 3,
+    "future_context_seconds": 1.4
+  },
+  "temporal_heads": {
+    "yolo_gru": {
+      "format": "sixonly-yolo_gru/1",
+      "class_names": [
+        "0_other_or_nonstandard",
+        "1_palm_to_palm",
+        "2_palm_over_dorsum",
+        "3_palm_to_palm_interlaced",
+        "4_backs_of_fingers",
+        "5_thumb_rubbing",
+        "6_fingertips_to_palm"
+      ],
+      "exp_sha256": "e3020c2e56d88c4be90ad788d82d2dc2d6a7e22eb5c1210297d05baaf388abe9",
+      "hparams": {
+        "feature_dim": 1280,
+        "hidden": 128,
+        "num_classes": 7,
+        "dropout": 0.3
+      },
+      "selected_epoch": 5,
+      "decoder": null
+    },
+    "boundary_gru": {
+      "format": "sixonly-boundary_gru/1",
+      "class_names": [
+        "0_other_or_nonstandard",
+        "1_palm_to_palm",
+        "2_palm_over_dorsum",
+        "3_palm_to_palm_interlaced",
+        "4_backs_of_fingers",
+        "5_thumb_rubbing",
+        "6_fingertips_to_palm"
+      ],
+      "exp_sha256": "e3020c2e56d88c4be90ad788d82d2dc2d6a7e22eb5c1210297d05baaf388abe9",
+      "hparams": {
+        "feature_dim": 1280,
+        "hidden": 128,
+        "num_classes": 7,
+        "dropout": 0.3,
+        "bidirectional": false
+      },
+      "selected_epoch": 3,
+      "decoder": {
+        "threshold": 0.3,
+        "min_gap": 4
+      }
+    }
+  },
+  "files": [
+    {
+      "path": "runtime/models/boundary_gru.pt",
+      "bytes": 1138589,
+      "sha256": "274ecbe980a84d070accd1c68d1155a9aa5661257ea576d881566a2113474602"
+    },
+    {
+      "path": "runtime/models/videomae/config.json",
+      "bytes": 1000,
+      "sha256": "5e65b8aa174c06c59985ce31393118d2635b6a2b16b33ff92a075d2a2505c9c8"
+    },
+    {
+      "path": "runtime/models/videomae/model.safetensors",
+      "bytes": 344952716,
+      "sha256": "84e18cb012f641d3e025da04ea1c8b059ad4d6b142132908f198fc36e598abf4"
+    },
+    {
+      "path": "runtime/models/videomae/preprocessor_config.json",
+      "bytes": 415,
+      "sha256": "4bc9b255ff212041bc28127d4fa0ae1630abca52bb2d882f3e4c0b9e5b763f06"
+    },
+    {
+      "path": "runtime/models/yolo_best.pt",
+      "bytes": 20893974,
+      "sha256": "e3020c2e56d88c4be90ad788d82d2dc2d6a7e22eb5c1210297d05baaf388abe9"
+    },
+    {
+      "path": "runtime/models/yolo_gru.pt",
+      "bytes": 1071253,
+      "sha256": "c8c6dc585c0cc4731549427f5633b5fb6ed4093de3e99ddf914fbfd782d9e715"
+    }
+  ],
+  "result_source_sha256": {
+    "frame_predictions": "37d73f45ab7f4d8d9bd3ea1e62fb065c3aa8649fbde5052f33c7b182148906eb",
+    "videomae_predictions": "9c21a292347c93e645006e94b94608999d0c29a0d1710c1255c0965b2e9566a5"
+  },
+  "training_provenance_note": "Retained GRU source selects on 14/8 and refits heads and normalization on 22 development clips; checkpoints do not embed full clip IDs. YOLO and VideoMAE use 14/8.",
+  "checkpoint_metrics_note": "Embedded metrics are historical two-clip scores; use the frozen ten-clip report."
+}

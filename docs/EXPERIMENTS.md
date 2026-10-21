@@ -1,15 +1,14 @@
 # 实验记录（EXPERIMENTS）
 
-当前主线实验：清洗后的 PSKUS 数据训练 YOLO26n-cls 逐帧分类，
-再用外置摄像头测逐帧稳定性、延迟和六步报告。下方 E1—E4 的旧时序实验
-保留作可选研究记录，不是产品交付的前置步骤。实施顺序见
-[当前主计划](IMPLEMENTATION_PLAN.zh-CN.md)。
+## 当前最终版本
 
-**规则：每跑一次实验（无论成功失败）都必须在这里追加一行。**
-没有 `config_hash` 的结果不允许出现在报告里 —— 因为无法说明它对应哪份配置。
+技术开发已于 2026-10-22 冻结。当前采用自采数据、YOLO＋自适应边界感知 GRU 摄像头主方案。
+最终指标引用[四模型统一对比](SELF_SCENE_FOUR_MODEL_COMPARISON.zh-CN.md)，训练来源、权重指纹与限制见
+[最终技术版本](FINAL_RELEASE.zh-CN.md)。本次归档没有重训或新增实验。
 
-`config_hash` 在每个实验目录的 `outputs/<run_name>/resolved_config.yaml` 里，
-或由 `python -m handwash.cli config` 打印。
+## 历史记录
+
+以下保留旧记录；其中“当前主线”“待跑”“必须”属于历史计划，不代表最终版仍需执行。
 
 ---
 

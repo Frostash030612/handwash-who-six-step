@@ -1,0 +1,37 @@
+[
+  {
+    "id": 0,
+    "name": "other",
+    "display": "Other"
+  },
+  {
+    "id": 1,
+    "name": "step1",
+    "display": "Palm to palm"
+  },
+  {
+    "id": 2,
+    "name": "step2",
+    "display": "Palm over dorsum"
+  },
+  {
+    "id": 3,
+    "name": "step3",
+    "display": "Fingers interlaced"
+  },
+  {
+    "id": 4,
+    "name": "step4",
+    "display": "Backs of fingers"
+  },
+  {
+    "id": 5,
+    "name": "step5",
+    "display": "Rotational thumbs"
+  },
+  {
+    "id": 6,
+    "name": "step6",
+    "display": "Fingertips to palm"
+  }
+]
