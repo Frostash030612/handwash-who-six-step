@@ -303,3 +303,9 @@ sources; provide a trained project checkpoint with `--checkpoint` for the final 
 5. Open-source baseline code — <https://github.com/edi-riga/handwash>
 6. WHO How to Handwash — <https://www.who.int/publications/m/item/how-to-handwash>
 7. Ultralytics YOLO26 — <https://docs.ultralytics.com/models/yolo26>
+
+## 自采模型摄像头页面
+
+`make self-scene-camera` 启动单模型识别页面：YOLO、YOLO + GRU、自适应边界感知 GRU、VideoMAE 四选一。
+支持实时动作、累计洗手时长、结束后缓存汇总和动作时间线。
+部署与权重目录说明见 [自采摄像头部署](docs/SELF_SCENE_CAMERA.zh-CN.md)。

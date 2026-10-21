@@ -84,7 +84,7 @@ include = ["handwash*"]
 exclude = ["tests*", "scripts*"]
 
 [tool.setuptools.package-data]
-handwash = ["py.typed", "static/*.html"]
+handwash = ["py.typed", "static/*.html", "static/*.js"]
 
 # ============================================================================
 # pytest —— 只允许一个测试目录 tests/，且必须与 src/ 分层对应

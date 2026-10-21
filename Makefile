@@ -169,3 +169,9 @@ clean:  ## 清理所有缓存（不动数据与权重）
 clean-outputs:  ## 清空 outputs/ 下的实验产物（危险：会删掉训练结果）
 	@read -p "确定要删除 outputs/ 下所有实验产物吗？[y/N] " ok && [ "$$ok" = "y" ]
 	find outputs -mindepth 1 -maxdepth 1 ! -name '.gitkeep' ! -name 'README.md' -exec rm -rf {} +
+
+# Self-scene single-model camera dashboard. Runtime data stays under outputs/.
+SELF_SCENE_CAMERA_DIR ?= outputs/self_scene_camera
+.PHONY: self-scene-camera
+self-scene-camera:  ## 自采四模型单选摄像头页面
+	$(PY) scripts/run_self_scene_camera.py --runtime-dir "$(SELF_SCENE_CAMERA_DIR)" config=configs/experiments/self_scene_camera.yaml

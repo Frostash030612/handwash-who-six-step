@@ -139,3 +139,11 @@
 - `PATCH`：修复与文档。
 
 当前版本：**0.1.0**（框架建立，尚未产出正式实验结果）。
+
+## 2026-10-22 — Self-scene camera dashboard
+
+- Added a responsive single-model camera dashboard with model selection, live action indication, total washing time and result timeline.
+- Added a portable self-scene camera service and CLI/Makefile entry point; runtime weights and recordings remain local.
+- Count only recognized washing time toward the configured total duration; no individual-step time requirement.
+- Prevent model-menu flicker by leaving unchanged option nodes and states untouched during status polling.
+- Final reports reuse streaming predictions. The legacy camera command is preserved.
