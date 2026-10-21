@@ -49,8 +49,11 @@ def package(args: argparse.Namespace) -> None:
     tracked = subprocess.check_output(["git", "ls-files", "-z"], cwd=repo).decode().split("\0")
     for name in filter(None, tracked):
         # Old public-data binaries and first-presentation personal material are not the final system.
-        if (name.startswith(("models/", "outputs/", "deliverables/", ".git"))
-                or Path(name).suffix.lower() in {".pt", ".pth", ".safetensors"}):
+        if name.startswith(".git") or Path(name).suffix.lower() in {".pt", ".pth", ".safetensors"}:
+            continue
+        if name.startswith(("models/", "outputs/", "deliverables/")) and name not in {
+            "models/README.md", "outputs/README.md", "deliverables/README.md",
+        }:
             continue
         copy_file(repo / name, out / "source" / name)
     write_text(out / "source" / "ARCHIVE_NOTE.md", """
