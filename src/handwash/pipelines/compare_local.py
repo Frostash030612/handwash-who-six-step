@@ -15,10 +15,10 @@ from handwash.core.labels import STEP_ORDER, Step
 from handwash.core.protocol import build_report
 from handwash.core.sequence_review import sequence_edit_distance
 from handwash.errors import DataError, ModelError
-from handwash.paths import ensure_dir, project_path
+from handwash.paths import MODELS_DIRNAME, ensure_dir, project_path
 from handwash.pipelines.video_smoothing import predict_labels
 
-MODEL_ROOT = project_path("models", "pskuss_ds1234")
+MODEL_ROOT = project_path(MODELS_DIRNAME, "pskuss_ds1234")
 EXPECTED_YOLO_NAMES = (
     "0_other_or_nonstandard", "1_palm_to_palm", "2_palm_over_dorsum",
     "3_palm_to_palm_interlaced", "4_backs_of_fingers", "5_thumb_rubbing",

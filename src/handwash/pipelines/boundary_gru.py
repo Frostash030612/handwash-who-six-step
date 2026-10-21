@@ -19,7 +19,6 @@ from handwash.core.boundary_decoding import (  # noqa: F401
 from handwash.errors import DataError, ModelError
 from handwash.pipelines.exp_demo import EXP_CLASS_NAMES
 
-
 BOUNDARY_HEAD_FORMAT = "yolo-gru-boundary/1"
 
 
@@ -50,7 +49,7 @@ def weak_boundary_intervals_from_consensus(
     labels = np.asarray(consensus, dtype=np.int64)
     valid = np.flatnonzero(labels >= 0)
     intervals: list[tuple[int, int]] = []
-    for previous, current in zip(valid[:-1], valid[1:]):
+    for previous, current in zip(valid[:-1], valid[1:], strict=False):
         gap = int(current - previous - 1)
         if 1 <= gap <= max_gap and labels[current] != labels[previous]:
             intervals.append((int(previous + 1), int(current + 1)))

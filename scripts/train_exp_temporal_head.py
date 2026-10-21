@@ -33,8 +33,12 @@ import numpy as np
 import torch
 from torch import nn
 
-from _bootstrap import PROJECT_ROOT
-from _common import build_config_parser, load_config_from_args
+if __package__ in (None, ""):
+    from _bootstrap import PROJECT_ROOT
+    from _common import build_config_parser, load_config_from_args
+else:
+    from ._bootstrap import PROJECT_ROOT
+    from ._common import build_config_parser, load_config_from_args
 from handwash.cli import split_argv
 from handwash.core.config import AssessConfig, parse_overrides
 from handwash.core.labels import STEP_ORDER, Step

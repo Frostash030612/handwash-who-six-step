@@ -22,10 +22,10 @@ from collections.abc import Iterable, Mapping, Sequence
 
 import numpy as np
 
+from handwash.core.action_chain import adaptive_boundary_gru_chain
 from handwash.core.config import AssessConfig
 from handwash.core.labels import CANONICAL_STEPS, NON_WASH_STEPS, STEP_ORDER, STEP_ZH, Step
 from handwash.core.schema import ProtocolReport, ProtocolViolation, StepStatistic, TimelineSegment
-from handwash.core.action_chain import adaptive_boundary_gru_chain
 from handwash.errors import ProtocolError
 
 __all__ = [

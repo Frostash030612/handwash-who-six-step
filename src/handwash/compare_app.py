@@ -12,6 +12,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from handwash.core.config import ResolvedConfig
+from handwash.logging import get_logger
 from handwash.pipelines.compare_local import compare_video
 
 MAX_UPLOAD_BYTES = 256 * 1024 * 1024
@@ -137,7 +138,7 @@ class _Handler(BaseHTTPRequestHandler):
 def serve_compare(cfg: ResolvedConfig, port: int = 8766) -> None:
     server = ThreadingHTTPServer(("127.0.0.1", port), _Handler)
     server.app = CompareApp(cfg)  # type: ignore[attr-defined]
-    print(f"同视频模型对照页面：http://127.0.0.1:{port}/", flush=True)
+    get_logger(__name__).info("同视频模型对照页面：http://127.0.0.1:%s/", port)
     try:
         server.serve_forever()
     finally:

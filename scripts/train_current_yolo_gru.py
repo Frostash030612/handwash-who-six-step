@@ -23,9 +23,15 @@ from torch import nn
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _bootstrap import PROJECT_ROOT
+if __package__ in (None, ""):
+    from _bootstrap import PROJECT_ROOT
+else:
+    from ._bootstrap import PROJECT_ROOT
 from handwash.pipelines.exp_demo import (
-    ExpFeatureExtractor, ExpTemporalHead, file_sha256, save_temporal_head,
+    ExpFeatureExtractor,
+    ExpTemporalHead,
+    file_sha256,
+    save_temporal_head,
 )
 from scripts.full_video_eval_common import videos_from_reference
 from scripts.train_exp_temporal_head import _extract_video

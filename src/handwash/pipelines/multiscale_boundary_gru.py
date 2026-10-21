@@ -11,7 +11,7 @@ from typing import Any
 
 import torch
 from torch import nn
-from torch.nn import functional as F
+from torch.nn import functional
 
 from handwash.errors import ModelError
 from handwash.pipelines.exp_demo import ExpTemporalHead
@@ -28,7 +28,7 @@ class CausalResidualBlock(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return x + self.dropout(self.activation(self.conv(F.pad(x, (self.left_padding, 0)))))
+        return x + self.dropout(self.activation(self.conv(functional.pad(x, (self.left_padding, 0)))))
 
 
 class TemporalStack(nn.Module):
@@ -98,9 +98,11 @@ class StructuralBoundaryGRU(nn.Module):
                  channels: int, dilations: list[int], dropout: float,
                  refinement: bool = False, use_boundary: bool = False) -> None:
         super().__init__()
-        self.hparams = dict(backbone_hparams=backbone_hparams, boundary_kind=boundary_kind,
-                            channels=channels, dilations=list(dilations), dropout=dropout,
-                            refinement=refinement, use_boundary=use_boundary)
+        self.hparams = {
+            "backbone_hparams": backbone_hparams, "boundary_kind": boundary_kind,
+            "channels": channels, "dilations": list(dilations), "dropout": dropout,
+            "refinement": refinement, "use_boundary": use_boundary,
+        }
         self.backbone = ExpTemporalHead(**backbone_hparams)
         hidden = int(backbone_hparams["hidden"])
         classes = int(backbone_hparams["num_classes"])

@@ -127,6 +127,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_camera.add_argument("--no-temporal-head", action="store_true", help="不加载时序头，只用 exp.pt 逐帧分类")
 
+    p_self_camera = sub.add_parser("self-scene-camera", help="自采四模型单选摄像头与总洗手时长判定")
+    p_self_camera.add_argument("--runtime-dir", default="outputs/self_scene_camera", help="包含 models/ 的本机运行目录")
+    p_self_camera.add_argument("--port", type=int, default=8876, help="本机网页端口")
+
     p_audit = sub.add_parser("audit-demo", help="本地视频核验：对比 exp.pt 逐帧基线与 GRU")
     p_audit.add_argument("--folder", default="data/external/pskus_demo_validation", help="递归扫描的视频目录")
     p_audit.add_argument("--checkpoint", default="exp.pt", help="七类 Ultralytics 分类权重")
@@ -291,6 +295,17 @@ def _dispatch(args: argparse.Namespace, overrides: dict) -> int:
                 print(f"{report.clip_id:<24} {verdict:<6} 得分 {report.overall_score:.2f}")
             return EXIT_OK
         raise HandwashError("assess 需要 --video 或 --folder", hint="见 handwash assess -h")
+
+    if command == "self-scene-camera":
+        from handwash.self_scene_camera import serve_self_scene_camera
+
+        rc = _load(args, overrides)
+        serve_self_scene_camera(
+            args.runtime_dir,
+            port=args.port,
+            minimum_wash_seconds=rc.assess.min_total_duration_s,
+        )
+        return EXIT_OK
 
     if command == "camera":
         from handwash.camera_app import serve_camera

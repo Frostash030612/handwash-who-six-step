@@ -41,7 +41,7 @@ def _eligible(video, sample_fps: float, radius: int) -> list[tuple[int, int]]:
     right, right_times = _read_csv(video.secondary)
     if not left or len(left) != len(right) or len(left_times) != len(right_times):
         return []
-    if any(not (a == b and abs(a - b) <= 0.001) for a, b in zip(left_times, right_times)):
+    if any(not (a == b and abs(a - b) <= 0.001) for a, b in zip(left_times, right_times, strict=False)):
         return []
     cap = cv2.VideoCapture(str(video.path))
     fps = float(cap.get(cv2.CAP_PROP_FPS) or 30.0)
@@ -49,7 +49,7 @@ def _eligible(video, sample_fps: float, radius: int) -> list[tuple[int, int]]:
     cap.release()
     stride = max(1, round(fps / sample_fps))
     max_index = min(len(left), frame_count)
-    agreed = [a >= 0 and a == b for a, b in zip(left[:max_index], right[:max_index])]
+    agreed = [a >= 0 and a == b for a, b in zip(left[:max_index], right[:max_index], strict=False)]
     result = []
     for i in range(0, max_index, stride):
         lo, hi = max(0, i - radius), min(max_index, i + radius + 1)
@@ -137,7 +137,7 @@ def build(root: Path, output: Path, sample_fps: float, radius: int,
                            "stable_consensus_frames": len(candidates[key]), "selected_frames": len(chosen)})
         if not chosen:
             continue
-        wanted = {frame_id: label for frame_id, label in chosen}
+        wanted = dict(chosen)
         cap = cv2.VideoCapture(str(video.path))
         index = 0
         while wanted:

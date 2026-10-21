@@ -1,0 +1,5 @@
+# Self-scene camera assessment; pretrained weights are supplied separately.
+# Applies to the self-scene-camera command, not training or historical evaluation.
+assess:
+  min_total_duration_s: 40.0
+  duration_check: none
