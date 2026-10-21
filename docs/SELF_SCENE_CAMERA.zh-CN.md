@@ -82,7 +82,7 @@ VideoMAE 必须是本轮自采训练的七类检查点，类别映射为 `0=othe
 - 服务仅绑定本机 loopback。请求限制为本机来源、JPEG 大小和图像尺寸上限；帧时间必须递增。
 - 本轮美化不重新训练权重、不调整已有模型解码，不产生新的模型精度结论。
 
-此前本机功能检查已覆盖四个模型分别加载和推理、30 秒不足与 40 秒达标等时长场景；这一轮只做界面及部署整合，未重新运行模型对照实验或测试套件。当前页面已目视检查，保留最近真实会话结果展示。
+此前本机功能检查已覆盖四个模型分别加载和推理、30 秒不足与 40 秒达标等时长场景；这一轮只做界面及部署整合，未重新运行模型对照实验或测试套件。当前页面已目视检查。完成后刷新页面会清空上次结果显示；本地录像文件保留。
 
 
 ## VideoMAE accuracy and live feedback
@@ -90,3 +90,5 @@ VideoMAE 必须是本轮自采训练的七类检查点，类别映射为 `0=othe
 In the project's internal matched-point comparison, VideoMAE ranked first: 99.53% frame accuracy and 99.02% macro F1 on 632 aligned test points (10 clips). This is a small, repeatedly inspected internal test set, so these scores describe that comparison and do not establish generalization to new users or rooms.
 
 That accuracy comes with a temporal delay. VideoMAE consumes a 16-frame window sampled at 5 fps, emits a new window prediction every 0.8 seconds, and places its label at the window center. It waits for about 3 seconds of frames before the first result and uses about 1.4 seconds of future frames relative to the label. A prediction can therefore arrive periodically while still describing an action from the recent past. It is useful as an offline accuracy benchmark, but it is not suitable for immediate live camera feedback. The smaller YOLO-family models provide the project's responsive live path.
+
+最终权重、训练来源与交付包见 [最终技术版本](FINAL_RELEASE.zh-CN.md)。
