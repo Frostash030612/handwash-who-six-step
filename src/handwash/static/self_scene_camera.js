@@ -60,7 +60,7 @@ function pill(text, kind = '') { $('pill').textContent = text; $('pill').classNa
 async function post(path, body, isJson = false) {
   const response = await fetch(path, {method: 'POST', headers: isJson ? {'Content-Type': 'application/json'} : {}, body: isJson ? JSON.stringify(body) : body});
   const data = await response.json();
-  if (!response.ok) throw Error(data.error || '请求失败');
+  if (!response.ok) throw Error(data.error || 'Request failed');
   return data;
 }
 function controls() {
@@ -142,7 +142,7 @@ function renderResult(result) {
   }
   $('coverage').textContent = `Washing ${seconds(a.wash_seconds)} sec · Other ${seconds(a.background_seconds)} sec · Unobserved ${seconds(a.unknown_seconds)} sec`;
   $('durationDetails').textContent = `Recording: ${seconds(result.recorded_seconds)} sec. Recognized washing: ${seconds(a.wash_seconds)} sec. Other: ${seconds(a.background_seconds)} sec. Unobserved: ${seconds(a.unknown_seconds)} sec. No individual-step time requirement.`;
-  $('computeDetails').textContent = `Inference during recording: ${seconds(prediction.total_compute_s)} sec. Final summary: ${milliseconds(result.finalization_ms}, not including queue wait).`;
+  $('computeDetails').textContent = `Inference during recording: ${seconds(prediction.total_compute_s)} sec. Final summary: ${milliseconds(result.finalization_ms)} (not including queue wait).`;
   showWash(a.wash_seconds, true);
 }
 function updateState(data) {
