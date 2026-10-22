@@ -56,9 +56,7 @@ def weak_boundary_intervals_from_consensus(
     return intervals
 
 
-def weak_interval_loss(
-    edge_logits: torch.Tensor, intervals: list[tuple[int, int, int]]
-) -> torch.Tensor:
+def weak_interval_loss(edge_logits: torch.Tensor, intervals: list[tuple[int, int, int]]) -> torch.Tensor:
     """Noisy-OR MIL loss: at least one boundary inside each uncertain interval."""
     if not intervals:
         return edge_logits.sum() * 0.0
@@ -170,23 +168,27 @@ def score_boundaries(
     }
 
 
-def load_boundary_gru(path: str | Path, *, map_location: str | torch.device = "cpu") -> tuple[BoundaryAwareGRU, dict[str, Any]]:
+def load_boundary_gru(
+    path: str | Path, *, map_location: str | torch.device = "cpu"
+) -> tuple[BoundaryAwareGRU, dict[str, Any]]:
     """Load and validate a boundary-GRU checkpoint."""
     source = Path(path)
     if not source.is_file():
-        raise DataError(f"找不到边界感知 GRU 权重：{source}")
+        raise DataError(f"Boundary-aware GRU weights not found: {source}")
     try:
         payload = torch.load(source, map_location=map_location, weights_only=True)
     except Exception as exc:  # pragma: no cover - backend-specific deserialization errors
-        raise ModelError(f"无法读取边界感知 GRU 权重：{source}", hint=str(exc)) from exc
+        raise ModelError(f"Cannot read boundary-aware GRU weights: {source}", hint=str(exc)) from exc
     if not isinstance(payload, dict) or payload.get("format") != BOUNDARY_HEAD_FORMAT:
-        raise ModelError(f"不是边界感知 GRU 权重：{source}")
+        raise ModelError(f"Not a boundary-aware GRU checkpoint: {source}")
     if tuple(payload.get("class_names", ())) != EXP_CLASS_NAMES:
-        raise ModelError("边界感知 GRU 类别顺序与七类协议不符")
+        raise ModelError("The boundary-aware GRU class order differs from the seven-class protocol")
     try:
         head = BoundaryAwareGRU(**payload["hparams"])
         head.load_state_dict(payload["state_dict"], strict=True)
     except Exception as exc:
-        raise ModelError(f"边界感知 GRU 权重结构不兼容：{source}", hint=str(exc)) from exc
+        raise ModelError(
+            f"Incompatible boundary-aware GRU checkpoint structure: {source}", hint=str(exc)
+        ) from exc
     head.eval()
     return head, payload

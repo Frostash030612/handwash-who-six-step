@@ -30,14 +30,21 @@ from handwash.core.boundary_metrics import (
 MODELS = ("yolo", "yolo_gru", "boundary_gru", "videomae")
 NAMES = {
     "yolo": "YOLO",
-    "yolo_gru": "YOLO＋GRU",
-    "boundary_gru": "YOLO＋自适应边界感知 GRU",
+    "yolo_gru": "YOLO + GRU",
+    "boundary_gru": "YOLO + Adaptive Boundary-Aware GRU",
     "videomae": "VideoMAE",
 }
 EXPECTED_VIDEOS = {
-    "4", "8", "test_correct_01", "test_correct_02", "test_correct_03",
-    "test_correct_04", "test_error_12356", "test_error_12564",
-    "test_error_32654", "test_error_645321",
+    "4",
+    "8",
+    "test_correct_01",
+    "test_correct_02",
+    "test_correct_03",
+    "test_correct_04",
+    "test_error_12356",
+    "test_error_12564",
+    "test_error_32654",
+    "test_error_645321",
 }
 
 
@@ -99,13 +106,16 @@ def main() -> None:
         truth = int(clip["true_label"])
         if frame["valid_for_evaluation"] != "True" or int(frame["ground_truth"]) != truth:
             raise ValueError(f"Ground truth differs at {key}")
-        aligned[clip_id].append({
-            "time_s": float(clip["time_s"]), "truth": truth,
-            "yolo": int(frame["yolo"]),
-            "yolo_gru": int(frame["yolo_gru"]),
-            "boundary_gru": int(frame["boundary_gru"]),
-            "videomae": int(clip["predicted_label"]),
-        })
+        aligned[clip_id].append(
+            {
+                "time_s": float(clip["time_s"]),
+                "truth": truth,
+                "yolo": int(frame["yolo"]),
+                "yolo_gru": int(frame["yolo_gru"]),
+                "boundary_gru": int(frame["boundary_gru"]),
+                "videomae": int(clip["predicted_label"]),
+            }
+        )
     if set(aligned) != EXPECTED_VIDEOS:
         raise ValueError(f"Unexpected test videos: {set(aligned) ^ EXPECTED_VIDEOS}")
 
@@ -121,18 +131,19 @@ def main() -> None:
         for model in MODELS:
             predicted = [row[model] for row in rows]
             raw_order = _order(predicted)
-            boundary, _ = score_boundaries(
-                ref, predicted_boundaries(predicted, times), tolerance_s=0.4
-            )
+            boundary, _ = score_boundaries(ref, predicted_boundaries(predicted, times), tolerance_s=0.4)
             final_order = raw_order
             if model == "boundary_gru":
                 frame_id = {"4": "prior_video4", "8": "prior_video8"}.get(clip_id, clip_id)
                 full = dense[frame_id]
                 chain = adaptive_boundary_gru_chain(
-                    [int(row[model]) for row in full], fps=5.0,
-                    smoothing_window_seconds=1.0, background_class=0,
+                    [int(row[model]) for row in full],
+                    fps=5.0,
+                    smoothing_window_seconds=1.0,
+                    background_class=0,
                     winner_confidences=[float(row[model + "_confidence"]) for row in full],
-                    outlier_z=-2.0, minimum_comparable_segments=4,
+                    outlier_z=-2.0,
+                    minimum_comparable_segments=4,
                 )
                 final_order = chain["order"]
             video_result["models"][model] = {
@@ -163,10 +174,13 @@ def main() -> None:
         final_matches = sum(v["models"][model]["final_order_match"] for v in per_video.values())
         chain_rate = final_matches / len(per_video)
         results[model] = {
-            "name": NAMES[model], "accuracy": accuracy, "macro_f1": macro_f1,
+            "name": NAMES[model],
+            "accuracy": accuracy,
+            "macro_f1": macro_f1,
             "output_boundary_f1": boundary.f1,
             "output_boundary_counts": {
-                "tp": boundary.true_positive, "fp": boundary.false_positive,
+                "tp": boundary.true_positive,
+                "fp": boundary.false_positive,
                 "fn": boundary.false_negative,
             },
             "output_boundary_mean_abs_error_s": (
@@ -190,17 +204,21 @@ def main() -> None:
             "frame_predictions": hashlib.sha256(args.frame_predictions.read_bytes()).hexdigest(),
             "videomae_predictions": hashlib.sha256(args.videomae_predictions.read_bytes()).hexdigest(),
         },
-        "ranking": ranking, "models": results, "videos": per_video,
+        "ranking": ranking,
+        "models": results,
+        "videos": per_video,
     }
     args.output.mkdir(parents=True, exist_ok=True)
-    (args.output / "result.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (args.output / "result.json").write_text(
+        json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     lines = [
-        "# 自采场景四模型统一时间点评估",
+        "# Four-model comparison at shared time centers",
         "",
-        "10 段已反复查看的自采视频，共 632 个相同且有效的时间点。YOLO 系列原始预测与 VideoMAE 窗口中心逐一精确对齐，真值逐点一致。",
-        "此表是回顾性内部对比；VideoMAE 的每次预测看连续 16 帧，YOLO 系列使用对应时刻的预测。",
+        "Ten repeatedly reviewed self-recorded videos; 632 exactly aligned valid time centers with identical reference labels.",
+        "This is a retrospective internal comparison. VideoMAE uses 16-frame windows; the YOLO family uses predictions at the corresponding times.",
         "",
-        "| 排名 | 模型 | 准确率 | 宏 F1 | 输出边界 F1 | 原始顺序 | 最终动作链 | 综合分数 |",
+        "| Rank | Model | Accuracy | Macro F1 | Output boundary F1 | Raw chain | Final chain | Composite |",
         "|---:|---|---:|---:|---:|---:|---:|---:|",
     ]
     for rank, model in enumerate(ranking, 1):
@@ -210,25 +228,28 @@ def main() -> None:
             f"{r['output_boundary_f1']:.2%} | {r['raw_order_matches']}/10 | "
             f"{r['final_order_matches']}/10 | {r['composite_score']:.2%} |"
         )
-    lines.extend([
-        "",
-        "综合分数沿用预定权重：40% 宏 F1＋30% 最终动作链完全匹配率＋30% 输出边界 F1。",
-        "边界指标是四种方法都能计算的类别输出切换指标，不等同于边界分支自身的边界 F1。",
-        "只有边界感知 GRU 使用自适应片段确认；其余三种方法的最终顺序等于原始顺序。",
-        "分类、边界和原始顺序在共同时间点计算；边界感知模型的最终动作链使用其原有 5 fps 预测运行已固定的自适应确认。",
-        "标签和解码已在这些视频上反复检查，结果不能作为全新独立测试的泛化结论。",
-        "",
-        "| 视频 | 真值顺序 | YOLO | YOLO＋GRU | 自适应边界感知 GRU | VideoMAE |",
-        "|---|---|---|---|---|---|",
-    ])
+    lines.extend(
+        [
+            "",
+            "Composite: 40% macro F1 + 30% final-chain exact match + 30% output boundary F1.",
+            "Output boundary F1 measures class-output changes for all methods; it is not the boundary-branch score.",
+            "Only the boundary-aware GRU uses adaptive segment confirmation; the other final chains equal their raw chains.",
+            "Classification, boundaries and raw chains use common centers. The boundary model applies its frozen adaptive confirmation to its dense 5 fps predictions.",
+            "Labels and decoding were repeatedly reviewed on these videos; the results do not establish independent generalization.",
+            "",
+            "| Video | Reference chain | YOLO | YOLO + GRU | Adaptive Boundary-Aware GRU | VideoMAE |",
+            "|---|---|---|---|---|---|",
+        ]
+    )
     for clip_id, item in per_video.items():
         cells = [clip_id, "→".join(map(str, item["true_order"]))]
         for model in MODELS:
             output = item["models"][model]
-            cells.append("→".join(map(str, output["final_order"])) +
-                         (" ✓" if output["final_order_match"] else " ✗"))
+            cells.append(
+                "→".join(map(str, output["final_order"])) + (" ✓" if output["final_order_match"] else " ✗")
+            )
         lines.append("| " + " | ".join(cells) + " |")
-    (args.output / "REPORT.zh-CN.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (args.output / "REPORT.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(json.dumps({"ranking": ranking, "models": results}, ensure_ascii=False, indent=2))
 
 

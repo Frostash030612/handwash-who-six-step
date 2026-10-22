@@ -34,12 +34,17 @@ DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
 MODEL_NAMES = {
     "yolo": "YOLO",
     "yolo_gru": "YOLO + GRU",
-    "boundary_gru": "YOLO + 自适应边界感知 GRU",
+    "boundary_gru": "YOLO + Adaptive Boundary-Aware GRU",
     "videomae": "VideoMAE",
 }
 LOCK = threading.RLock()
 WORK = queue.Queue()
-STATE = {"phase": "ready", "message": "选择模型并开启摄像头后开始。", "device": DEVICE, "frames": 0}
+STATE = {
+    "phase": "ready",
+    "message": "Choose a model and enable the camera preview to begin.",
+    "device": DEVICE,
+    "frames": 0,
+}
 SESSION = None
 
 
@@ -84,7 +89,7 @@ def catalog():
 def prepared(raw):
     im = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
     if im is None:
-        raise ValueError("无效图像")
+        raise ValueError("The received image is invalid.")
     h, w = im.shape[:2]
     scale = 1080 / max(h, w)
     nw, nh = round(w * scale), round(h * scale)
@@ -103,7 +108,7 @@ class SelectedModel:
         modelroot = ROOT / MODELS_DIRNAME
         if key == "videomae":
             if not vm_ready():
-                raise ValueError("VideoMAE 权重或预处理配置尚未完整就绪")
+                raise ValueError("VideoMAE weights or preprocessing files are not ready.")
             from torchvision.transforms import Compose, Normalize, Resize, ToTensor
             from transformers import VideoMAEForVideoClassification, VideoMAEImageProcessor
 
@@ -113,10 +118,10 @@ class SelectedModel:
                 .to(DEVICE)
             )
             if self.vm.config.num_frames != 16 or self.vm.config.num_labels != 7:
-                raise ValueError("VideoMAE 窗口或类别数量与自采模型不一致")
+                raise ValueError("The VideoMAE frame window or class count does not match this model.")
             expected = {0: "other", **{i: f"step{i}" for i in range(1, 7)}}
             if self.vm.config.id2label != expected:
-                raise ValueError("VideoMAE 类别映射不一致")
+                raise ValueError("The VideoMAE class mapping does not match.")
             processor = VideoMAEImageProcessor.from_pretrained(modelroot / "videomae", local_files_only=True)
             # Same direct 224 resize and normalization as self-scene training/evaluation.
             self.transform = Compose(
@@ -132,7 +137,7 @@ class SelectedModel:
             checkpoint = modelroot / f"{key}.pt"
             ck = torch.load(checkpoint, map_location="cpu", weights_only=False)
             if ck["exp_sha256"] != self.sha["yolo"]:
-                raise ValueError("YOLO 与时序模型权重不匹配")
+                raise ValueError("The YOLO and temporal model weights do not match.")
             cls = BoundaryAwareGRU if key == "boundary_gru" else ExpTemporalHead
             self.head = cls(**ck["hparams"]).eval().to(DEVICE)
             self.head.load_state_dict(ck["state_dict"])
@@ -208,11 +213,11 @@ def finish_session(session, engine):
     began = time.perf_counter()
     rows = session["rows"]
     if not rows:
-        raise ValueError("本次没有收到画面，请重新开始")
+        raise ValueError("No frames were received. Please start a new session.")
     end_s = session["end_s"]
     grid = np.arange(0, end_s, 0.2)
     if not len(grid):
-        raise ValueError("录像时长不足")
+        raise ValueError("The recording is too short to analyze.")
     key = session["model"]
     confidence = np.zeros(len(grid))
     labels = np.full(len(grid), -1, dtype=int)
@@ -231,7 +236,7 @@ def finish_session(session, engine):
             valid = np.zeros(len(grid), dtype=bool)
     else:
         if len(session["cache"]) != len(rows):
-            raise ValueError("尚有帧未完成推理，不能生成完整结果")
+            raise ValueError("Some received frames are still being processed.")
         times = np.array([r["time_s"] for r in rows])
         idx = abs(times[:, None] - grid[None, :]).argmin(axis=0)
         valid = abs(times[idx] - grid) <= 0.3
@@ -325,7 +330,7 @@ def worker():
                         torch.mps.empty_cache()
                     engine = SelectedModel(session["model"])
                 with LOCK:
-                    STATE.update(phase="recording", message="模型已就绪，正在采集。")
+                    STATE.update(phase="recording", message="Model ready. Capturing frames.")
             elif kind == "frame":
                 began = time.perf_counter()
                 record = engine.frame(session, row)
@@ -341,23 +346,25 @@ def worker():
                             prediction_time_s=record["time_s"],
                             inference_ms=elapsed * 1000,
                             capture_to_result_ms=(time.time() - row["received"]) * 1000,
-                            message="正在识别，洗手计时为实时估计。",
+                            message="Recognizing actions. Washing time is a live estimate.",
                         )
                     elif session["model"] == "videomae" and not session["windows"]:
-                        STATE["message"] = "VideoMAE 正在收集首个 16 帧窗口（约 3 秒）。"
+                        STATE["message"] = (
+                            "VideoMAE is buffering its first 16-frame window (about 3 seconds)."
+                        )
             elif kind == "finish":
                 with LOCK:
-                    STATE.update(phase="analyzing", message="正在汇总已缓存的预测…")
+                    STATE.update(phase="analyzing", message="Preparing the report from cached predictions…")
                 result = finish_session(session, engine)
                 with LOCK:
                     STATE.update(
                         phase="done",
-                        message="识别完成，洗手时长和动作顺序见下方。",
+                        message="Session complete. Review the washing time and step order below.",
                         result=result,
                         live_wash_seconds=result["assessment"]["wash_seconds"],
                     )
         except Exception as error:
-            log.exception("摄像头推理失败")
+            log.exception("Camera inference failed")
             if kind == "prepare":
                 engine = None
             with LOCK:
@@ -399,25 +406,25 @@ class Handler(BaseHTTPRequestHandler):
             host = self.headers.get("Host", "")
             allowed = {f"127.0.0.1:{self.server.server_port}", f"localhost:{self.server.server_port}"}
             if host not in allowed or self.headers.get("Origin") not in (None, f"http://{host}"):
-                return self.reply({"error": "仅接受本机页面请求"}, 403)
+                return self.reply({"error": "Only local-page requests are accepted"}, 403)
             path = urlsplit(self.path)
             query = parse_qs(path.query)
             n = int(self.headers.get("Content-Length", "0"))
             if n < 0 or n > 4 * 1024 * 1024:
-                raise ValueError("请求过大")
+                raise ValueError("The request is too large.")
             body = self.rfile.read(n)
             if len(body) != n:
-                raise ValueError("数据接收不完整")
+                raise ValueError("The uploaded frame was incomplete.")
             if path.path == "/start":
                 request = json.loads(body or b"{}")
                 key = request.get("model")
                 if key not in MODEL_NAMES:
-                    raise ValueError("请先选择一个模型，再开始")
+                    raise ValueError("Select a model before starting.")
                 if not next(m["available"] for m in catalog() if m["id"] == key):
-                    raise ValueError("所选模型权重尚未完整就绪")
+                    raise ValueError("The selected model weights are not ready.")
                 with LOCK:
                     if STATE["phase"] not in ("ready", "done", "error") or WORK.unfinished_tasks:
-                        raise ValueError("上一段识别还未结束")
+                        raise ValueError("The previous session has not finished.")
                     sid = time.strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6]
                     folder = ROOT / "sessions" / sid
                     folder.mkdir(parents=True)
@@ -447,7 +454,7 @@ class Handler(BaseHTTPRequestHandler):
                         device=DEVICE,
                         frames=0,
                         live_wash_seconds=0.0,
-                        message="正在加载所选模型…",
+                        message="Loading the selected model…",
                     )
                     WORK.put(("prepare", sid, None))
                 return self.reply({"session": sid, "model": key, "phase": "preparing"})
@@ -455,15 +462,15 @@ class Handler(BaseHTTPRequestHandler):
                 t, sid = float(query["t"][0]), query["session"][0]
                 with Image.open(io.BytesIO(body)) as image:
                     if max(image.size) > 4096:
-                        raise ValueError("图像尺寸过大")
+                        raise ValueError("The image dimensions are too large.")
                     image.verify()
                 with LOCK:
                     if SESSION is None or SESSION["id"] != sid or STATE["phase"] != "recording":
-                        raise ValueError("当前没有对应的录像会话")
+                        raise ValueError("No matching recording session is active.")
                     if not np.isfinite(t) or not 0 <= t <= 125:
-                        raise ValueError("超出测试时长")
+                        raise ValueError("The recording exceeds the time limit.")
                     if SESSION["rows"] and t <= SESSION["rows"][-1]["time_s"]:
-                        raise ValueError("采样时间未递增")
+                        raise ValueError("The frame timestamp did not advance.")
                     index = len(SESSION["rows"])
                     dest = SESSION["dir"] / f"frame_{index:05d}.jpg"
                     dest.write_bytes(body)
@@ -482,13 +489,15 @@ class Handler(BaseHTTPRequestHandler):
                         or STATE["phase"] != "recording"
                         or request.get("session") != SESSION["id"]
                     ):
-                        raise ValueError("当前没有对应的录像会话")
+                        raise ValueError("No matching recording session is active.")
                     last = SESSION["rows"][-1]["time_s"] if SESSION["rows"] else 0
                     end_s = float(request.get("elapsed_s", last))
                     if not np.isfinite(end_s) or not last <= end_s <= 125:
-                        raise ValueError("无效结束时间")
+                        raise ValueError("The recording end time is invalid.")
                     SESSION["end_s"] = end_s
-                    STATE.update(phase="flushing", elapsed_s=end_s, message="正在处理最后几帧…")
+                    STATE.update(
+                        phase="flushing", elapsed_s=end_s, message="Processing the last received frames…"
+                    )
                     WORK.put(("finish", SESSION["id"], None))
                 return self.reply({"ok": True})
             self.reply({"error": "not found"}, 404)
@@ -511,12 +520,12 @@ def serve_self_scene_camera(runtime_dir, *, port=8876, minimum_wash_seconds=40.0
     from handwash.errors import HandwashError
 
     if not math.isfinite(minimum_wash_seconds) or minimum_wash_seconds <= 0:
-        raise HandwashError("assess.min_total_duration_s 必须为正数")
+        raise HandwashError("assess.min_total_duration_s must be positive")
     ROOT = Path(runtime_dir).expanduser().resolve()
     MINIMUM_WASH_SECONDS = float(minimum_wash_seconds)
     ROOT.mkdir(parents=True, exist_ok=True)
     # Bind first: a port conflict must not leave an orphan inference worker.
     with ThreadingHTTPServer(("127.0.0.1", port), Handler) as server:
         threading.Thread(target=worker, daemon=True).start()
-        log.info("摄像头页面：http://127.0.0.1:%s", server.server_port)
+        log.info("Camera page: http://127.0.0.1:%s", server.server_port)
         server.serve_forever()

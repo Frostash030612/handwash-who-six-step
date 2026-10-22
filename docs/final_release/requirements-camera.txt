@@ -1,4 +1,4 @@
-# Key packages from the existing macOS Python 3.12 deployment.
+# Frozen camera runtime versions from the existing macOS environment.
 torch==2.14.1
 torchvision==0.29.1
 numpy==2.5.3

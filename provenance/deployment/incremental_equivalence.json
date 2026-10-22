@@ -1,0 +1,9 @@
+{
+  "frames": 40,
+  "device": "mps",
+  "yolo_gru_max_abs_probability_difference": 1.4901161193847656e-07,
+  "boundary_gru_max_abs_probability_difference": 2.980232238769531e-07,
+  "boundary_score_max_abs_difference": 2.384185791015625e-07,
+  "yolo_gru_order_matches": true,
+  "boundary_order_matches": true
+}

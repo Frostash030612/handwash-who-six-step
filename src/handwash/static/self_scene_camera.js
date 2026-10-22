@@ -4,50 +4,9 @@ const video = $('video'), canvas = $('canvas');
 const COLORS = ['var(--other)', 'var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)', 'var(--s5)', 'var(--s6)'];
 const NAMES = ['Other', 'Step 1', 'Step 2', 'Step 3', 'Step 4', 'Step 5', 'Step 6'];
 const MODEL_NAMES = {yolo: 'YOLO', yolo_gru: 'YOLO + GRU', boundary_gru: 'YOLO + Adaptive Boundary-Aware GRU', videomae: 'VideoMAE'};
-const STATUS_TEXT = {
-  '选择模型并开启摄像头后开始。': 'Choose a model and enable the camera preview to begin.',
-  '模型已就绪，正在采集。': 'Model ready. Capturing frames.',
-  '正在识别，洗手计时为实时估计。': 'Recognizing actions. Washing time is a live estimate.',
-  '正在汇总已缓存的预测…': 'Preparing the report from cached predictions…',
-  '识别完成，洗手时长和动作顺序见下方。': 'Session complete. Review the washing time and step order below.',
-  '正在加载所选模型…': 'Loading the selected model…',
-  '正在处理最后几帧…': 'Processing the last received frames…',
-  'VideoMAE 正在收集首个 16 帧窗口（约 3 秒）。': 'VideoMAE is buffering its first 16-frame window (about 3 seconds).',
-  '无效图像': 'The received image is invalid.',
-  'VideoMAE 权重或预处理配置尚未完整就绪': 'VideoMAE weights or preprocessing files are not ready.',
-  'VideoMAE 窗口或类别数量与自采模型不一致': 'The VideoMAE frame window or class count does not match this model.',
-  'VideoMAE 类别映射不一致': 'The VideoMAE class mapping does not match.',
-  'YOLO 与时序模型权重不匹配': 'The YOLO and temporal model weights do not match.',
-  '本次没有收到画面，请重新开始': 'No frames were received. Please start a new session.',
-  '录像时长不足': 'The recording is too short to analyze.',
-  '尚有帧未完成推理，不能生成完整结果': 'Some received frames are still being processed.',
-  '请求过大': 'The request is too large.',
-  '数据接收不完整': 'The uploaded frame was incomplete.',
-  '请先选择一个模型，再开始': 'Select a model before starting.',
-  '所选模型权重尚未完整就绪': 'The selected model weights are not ready.',
-  '上一段识别还未结束': 'The previous session has not finished.',
-  '图像尺寸过大': 'The image dimensions are too large.',
-  '当前没有对应的录像会话': 'No matching recording session is active.',
-  '超出测试时长': 'The recording exceeds the time limit.',
-  '采样时间未递增': 'The frame timestamp did not advance.',
-  '无效结束时间': 'The recording end time is invalid.',
-  '未能读取摄像头画面': 'Could not capture a camera frame.',
-  '请先开启摄像头': 'Enable the camera preview first.',
-  '录像会话已改变': 'The recording session changed.',
-  '服务无响应': 'The local service did not respond.',
-  '本机服务需要更新，请等待重启。': 'The local service needs to be restarted.'
-};
-const english = value => STATUS_TEXT[value] || value;
-function englishReason(value) {
-  let match = value.match(/^洗手总时长不足：([\d.]+) 秒，要求至少 ([\d.]+) 秒$/);
-  if (match) return `Recognized washing time is ${match[1]} sec; at least ${match[2]} sec is required.`;
-  match = value.match(/^未识别到动作 (.*)$/);
-  if (match) return `Steps not detected: ${match[1].replaceAll('、', ', ')}.`;
-  if (value === '动作顺序不符合 1 → 2 → 3 → 4 → 5 → 6') return 'The detected steps are out of order.';
-  match = value.match(/^已识别洗手 ([\d.]+) 秒，另有 ([\d.]+) 秒未得到预测，暂不能确认时长达标$/);
-  if (match) return `${match[1]} sec of washing recognized; another ${match[2]} sec was unobserved, so the time requirement is uncertain.`;
-  return english(value);
-}
+// The server emits English messages and assessment reasons.
+const english = value => value;
+const englishReason = value => value;
 let stream = null, session = null, timer = null, pending = null, startedAt = 0;
 let recording = false, starting = false, stopping = false, pollBusy = false, connected = false;
 let state = {}, minimumSeconds = 40, available = {}, renderedSession = null;
@@ -122,8 +81,8 @@ function renderResult(result) {
   $('report').hidden = false;
   $('reportTitle').textContent = `${MODEL_NAMES[result.model]} · Session results`;
   $('recordingInfo').textContent = `${seconds(result.recorded_seconds)} sec · ${result.captured_frames} frames received`;
-  $('verdict').textContent = ({'达标': 'Complete', '未达标': 'Incomplete', '待确认': 'Needs review'})[a.verdict] || a.verdict;
-  $('verdict').className = 'verdict ' + (a.passed ? 'pass' : a.verdict === '待确认' ? 'pending' : 'fail');
+  $('verdict').textContent = a.verdict;
+  $('verdict').className = 'verdict ' + (a.passed ? 'pass' : a.verdict === 'Needs review' ? 'pending' : 'fail');
   $('finalWash').textContent = `${seconds(a.wash_seconds)} sec · ${a.duration_met ? 'met' : a.duration_status === 'insufficient_evidence' ? 'uncertain' : 'short'}`;
   $('finalWash').className = a.duration_met ? 'pass' : 'fail';
   $('finalSteps').textContent = `${6 - a.missing_steps.length} / 6`;
@@ -196,7 +155,7 @@ function updateState(data) {
 async function poll() {
   if (pollBusy) return;
   pollBusy = true;
-  try { const response = await fetch('/status', {cache: 'no-store'}); if (!response.ok) throw Error('服务无响应'); updateState(await response.json()); }
+  try { const response = await fetch('/status', {cache: 'no-store'}); if (!response.ok) throw Error('The local service did not respond.'); updateState(await response.json()); }
   catch (error) { connected = false; pill('Disconnected'); say(`Cannot reach the local service: ${error.message}`, 'error'); controls(); }
   finally { pollBusy = false; }
 }
@@ -232,7 +191,7 @@ async function sendFrame() {
     canvas.width = Math.round(video.videoWidth * scale); canvas.height = Math.round(video.videoHeight * scale);
     canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', .92));
-    if (!blob) throw Error('未能读取摄像头画面');
+    if (!blob) throw Error('Could not capture a camera frame.');
     await post(`/frame?session=${encodeURIComponent(session)}&t=${time.toFixed(5)}`, blob);
   })();
   try { await pending; }
@@ -243,7 +202,7 @@ async function startSession() {
   if (starting || recording) return;
   starting = true; controls();
   try {
-    if (!stream?.active) throw Error('请先开启摄像头');
+    if (!stream?.active) throw Error('Enable the camera preview first.');
     const response = await post('/start', {model: selected()}, true);
     session = response.session;
     hidePreviousSession = false;
@@ -252,7 +211,7 @@ async function startSession() {
     for (;;) {
       const statusResponse = await fetch('/status', {cache: 'no-store'});
       const data = await statusResponse.json(); updateState(data);
-      if (data.session !== session) throw Error('录像会话已改变');
+      if (data.session !== session) throw Error('The recording session changed.');
       if (data.phase === 'error') throw Error(data.message);
       if (data.phase === 'recording') break;
       await new Promise(resolve => setTimeout(resolve, 250));

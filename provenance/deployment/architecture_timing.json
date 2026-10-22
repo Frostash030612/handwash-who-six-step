@@ -1,0 +1,29 @@
+{
+  "device": "mps",
+  "torch": "2.14.1",
+  "batch_size": 1,
+  "repetitions": 3,
+  "note": "Synthetic input timing only. VideoMAE randomly initialized from exact self-scene config; no accuracy measured. RSS is cumulative process peak, not isolated per-model peak.",
+  "ours": {
+    "seconds": [
+      0.14862974999959988,
+      0.14145454199933738,
+      0.15432075000080658
+    ],
+    "median_ms": 148.62974999959988,
+    "process_peak_rss_mib": 561.9375,
+    "current_mps_driver_mib": 1129.171875,
+    "parameters": 10642639
+  },
+  "videomae_architecture": {
+    "seconds": [
+      0.3417384169997604,
+      0.3122514999995474,
+      0.317579915999886
+    ],
+    "median_ms": 317.579915999886,
+    "process_peak_rss_mib": 935.796875,
+    "current_mps_driver_mib": 1417.703125,
+    "parameters": 86232583
+  }
+}

@@ -12,9 +12,9 @@ def make_segments(labels, starts, end_s, *, confidence=None, statuses=None):
     including short segments that the boundary model did not admit to its chain.
     """
     if len(labels) != len(starts):
-        raise ValueError("时间和标签数量不一致")
+        raise ValueError("The timestamp and label counts do not match")
     if not isfinite(end_s) or end_s < 0:
-        raise ValueError("无效录像时长")
+        raise ValueError("Invalid recording duration")
     result = []
     for i, value in enumerate(labels):
         left = max(0.0, float(starts[i]))
@@ -23,7 +23,7 @@ def make_segments(labels, starts, end_s, *, confidence=None, statuses=None):
             continue
         label = int(value)
         if label not in range(-1, 7):
-            raise ValueError("未知动作类别")
+            raise ValueError("Unknown action class")
         status = (
             statuses[i]
             if statuses is not None
@@ -69,7 +69,7 @@ def collapse_order(labels):
 
 def assess(segments, order, recorded_seconds, minimum_seconds=MINIMUM_WASH_SECONDS):
     if not isfinite(minimum_seconds) or minimum_seconds <= 0:
-        raise ValueError("无效最低洗手时长")
+        raise ValueError("Invalid minimum washing duration")
     washing = sum(s["duration_s"] for s in segments if 1 <= s["class"] <= 6)
     background = sum(s["duration_s"] for s in segments if s["class"] == 0)
     unknown = max(0.0, recorded_seconds - washing - background)
@@ -84,13 +84,17 @@ def assess(segments, order, recorded_seconds, minimum_seconds=MINIMUM_WASH_SECON
     passed = enough and not missing and in_order
     reasons = []
     if duration_status == "not_met":
-        reasons.append(f"洗手总时长不足：{washing:.1f} 秒，要求至少 {minimum_seconds:g} 秒")
+        reasons.append(
+            f"Insufficient washing time: {washing:.1f} seconds; required minimum: {minimum_seconds:g} s"
+        )
     elif duration_status == "insufficient_evidence":
-        reasons.append(f"已识别洗手 {washing:.1f} 秒，另有 {unknown:.1f} 秒未得到预测，暂不能确认时长达标")
+        reasons.append(
+            f"Recognized washing: {washing:.1f} seconds; {unknown:.1f} seconds have no prediction, so the duration requirement cannot yet be confirmed"
+        )
     if missing:
-        reasons.append("未识别到动作 " + "、".join(map(str, missing)))
+        reasons.append("Missing steps: " + ", ".join(map(str, missing)))
     elif not in_order:
-        reasons.append("动作顺序不符合 1 → 2 → 3 → 4 → 5 → 6")
+        reasons.append("The detected steps are out of order; expected 1 -> 2 -> 3 -> 4 -> 5 -> 6")
     return {
         "wash_seconds": washing,
         "background_seconds": background,
@@ -103,9 +107,9 @@ def assess(segments, order, recorded_seconds, minimum_seconds=MINIMUM_WASH_SECON
         "missing_steps": missing,
         "order_correct": in_order,
         "passed": passed,
-        "verdict": "达标"
+        "verdict": "Complete"
         if passed
-        else ("待确认" if duration_status == "insufficient_evidence" and in_order else "未达标"),
+        else ("Needs review" if duration_status == "insufficient_evidence" and in_order else "Incomplete"),
         "reasons": reasons,
         "per_step_duration_required": False,
     }

@@ -1,18 +1,4 @@
-"""视频解码与抽帧。
-
-后端策略（CONTRIBUTING.md R16）
---------------------------------
-优先 OpenCV（快，且能直接按目标 fps 抽样）；不可用时回退 imageio-ffmpeg。
-两个后端都不可用时抛 ``BackendUnavailableError``，并给出安装命令。
-**解码细节只存在这个文件里**，其余模块只调用 ``probe_video`` / ``iter_frames`` / ``extract_frames``。
-
-时基约定（重要）
------------------
-时间戳使用原视频帧号/原生FPS；OpenCV 提供有效解码时间时采用其时间戳。
-不能用原始帧号除以目标采样FPS，否则会把视频时长缩短约采样倍率。
-当帧数元数据缺失但设置了 ``max_frames`` 时，先统计帧数再第二遍均匀抽样，
-避免只保留开头或给时序模型输入不均匀的帧间隔。
-"""
+"""Video decoding, sampling and export utilities."""
 
 from __future__ import annotations
 
@@ -45,8 +31,6 @@ Backend = Literal["opencv", "imageio"]
 
 @dataclass(frozen=True, slots=True)
 class VideoMeta:
-    """视频元信息（探测失败时字段可能为 None，但 path 一定有效）。"""
-
     path: str
     frame_count: int
     fps: float
@@ -68,7 +52,7 @@ class VideoMeta:
 
 
 def available_backend() -> Backend:
-    """返回当前可用的解码后端名。"""
+
     try:
         import cv2  # noqa: F401
 
@@ -79,24 +63,24 @@ def available_backend() -> Backend:
         import imageio.v3 as iio  # noqa: F401
 
         return "imageio"
-    except ImportError as exc:  # pragma: no cover - 环境缺依赖
+    except ImportError as exc:
         raise BackendUnavailableError(
-            "视频解码",
-            "conda env update -f environment.yml（需要 opencv 或 imageio-ffmpeg）",
+            "Video decoding",
+            "Install opencv-python or imageio-ffmpeg in the current environment.",
         ) from exc
 
 
 def _require_video_path(path: str | Path) -> Path:
     target = Path(path)
     if not target.exists():
-        raise VideoDecodeError(target, "文件不存在")
+        raise VideoDecodeError(target, "File not found")
     if target.suffix.lower() not in VIDEO_EXTENSIONS:
-        log.warning("文件扩展名不在已知视频列表中：%s（仍尝试解码）", target.suffix)
+        log.warning("Unknown video extension: %s (attempting decoding)", target.suffix)
     return target
 
 
 def probe_video(path: str | Path, *, backend: Backend | None = None) -> VideoMeta:
-    """读取视频元信息（不加载全部帧）。"""
+
     target = _require_video_path(path)
     chosen = backend or available_backend()
 
@@ -105,7 +89,9 @@ def probe_video(path: str | Path, *, backend: Backend | None = None) -> VideoMet
 
         cap = cv2.VideoCapture(str(target))
         if not cap.isOpened():
-            raise VideoDecodeError(target, "OpenCV 无法打开（编码不支持或文件损坏）")
+            raise VideoDecodeError(
+                target, "OpenCV could not open the video (unsupported codec or damaged file)"
+            )
         try:
             fps = float(cap.get(cv2.CAP_PROP_FPS)) or 0.0
             count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
@@ -138,22 +124,14 @@ def iter_frames(
     frame_step: int = 1,
     max_frames: int | None = None,
 ) -> Iterator[tuple[int, float, np.ndarray]]:
-    """按顺序产出 ``(原始帧号, 时间戳秒, RGB uint8 HWC 数组)``。
 
-    Parameters
-    ----------
-    sample_fps:
-        目标抽帧率。None 表示"每帧都取"（仍受 ``frame_step`` 限制）。
-    frame_step:
-        固定步长降采样（与 ``sample_fps`` 二选一，同时给则以 ``sample_fps`` 为准）。
-    """
     target = _require_video_path(path)
     if sample_fps is not None and sample_fps <= 0:
-        raise VideoDecodeError(target, f"sample_fps 必须为正，实际 {sample_fps}")
+        raise VideoDecodeError(target, f"sample_fps must be positive; received {sample_fps}")
     if frame_step < 1:
-        raise VideoDecodeError(target, f"frame_step 必须 >= 1，实际 {frame_step}")
+        raise VideoDecodeError(target, f"frame_step must be >= 1; received {frame_step}")
     if max_frames is not None and max_frames < 1:
-        raise VideoDecodeError(target, f"max_frames 必须 >= 1，实际 {max_frames}")
+        raise VideoDecodeError(target, f"max_frames must be >= 1; received {max_frames}")
 
     backend = available_backend()
     if backend == "opencv":
@@ -172,7 +150,7 @@ def _iter_opencv(
 
     cap = cv2.VideoCapture(str(target))
     if not cap.isOpened():
-        raise VideoDecodeError(target, "OpenCV 无法打开")
+        raise VideoDecodeError(target, "OpenCV could not open the video")
 
     native_fps = float(cap.get(cv2.CAP_PROP_FPS)) or 0.0
     raw_frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
@@ -186,9 +164,8 @@ def _iter_opencv(
         cap.release()
         cap = cv2.VideoCapture(str(target))
         if not cap.isOpened():
-            raise VideoDecodeError(target, "无法在统计帧数后重新打开视频")
+            raise VideoDecodeError(target, "Unable to reopen the video after counting frames")
 
-    # 目标采样间隔（原始帧为单位）：sample_fps=5 且原生 30fps -> 每 6 帧取一帧
     if sample_fps is not None and native_fps > 0:
         stride = max(1, int(round(native_fps / sample_fps)))
     else:
@@ -206,11 +183,7 @@ def _iter_opencv(
                 break
             if index % stride == 0 and (selected is None or index in selected):
                 rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-                timestamp = (
-                    index / native_fps
-                    if native_fps > 0
-                    else (index // stride) / max(sample_fps, 1.0)
-                )
+                timestamp = index / native_fps if native_fps > 0 else (index // stride) / max(sample_fps, 1.0)
                 position_ms = float(cap.get(cv2.CAP_PROP_POS_MSEC))
                 if index > 0 and np.isfinite(position_ms) and position_ms > last_timestamp * 1000.0:
                     timestamp = position_ms / 1000.0
@@ -222,7 +195,7 @@ def _iter_opencv(
         cap.release()
 
     if emitted == 0:
-        raise VideoDecodeError(target, "未解码出任何帧")
+        raise VideoDecodeError(target, "No frames were decoded")
 
 
 def _iter_imageio(
@@ -239,7 +212,7 @@ def _iter_imageio(
         try:
             frame_count = sum(1 for _ in iio.imiter(str(target)))
         except Exception as exc:
-            raise VideoDecodeError(target, f"无法统计视频帧数：{exc}") from exc
+            raise VideoDecodeError(target, f"Cannot count video frames: {exc}") from exc
     else:
         frame_count = meta.frame_count
 
@@ -256,7 +229,7 @@ def _iter_imageio(
         if index % stride != 0 or (selected is not None and index not in selected):
             continue
         arr = np.asarray(frame)
-        if arr.ndim == 2:  # 灰度视频：复制成三通道
+        if arr.ndim == 2:
             arr = np.stack([arr] * 3, axis=-1)
         timestamp = (
             index / native_fps
@@ -270,11 +243,11 @@ def _iter_imageio(
         emitted += 1
 
     if emitted == 0:
-        raise VideoDecodeError(target, "未解码出任何帧")
+        raise VideoDecodeError(target, "No frames were decoded")
 
 
 def _evenly_selected_raw_indices(frame_count: int, stride: int, max_frames: int | None) -> set[int] | None:
-    """对完整视频等间隔限帧，确保上限不会只保留视频开头。"""
+
     if max_frames is None or frame_count <= 0:
         return None
     candidates = np.arange(0, frame_count, stride, dtype=np.int64)
@@ -294,7 +267,7 @@ def extract_frames(
     frame_step: int = 1,
     max_frames: int | None = None,
 ) -> tuple[list[int], list[float], list[np.ndarray]]:
-    """一次性抽出全部帧（小视频用；长视频请用 ``iter_frames`` 流式处理）。"""
+
     indices: list[int] = []
     stamps: list[float] = []
     frames: list[np.ndarray] = []
@@ -308,7 +281,7 @@ def extract_frames(
 
 
 def save_frame(frame: np.ndarray, path: str | Path, *, quality: int = 92) -> Path:
-    """把一帧写盘（jpg/png）。用 Pillow，避免为写图引入 cv2 依赖。"""
+
     from PIL import Image
 
     target = Path(path)
@@ -327,18 +300,11 @@ def write_video(
     *,
     fps: float = 5.0,
 ) -> Path:
-    """把一组 RGB 帧写成视频。
 
-    用途：**在没有真实拍摄素材时生成可解码的测试视频**（例如把一段动作序列
-    渲染成 GIF 用于端到端验证、或把抽帧结果回灌成视频做演示）。
-
-    后端策略：有 imageio-ffmpeg 就写 mp4（体积小）；否则回退写 GIF
-    （Pillow 直接支持，且 ``io.video`` 能解码回来，链路仍然完整）。
-    """
     if not frames:
-        raise VideoDecodeError(path, "frames 为空，无法写出视频")
+        raise VideoDecodeError(path, "Cannot write a video with no frames")
     if fps <= 0:
-        raise VideoDecodeError(path, f"fps 必须为正，实际 {fps}")
+        raise VideoDecodeError(path, f"fps must be positive; received {fps}")
 
     target = Path(path)
     ensure_dir(target.parent)
@@ -351,14 +317,14 @@ def write_video(
     try:
         import imageio.v3 as iio
     except ImportError:
-        log.warning("未安装 imageio-ffmpeg，改为写出 GIF：%s", target.with_suffix(".gif"))
+        log.warning("imageio-ffmpeg is unavailable; writing GIF: %s", target.with_suffix(".gif"))
         return _write_gif(arrays, target.with_suffix(".gif"), fps)
 
     try:
         iio.imwrite(str(target), np.stack(arrays), fps=fps, codec="libx264")
         return target
     except Exception as exc:
-        log.warning("mp4 编码失败（%s），改为写出 GIF", exc)
+        log.warning("MP4 encoding failed (%s); writing GIF instead", exc)
         return _write_gif(arrays, target.with_suffix(".gif"), fps)
 
 
@@ -375,5 +341,5 @@ def _write_gif(frames: Sequence[np.ndarray], target: Path, fps: float) -> Path:
         loop=0,
         optimize=False,
     )
-    log.info("已写出 GIF：%s（%d 帧 @ %.1ffps）", target, len(images), fps)
+    log.info("GIF written: %s (%d frames @ %.1ffps)", target, len(images), fps)
     return target
