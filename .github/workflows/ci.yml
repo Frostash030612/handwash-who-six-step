@@ -1,4 +1,4 @@
-name: English release integrity
+name: Release integrity
 on:
   pull_request:
     branches: [main]
@@ -12,5 +12,5 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Check the English source release
+      - name: Check the source release
         run: python scripts/check_release.py

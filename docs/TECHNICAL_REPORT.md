@@ -1,6 +1,6 @@
 # Handwashing Action Recognition and Local Assessment
 
-**Final technical report · English edition · 22 October 2026**
+**Final technical report · 22 October 2026**
 
 ## 1. Objective and system boundary
 
@@ -53,7 +53,7 @@ boundary GRU. The ten reported test clips are absent from its final-fit list.
 
 This protocol difference is disclosed because it prevents a strict equal-data architecture-only
 ablation claim. No PSKUS training data or PSKUS-trained model assets are included in the final
-model set. This English release freezes existing artifacts and does not retrain them.
+model set. The supplied checkpoints and evaluation records define the final system.
 
 ## 5. Evaluation protocol and results
 
@@ -118,8 +118,7 @@ The package includes frozen weights, local source, the self-recorded dataset, an
 saved prediction exports, metric calculation code, dependency pins and SHA-256 manifests. The
 quick-start guide covers installation, one-model camera use, offline metric recalculation and
 troubleshooting. Historical training scripts document origin but require path/environment
-adaptation for a new cloud run. The English localization changes presentation and launch
-packaging; it does not produce new model measurements.
+adaptation for a new cloud run.
 
 A course-specific final report with team details and references, presentation slides, recorded
 presentation and individual reports are separate submission artifacts. This document is the

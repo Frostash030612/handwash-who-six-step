@@ -3,8 +3,8 @@
 ## Scope and protocol
 
 This is the saved retrospective comparison from 21 October 2026: ten previously reviewed
-self-recorded videos and 632 exactly aligned valid centers. No new inference was run for
-this English edition. Accuracy and macro F1 use the seven-class labels at common centers.
+self-recorded videos and 632 exactly aligned valid centers. Accuracy and macro F1
+use the seven-class labels at common centers.
 VideoMAE predictions use 16-frame windows; matching YOLO-family predictions use those same
 center times. This aligns evaluation times without making the input contexts identical.
 
@@ -181,5 +181,4 @@ final-fit quantities, as documented in the training provenance.
 - The local ZIP includes `frame_predictions.csv` with saved YOLO-family predictions.
 - The local ZIP includes `videomae_predictions.csv` with saved VideoMAE predictions.
 
-To recalculate metrics from these exports, follow the root README. Predictions
-and numeric results were preserved; model display names were translated to English.
+To recalculate metrics from these exports, follow the root README.

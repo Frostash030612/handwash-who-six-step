@@ -1,6 +1,6 @@
 {
   "release": "handwash-final-20261022",
-  "status": "frozen existing models; no retraining during packaging",
+  "status": "final self-recorded model checkpoints",
   "primary_model": "boundary_gru",
   "offline_reference": "videomae",
   "input_sizes": {

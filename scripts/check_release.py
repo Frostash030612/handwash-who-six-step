@@ -1,4 +1,4 @@
-"""Static integrity gate for the English source release."""
+"""Static integrity gate for the final source release."""
 from pathlib import Path
 import ast
 import re
@@ -24,4 +24,4 @@ for name in filter(None, tracked):
                     raise SystemExit(f"Broken link in {name}: {link}")
     if path.suffix.lower() in {".pt", ".pth", ".safetensors", ".mov", ".mp4", ".zip"}:
         raise SystemExit(f"Unexpected binary asset: {name}")
-print("English source integrity passed")
+print("Release source integrity passed")

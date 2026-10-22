@@ -1,4 +1,4 @@
-# Final English Source Release
+# Final Source Release
 
 Read the [repository overview](../README.md), [technical report](TECHNICAL_REPORT.md),
 [model card](MODEL_CARD.md), [dataset guide](../dataset/README.md),
@@ -6,6 +6,5 @@ Read the [repository overview](../README.md), [technical report](TECHNICAL_REPOR
 
 The complete local technical package contains 32 self-recorded videos, 6,987 sampled
 frames, annotations, frozen weights and saved prediction exports. These large/private
-assets are not uploaded to GitHub. The current source branch is the English distribution;
-older bilingual material remains in the repository history and the final frozen tag.
-No model retraining or new evaluation was performed for the English update.
+assets are not uploaded to GitHub. The current source branch contains the camera application and final system documents.
+Earlier project material remains in the repository history and the frozen tag.

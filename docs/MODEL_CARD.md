@@ -55,5 +55,4 @@ embedded in older checkpoints. Generalization to unseen users or viewpoints is u
 
 `runtime/models/` contains `yolo_best.pt`, `yolo_gru.pt`, `boundary_gru.pt`, and
 `videomae/{model.safetensors,config.json,preprocessor_config.json}`. The [model manifest](final_release/model_manifest.json)
-records file sizes, SHA-256 hashes, class contracts and decoder parameters. No checkpoint
-was rewritten for this English edition.
+records file sizes, SHA-256 hashes, class contracts and decoder parameters. Checkpoint hashes and class contracts are recorded in the model manifest.
