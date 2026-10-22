@@ -89,7 +89,7 @@ NON_WASH_STEPS: Final[tuple[Step, ...]] = (
     Step.UNKNOWN,
 )
 
-# Retain the legacy exported name for API compatibility; this distribution uses English text.
+# Retain the exported name for API compatibility.
 STEP_ZH: Final[Mapping[Step, str]] = {
     Step.STEP_1: "Palm-to-palm rubbing",
     Step.STEP_2: "Palm over dorsum",

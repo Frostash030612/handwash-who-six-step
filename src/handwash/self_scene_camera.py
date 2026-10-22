@@ -512,7 +512,7 @@ def serve_self_scene_camera(runtime_dir, *, port=8876, minimum_wash_seconds=40.0
     """Serve one local camera session with weights supplied in runtime_dir/models.
 
     The 1088/224 input sizes and temporal windows are the trained checkpoint
-    contract. This entry point does not retrain or change model decoding.
+    contract and loads the matching checkpoints and decoder configuration.
     """
     global ROOT, MINIMUM_WASH_SECONDS
     import math

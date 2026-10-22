@@ -1,8 +1,8 @@
 # Six-Step Handwashing Recognition and Assessment
 
-**Final English source release · 22 October 2026**
+**Final source release · 22 October 2026**
 
-This repository contains the English camera application, the relevant training and
+This repository contains the camera application, the relevant training and
 evaluation code, and the frozen ten-video comparison. The primary camera method is
 **YOLO + Adaptive Boundary-Aware GRU**. YOLO and YOLO + GRU are structural baselines;
 VideoMAE Base is the offline accuracy reference.
@@ -25,7 +25,7 @@ heads were finally refit on 22 development clips, whereas YOLO and VideoMAE used
 
 ## Repository contents
 
-- [`src/handwash/`](src/handwash/): English camera backend, temporal models, adaptive chain
+- [`src/handwash/`](src/handwash/): camera backend, temporal models, adaptive chain
   confirmation, assessment and dashboard.
 - [`scripts/run_self_scene_camera.py`](scripts/run_self_scene_camera.py): local camera launcher.
 - [`scripts/compare_self_scene_common_centers.py`](scripts/compare_self_scene_common_centers.py):
@@ -38,10 +38,8 @@ heads were finally refit on 22 development clips, whereas YOLO and VideoMAE used
 - [`evaluation/REPORT.md`](evaluation/REPORT.md): all ten videos and 40 predicted chains.
 - [`provenance/README.md`](provenance/README.md): actual training and deployment evidence.
 
-Earlier bilingual plans, old public-data experiments, historical demos and obsolete
-coursework notes were removed from the current branch. They remain in Git history and
-the `self-scene-final-20261022` tag. The final camera source and documented scores have
-not been retrained or rerun for this English release.
+The current branch focuses on the camera system and the final self-recorded results.
+Historical experiments remain in Git history and the `self-scene-final-20261022` tag.
 
 ## Local camera setup
 
