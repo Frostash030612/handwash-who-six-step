@@ -164,13 +164,17 @@ def apply_decoder(
         raise ValueError(f"Decoder {method!r} needs boundary probabilities")
     if method == "boundary_segment":
         return decode_boundaries(
-            class_probs, boundary_probs,
-            threshold=float(decoder["threshold"]), min_gap=int(decoder["min_gap"]),
+            class_probs,
+            boundary_probs,
+            threshold=float(decoder["threshold"]),
+            min_gap=int(decoder["min_gap"]),
         )
     if method == "boundary_blend":
         return decode_boundary_blend(
-            class_probs, boundary_probs,
-            threshold=float(decoder["threshold"]), min_gap=int(decoder["min_gap"]),
+            class_probs,
+            boundary_probs,
+            threshold=float(decoder["threshold"]),
+            min_gap=int(decoder["min_gap"]),
             raw_weight=float(decoder["raw_weight"]),
             protect_min_frames=seconds_to_frames(
                 float(decoder["protect_min_seconds"]), float(decoder["sample_fps"])

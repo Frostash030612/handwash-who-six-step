@@ -1,8 +1,0 @@
-{
-  "sample_fps": 5.0,
-  "num_frames": 16,
-  "window_stride": 4,
-  "yolo": {"method": "hysteresis", "width": 3, "min_run": 1, "confirm_frames": 2, "margin": 0.0},
-  "yolo_gru": {"method": "mean_min_run", "width": 1, "min_run": 1},
-  "videomae": {"method": "mean_min_run", "width": 3, "min_run": 1}
-}

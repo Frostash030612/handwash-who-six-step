@@ -1,198 +1,28 @@
-# ============================================================================
-# .gitignore —— 什么绝对不能进 Git
-# 核心原则：数据、训练权重、输出、密钥不进仓库；根目录 exp.pt 是演示例外。
-# ============================================================================
-
-# --- 数据 -------------------------------------------------------------------
-# 【设计原则：默认全忽略，只白名单放行】
-#
-# 为什么不用"排除大文件扩展名 + 放行若干小文件"的写法：那是**黑名单**思路，
-# 每出现一种新的数据文件类型（标注 json、统计 csv、校验文件、.extracted 标记……）
-# 都会被默认放行，于是"顺手"被提交。这个仓库真的踩过：
-# 一份只含 1/11 分片的 manifest.csv 被提交，任何 pull 下来的人都会拿到错误划分并在训练时使用。
-#
-# 所以改成：**`data/` 下一切内容默认都进不了 Git**，只有极少数文件名例外。
-#
-# 【Git 的规则，改这里之前务必看懂】
-#   1. 忽略**目录**会让整个目录被跳过，里面的文件再也无法用 `!` 捞回来。
-#      所以必须**逐层忽略内容、逐层放行目录链**，而不是一句 `data/**`。
-#      （踩过：`data/**` 会连 `data/raw/` 这样的子目录一起忽略，
-#        结果 `!data/**/SOURCES.json` 完全失效。）
-#   2. 规则**先匹配先生效**，后面的 `!` 可以覆盖前面的排除。所以白名单放在最后。
-#
-# 自检命令（改完务必跑）：python scripts/check_data_ignores.py
-# 第 1 步：数据顶层默认全忽略
-data/*
-# 第 2 步：只放行**目录本身**（不是内容），让 Git 愿意进入 data/raw/
-!data/raw/
-# 第 3 步：data/raw/ 下的内容同样默认全忽略
-data/raw/**
-# 第 4 步：白名单 —— 全仓库只有**两个数据文件**允许提交：
-#   data/README.md          data/ 目录说明（唯一一份，别再散落多份）
-#   data/raw/SOURCES.json   数据来源 + md5 清单，协作契约（见 docs/DATA_COLLABORATION.md）
-!data/README.md
-!data/raw/SOURCES.json
-#
-# 【为什么白名单这么窄】
-#   gitignore **无法干净地表达"任意深度只放行某文件名"** —— 放行一个深层文件，
-#   必须把路径上每一级目录都显式放行；漏一层就静默失效。
-#   （踩过：`data/**` 会连 `data/raw/` 这样的子目录一起忽略，
-#    于是 `!data/**/SOURCES.json` 完全无效，而表面上规则写得很"漂亮"。）
-#   所以这里改成"显式列出允许的两个路径"，范围小、可读、可验证：
-#   想让新文件进 Git，就必须来改这一行 —— 强制一次有意识的选择。
-
-# ---------------------------------------------------------------------------
-# 【特别说明：manifest.csv 与 split_report.json 为什么不提交】
-#
-# 它们体积很小、看起来很适合进 Git，但它们是**划分契约** —— 谁拿到就用它训练与评估。
-# 如果某人只下了部分分片（例如 11 个分片里的 1 个）就跑 prepare 并提交 manifest，
-# 那么全组 pull 下来拿到的都是这份基于 1.2% 数据的错误划分，而它**看起来完全正常**。
-# 这是最危险的地方：没有报错、没有异常，只是所有结论都不可比。
-#
-# 正确做法：**划分随抽帧结果的压缩包分发**（scripts/pack_processed_data.py 生成的
-# frames zip 里就带 manifest 与 split_report），那个包由"下全数据的那个人"生成，
-# 有 sha256 可校验，队友解包即复现同一份划分。见 docs/DATA_COLLABORATION.md §3.0。
-#
-# 若确实要把权威划分提交进 Git（例如交付最终快照），请显式强制添加，
-# 并在 PR 里说明数据完整性（分片数 / 段数）：
-#     git add -f data/processed/pskuss/manifest.csv
-# ---------------------------------------------------------------------------
-
-# --- 模型权重与导出 ---------------------------------------------------------
-# 根目录运行时模型默认忽略；项目明确归档的公平对照权重在下方白名单中例外。
-# 使用根路径，避免误忽略 src/handwash/models/ 里的应用代码。
-/models/
-!/models/
-models/*
-!/models/README.md
-!/models/pskuss_ds1234/
-models/pskuss_ds1234/*
-!/models/pskuss_ds1234/yolo/
-!/models/pskuss_ds1234/yolo_gru/
-!/models/pskuss_ds1234/videomae_center_stable/
-!/models/pskuss_ds1234/boundary_gru/
-!/models/pskuss_ds1234/web_inference.json
-models/pskuss_ds1234/yolo/*
-!models/pskuss_ds1234/yolo/best.pt
-models/pskuss_ds1234/boundary_gru/*
-!models/pskuss_ds1234/boundary_gru/head.pt
-!models/pskuss_ds1234/boundary_gru/metadata.json
-!models/pskuss_ds1234/boundary_gru/validation.json
-!models/pskuss_ds1234/boundary_gru/test_summary.json
-models/pskuss_ds1234/yolo_gru/*
-!models/pskuss_ds1234/yolo_gru/head.pt
-models/pskuss_ds1234/videomae_center_stable/*
-!models/pskuss_ds1234/videomae_center_stable/model.safetensors
-!models/pskuss_ds1234/videomae_center_stable/config.json
-!models/pskuss_ds1234/videomae_center_stable/preprocessor_config.json
-!models/pskuss_ds1234/videomae_center_stable/handwash_metadata.json
-*.pt
-!/exp.pt
-!/exp_temporal_head.pt
-*.pth
-*.onnx
-*.engine
-*.tflite
-*.mlpackage
-!**/configs/models/*.yaml
-# These three explicitly archived checkpoints are stored through Git LFS.
-!/models/pskuss_ds1234/yolo/best.pt
-!/models/pskuss_ds1234/yolo_gru/head.pt
-!/models/pskuss_ds1234/boundary_gru/head.pt
-# 本地 Ultralytics 数据导出清单；公开仓库只保留获取和处理数据的说明。
-/pskus-dataset1-dataset4-high-confidence-ultralytics.ndjson
-
-# --- 提交件（含个人姓名/学号，不进 Git）-------------------------------------
-# 提案、报告、视频、PPT、最终 ZIP 都由脚本生成或人工产出，
-# 统一放 deliverables/ 并在本地/共享盘流转；不要提交到公开可查的地方。
-#
-# 【必须用 deliverables/* 而不是 deliverables/】
-# Git 不允许重新包含"父目录已被排除"的文件：写了 `deliverables/` 之后，
-# 下面的 `!deliverables/README.md` 会完全失效（本仓库曾经就是这个问题）。
-deliverables/*
-!deliverables/README.md
-# User-requested upload of this specific presentation. Other deliverables stay ignored.
-!deliverables/Video-based-Six-Step-Handwashing-Assessment.pptx
-# User-requested upload of the first-presentation speech scripts (names only, no student IDs).
-!deliverables/演讲稿-4人版.md
-!deliverables/演讲稿-4人版-中文.md
-# 旧版 repo/ 副本可能含姓名、分组信息或文档元数据，也留在本地。
-
-# --- 实验输出（保留结构，不保留内容）---------------------------------------
-outputs/*
-!outputs/**/.gitkeep
-!outputs/**/README.md
-
-# --- 实验记录 ---------------------------------------------------------------
-mlruns/
-wandb/
-lightning_logs/
-*.ckpt
-
-# --- Python -----------------------------------------------------------------
+# Local environments and generated files
+.venv/
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-build/
-dist/
-*.egg-info/
-.eggs/
-pip-wheel-metadata/
-
-# --- 虚拟环境 ---------------------------------------------------------------
-.venv/
-venv/
-env/
-.conda/
-
-# --- 测试与类型检查缓存 -----------------------------------------------------
 .pytest_cache/
-# pytest 在无法创建 .pytest_cache 的受限环境里会把临时锁目录留在仓库根，
-# 名字形如 pytest-cache-files-xxxx；这里一并忽略，避免污染 git status。
-pytest-cache-files-*/
-.mypy_cache/
 .ruff_cache/
-.coverage
-.coverage.*
-coverage.xml
-htmlcov/
-.tox/
-.nox/
-
-# --- Notebook ---------------------------------------------------------------
-.ipynb_checkpoints/
-*.ipynb.tmp
-
-# --- 编辑器 / 系统 ----------------------------------------------------------
-.vscode/*
-!.vscode/settings.json
-!.vscode/extensions.json
-.idea/
-*.swp
-*~
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# --- 密钥与本地覆盖 ---------------------------------------------------------
-.env
-.env.*
-!.env.example
-configs/local*.yaml
-!configs/local.example.yaml
-*.pem
-*.key
-
-# --- 临时文件 ---------------------------------------------------------------
-*.log
-tmp/
-scratch/
-*.tmp
-*.bak
-
-# --- 本项目专用的临时目录 ---------------------------------------------------
-# pytest / 合成数据 / 冒烟产物都放这里，保证"不往仓库外写文件"，
-# 也让沙箱环境（CI、受限的执行环境）能正常跑测试。
+.mypy_cache/
 .tmp/
+.coverage
+*.egg-info/
+.DS_Store
+
+# Private source data, weights, sessions and generated reports
+runtime/
+data/
+!dataset/
+!dataset/README.md
+models/
+outputs/
+deliverables/
+*.pt
+*.pth
+*.safetensors
+*.mov
+*.mp4
+*.zip
+*.zip.sha256
+reproduced_metrics/

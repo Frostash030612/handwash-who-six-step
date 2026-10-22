@@ -1,12 +1,4 @@
-"""随机种子：所有实验必须可复现（CONTRIBUTING.md R13）。
-
-规则：
-    * 训练入口第一件事就是 ``seed_everything(cfg.runtime.seed)``。
-    * 禁止在模块里裸写 ``random.seed(42)``。
-    * 报告里必须记录实际种子（``TrainResult.seed``）。
-
-本模块属于 L1 契约层：只 import numpy 与标准库，torch 存在时才顺手设种子。
-"""
+"""Deterministic random-number initialization for retained training utilities."""
 
 from __future__ import annotations
 
@@ -22,23 +14,15 @@ DEFAULT_SEED: Final[int] = 42
 
 
 def seed_everything(seed: int = DEFAULT_SEED, *, deterministic: bool = True) -> int:
-    """一次性给 python / numpy / torch / cuda 设种子，返回实际使用的种子。
 
-    Parameters
-    ----------
-    seed:
-        非负整数。
-    deterministic:
-        True 时让 cuDNN 走确定性算法（可能略慢，但结果可复现）。
-    """
     if seed < 0:
-        raise ValueError(f"seed 必须为非负整数，实际 {seed}")
+        raise ValueError(f"seed must be a non-negative integer; received {seed}")
 
     os.environ["PYTHONHASHSEED"] = str(seed)
     random.seed(seed)
     np.random.seed(seed)
 
-    try:  # torch 是可选依赖：没装也要能跑核心逻辑
+    try:
         import torch
 
         torch.manual_seed(seed)
@@ -46,19 +30,19 @@ def seed_everything(seed: int = DEFAULT_SEED, *, deterministic: bool = True) -> 
         if deterministic:
             torch.backends.cudnn.deterministic = True
             torch.backends.cudnn.benchmark = False
-            # PyTorch >= 1.8：让某些原子操作报错而不是悄悄引入不确定性
+
             try:
                 torch.use_deterministic_algorithms(True, warn_only=True)
             except (AttributeError, RuntimeError):  # pragma: no cover
                 pass
-    except ImportError:  # pragma: no cover - 无 torch 环境
+    except ImportError:
         pass
 
     return seed
 
 
 def worker_init_fn(worker_id: int) -> None:
-    """DataLoader 的 worker 种子初始化：保证多进程加载也是确定的。"""
+
     try:
         from torch.utils.data import get_worker_info
 

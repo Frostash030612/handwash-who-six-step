@@ -1,0 +1,39 @@
+{
+  "cached_original_video": {
+    "order": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "wash_seconds": 49.00000000000001,
+    "verdict": "Complete"
+  },
+  "videomae_window_coverage": {
+    "wash_seconds": 1.6,
+    "background_seconds": 0,
+    "unknown_seconds": 2.4,
+    "minimum_wash_seconds": 40.0,
+    "remaining_wash_seconds": 38.4,
+    "duration_met": false,
+    "duration_status": "not_met",
+    "steps_complete": false,
+    "missing_steps": [
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "order_correct": false,
+    "passed": false,
+    "verdict": "Incomplete",
+    "reasons": [
+      "Insufficient washing time: 1.6 seconds; at least 40 seconds required.",
+      "Missing steps: 2, 3, 4, 5, 6"
+    ],
+    "per_step_duration_required": false
+  }
+}

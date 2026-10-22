@@ -1,94 +1,78 @@
-> **English** | [中文](/README.zh-CN.md)
-
 # Six-Step Handwashing Recognition and Assessment
 
-**Final technical version: 2026-10-22.** A local camera application recognizes seven
-classes (other plus six handwashing actions), builds an action chain and checks total
-washing time. Model development is frozen; this repository records the final implementation.
+**Final English source release · 22 October 2026**
 
-## Final models and data
+This repository contains the English camera application, the relevant training and
+evaluation code, and the frozen ten-video comparison. The primary camera method is
+**YOLO + Adaptive Boundary-Aware GRU**. YOLO and YOLO + GRU are structural baselines;
+VideoMAE Base is the offline accuracy reference.
 
-- **Primary camera method:** YOLO + Adaptive Boundary-Aware GRU.
-- **Structural baselines:** YOLO and YOLO + GRU.
-- **Offline accuracy reference:** VideoMAE Base with generic Kinetics pretraining.
-- **Dataset:** 32 self-recorded clips; 14/8 development split and 10 test clips.
-  The retained GRU-head script refits on all 22 development clips after selection.
-  See the [training provenance](docs/FINAL_RELEASE.md#training-provenance-and-scope).
-- **Assessment:** six steps in order and at least 40 seconds of recognized washing.
-  There is no separate minimum duration for each step.
+## Final internal comparison
 
-The final model set uses no PSKUS data or PSKUS-trained weights. Public-data experiments
-elsewhere in the repository are historical work, not the current camera model bundle.
-
-## Start the camera application
-
-Use Python 3.12. From the repository root:
-
-```sh
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -r docs/final_release/requirements-camera.txt -e ".[compare]"
-python scripts/run_self_scene_camera.py --runtime-dir /path/to/runtime config=configs/experiments/self_scene_camera.yaml
-```
-
-Supply `runtime/models/` from the local final package; see the
-[exact weight layout](docs/SELF_SCENE_CAMERA.zh-CN.md). A GitHub clone alone does not
-include the self-recorded videos or these weights. The old root `exp.pt` is a historical
-demo and is not a substitute for the final weights.
-
-Open http://127.0.0.1:8876/ and grant camera permission. Select one model, preview the
-camera, start recognition, then finish. The final report uses cached predictions.
-Refreshing a completed session clears its previous on-screen result without deleting
-saved local recordings. MPS is used when available, otherwise CPU; this entry point
-does not select CUDA. One session is served at a time.
-
-The local final archive includes installation and launch helpers, model files,
-data and saved results. See [final release instructions](docs/FINAL_RELEASE.md).
-
-## Recorded internal comparison
-
-Ten previously reviewed test clips, 632 matched valid time centers:
-
-| Model | Accuracy | Macro F1 | Output boundary F1 | Final action chain |
-| --- | ---: | ---: | ---: | ---: |
+| Model | Accuracy | Macro F1 | Output boundary F1 | Final chain match |
+|---|---:|---:|---:|---:|
 | YOLO | 95.25% | 93.84% | 76.92% | 2/10 |
 | YOLO + GRU | 96.04% | 93.58% | 87.59% | 6/10 |
 | YOLO + Adaptive Boundary-Aware GRU | 96.52% | 93.71% | 94.40% | 10/10 |
 | VideoMAE | 99.53% | 99.02% | 97.48% | 10/10 |
 
-Only the boundary model uses adaptive final-chain confirmation. This is an internal
-complete-method comparison, not proof of independent generalization or an architecture-only
-ablation. Read the [evaluation protocol and limitations](docs/SELF_SCENE_FOUR_MODEL_COMPARISON.zh-CN.md).
+Ten repeatedly reviewed self-recorded clips and 632 aligned valid centers were used.
+VideoMAE leads internal accuracy. The boundary-aware method is selected for local camera
+feedback and is the only model with adaptive action-chain confirmation. These are
+retrospective internal results, not independent new-scene generalization. The temporal
+heads were finally refit on 22 development clips, whereas YOLO and VideoMAE used the
+14/8 selection partition; this is not a strict equal-data architecture ablation.
 
-VideoMAE has the highest internal accuracy. Its 16-frame window needs about 3 seconds
-before the first prediction and about 1.4 seconds of future context for centered labels,
-plus computation. It can stream delayed updates, but is not an immediate camera coach.
-The primary method is the selected local camera solution, not the highest-accuracy method.
+## Repository contents
 
-## Release files
+- [`src/handwash/`](src/handwash/): English camera backend, temporal models, adaptive chain
+  confirmation, assessment and dashboard.
+- [`scripts/run_self_scene_camera.py`](scripts/run_self_scene_camera.py): local camera launcher.
+- [`scripts/compare_self_scene_common_centers.py`](scripts/compare_self_scene_common_centers.py):
+  recalculate the saved four-model metrics.
+- [`scripts/train_videomae_self_scene.py`](scripts/train_videomae_self_scene.py): retained
+  self-recorded VideoMAE training source.
+- [`docs/TECHNICAL_REPORT.md`](docs/TECHNICAL_REPORT.md): final system methods, results and limits.
+- [`docs/MODEL_CARD.md`](docs/MODEL_CARD.md): model inputs, labels, training and deployment.
+- [`dataset/README.md`](dataset/README.md): annotation and split description.
+- [`evaluation/REPORT.md`](evaluation/REPORT.md): all ten videos and 40 predicted chains.
+- [`provenance/README.md`](provenance/README.md): actual training and deployment evidence.
 
-- [Final technical release](docs/FINAL_RELEASE.md) / [中文](docs/FINAL_RELEASE.zh-CN.md)
-- [Frozen weight and decoder manifest](docs/final_release/model_manifest.json)
-- [Seven-class label map](docs/final_release/label_map.json)
-- [Final metric table](docs/final_release/metrics.csv)
-- [Per-video predicted chains](docs/final_release/action_chains.csv)
-- [Camera deployment details](docs/SELF_SCENE_CAMERA.zh-CN.md)
-- [Current results and historical experiment index](docs/EXPERIMENTS.md)
-- [Coursework deliverables](deliverables/README.md)
+Earlier bilingual plans, old public-data experiments, historical demos and obsolete
+coursework notes were removed from the current branch. They remain in Git history and
+the `self-scene-final-20261022` tag. The final camera source and documented scores have
+not been retrained or rerun for this English release.
 
-Source code and reports are on GitHub. The local technical ZIP also contains weights,
-raw videos, sampled frames, annotations and prediction exports. It excludes account
-credentials, camera-session history and caches. It is not the final report/presentation ZIP.
+## Local camera setup
 
-## Historical work and contributor information
+The self-recorded raw videos, sampled images, frame annotations and model weights are
+included in the **local technical ZIP**, not this GitHub source repository. Place its
+`runtime/models/` directory at a local path. Install Python 3.12 and dependencies:
 
-The following documents describe earlier public-data work. They are preserved for
-provenance and are not additional tasks required to finish this release:
+```sh
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -r docs/final_release/requirements-camera.txt -e '.[compare]'
+.venv/bin/python scripts/run_self_scene_camera.py --runtime-dir /absolute/path/to/runtime
+```
 
-- [Public-data comparison](docs/FAIR_VIDEO_COMPARISON.zh-CN.md)
-- [Previous implementation plan](docs/IMPLEMENTATION_PLAN.zh-CN.md)
-- [Coursework plan](docs/PROJECT_PLAN_4_WEEK.md)
-- [Architecture](docs/ARCHITECTURE.md), [configuration](docs/CONFIG.md),
-  [contribution rules](CONTRIBUTING.md)
+Open `http://127.0.0.1:8876/`, grant camera permission, select one model and begin a
+session. If the port is occupied, add `--port 8877`. The dashboard requires both the
+ordered chain 1–6 and at least 40 seconds of recognized washing. Other and unknown
+frames do not count. There is no fixed per-step duration threshold.
 
-No medical diagnosis is made. Outputs are model-based assessments of the recorded actions.
+VideoMAE can run locally and stream delayed predictions. Its first 16-frame window
+needs about three seconds of input; centered labels use about 1.4 seconds of future
+context plus compute time. It is not equivalent to immediate frame-by-frame feedback.
+
+To recalculate the saved results, supply the prediction CSVs from the local package:
+
+```sh
+.venv/bin/python scripts/compare_self_scene_common_centers.py \
+  --frame-predictions /path/to/frame_predictions.csv \
+  --videomae-predictions /path/to/videomae_predictions.csv \
+  --output reproduced_metrics
+```
+
+This source release excludes raw self-recorded videos, weights, credentials and camera
+session histories. The coursework report, final slides, presentation recording and
+individual submissions are separate deliverables.

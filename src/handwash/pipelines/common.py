@@ -1,9 +1,3 @@
-"""Pipeline 共享设施：设备、DataLoader、数据集解析、批次构造。
-
-这个文件存在的唯一目的：让 train / evaluate / infer 三处**用同一套**数据装配逻辑。
-只要三处各自写一遍，"训练时增强开了、评估时忘了关"这类事故必然发生。
-"""
-
 from __future__ import annotations
 
 from collections import defaultdict
@@ -37,14 +31,11 @@ log = get_logger(__name__)
 
 
 # ============================================================================
-# 设备
+
+
 # ============================================================================
 def resolve_device(spec: str = "auto") -> torch.device:
-    """把配置里的 ``device`` 翻译成 ``torch.device``。
 
-    ``auto``：有 CUDA 用 cuda，有 MPS 用 mps，否则 cpu。
-    注意：**不要静默把用户指定的 cuda 降级为 cpu** —— 那会让实验悄悄变慢十倍。
-    """
     key = str(spec).strip().lower()
     if key == "auto":
         if torch.cuda.is_available():
@@ -54,31 +45,31 @@ def resolve_device(spec: str = "auto") -> torch.device:
         return torch.device("cpu")
     if key.startswith("cuda") and not torch.cuda.is_available():
         raise TrainingError(
-            "配置要求使用 CUDA，但当前环境不可用",
-            hint="检查显卡驱动与 pytorch-cuda 是否装对；或改 runtime.device=cpu。",
+            "CUDA was requested but is unavailable in this environment",
+            hint="Check the GPU driver and PyTorch CUDA installation, or set runtime.device=cpu.",
         )
     if key.startswith("cuda:"):
         try:
             index = int(key.split(":", 1)[1])
         except ValueError as exc:
-            raise TrainingError(f"CUDA 设备编号无效：{spec!r}") from exc
+            raise TrainingError(f"Invalid CUDA device index: {spec!r}") from exc
         if index < 0 or index >= torch.cuda.device_count():
             raise TrainingError(
-                f"CUDA 设备编号超出范围：{index}",
-                hint=f"当前可用 CUDA 设备数：{torch.cuda.device_count()}。",
+                f"CUDA device index is out of range: {index}",
+                hint=f"Available CUDA device count: {torch.cuda.device_count()}.",
             )
     if key == "mps":
         backend = getattr(torch.backends, "mps", None)
         if backend is None or not backend.is_available():
-            raise TrainingError("配置要求使用 MPS，但当前环境不可用")
+            raise TrainingError("MPS was requested but is unavailable in this environment")
     try:
         return torch.device(key)
     except (RuntimeError, ValueError) as exc:
-        raise TrainingError(f"运行设备配置无效：{spec!r}", hint=str(exc)) from exc
+        raise TrainingError(f"Invalid runtime device: {spec!r}", hint=str(exc)) from exc
 
 
 def describe_device(device: torch.device) -> dict[str, Any]:
-    """设备摘要，写进实验日志（报告里要交代算力条件）。"""
+
     info: dict[str, Any] = {"device": str(device), "torch": torch.__version__}
     if device.type == "cuda":
         info["cuda_device_name"] = torch.cuda.get_device_name(device)
@@ -90,19 +81,22 @@ def describe_device(device: torch.device) -> dict[str, Any]:
 
 
 def maybe_enable_tf32(device: torch.device, *, enable: bool = True) -> None:
-    """在 Ampere 及以上开启 TF32：矩阵乘更快，精度损失对本任务可接受。"""
+
     if device.type != "cuda":
         return
     try:
         torch.backends.cuda.matmul.allow_tf32 = enable
         torch.backends.cudnn.allow_tf32 = enable
-        log.info("TF32 已%s（仅影响 CUDA 矩阵乘精度）", "开启" if enable else "关闭")
-    except AttributeError:  # pragma: no cover - 老版本 torch
+        log.info(
+            "TF32 %s (affects CUDA matrix multiplication precision only)", "enabled" if enable else "disabled"
+        )
+    except AttributeError:
         pass
 
 
 # ============================================================================
-# 数据
+
+
 # ============================================================================
 def resolve_split_records(
     rc: ResolvedConfig,
@@ -111,12 +105,8 @@ def resolve_split_records(
     allow_synthetic: bool = False,
     dataset_name: str | None = None,
 ) -> list[FrameRecord]:
-    """取某个 split 的帧记录。
 
-    合成数据只允许由显式 ``dataset.name=synthetic`` 配置触发；真实数据
-    manifest 缺失、为空或缺少指定 split 时一律报错，不做静默替换。
-    """
-    from handwash.data.dataset import load_split_records  # noqa: F401  （供外部按需导入）
+    from handwash.data.dataset import load_split_records
     from handwash.io.manifest import read_manifest
     from handwash.paths import DEFAULT_MANIFEST_RELPATH, resolve_relative
 
@@ -127,8 +117,6 @@ def resolve_split_records(
     if path.exists():
         records = read_manifest(path)
         if name == "synthetic" and allow_synthetic and records:
-            # 旧版合成 manifest 把 frames/ 也写进 image_path，训练时会变成
-            # frames/frames/<clip>/<frame>.jpg。合成数据是可重建产物，自动修复。
             frames_dir = resolve_relative(spec.get("frames_dir") or path.parent / "frames")
             missing_image = False
             for rec in records:
@@ -137,25 +125,25 @@ def resolve_split_records(
                     missing_image = True
                     break
             if missing_image:
-                log.warning("合成数据的图像路径与 manifest 不一致，正在重新生成：%s", path)
+                log.warning("Synthetic image paths do not match the manifest; regenerating: %s", path)
                 return _synthetic_records(rc, split=str(split), manifest_path=path, regenerate=True)
         subset = [rec for rec in records if rec.split == str(split)]
         if subset:
             return subset
         if not allow_synthetic or name != "synthetic":
             raise DataError(
-                f"manifest 中没有 dataset={name} split={split} 的记录：{path}",
-                hint="确认 prepare 使用了相同数据集配置，且指定 split 已写入 manifest。",
+                f"No matching dataset in the manifest: dataset={name} split={split} records: {path}",
+                hint="Use the same dataset configuration during preparation and include the selected split in the manifest.",
             )
 
     if not allow_synthetic or name != "synthetic":
         raise DataError(
-            f"找不到 dataset={name} split={split} 的数据（{path}）",
-            hint="先运行 handwash prepare，或见 docs/DATA.md 下载数据集。",
+            f"Cannot find dataset={name} split={split} data ({path})",
+            hint="Provide a prepared dataset and a matching manifest first.",
         )
 
     log.warning(
-        "未找到真实数据（%s），本次使用**合成数据**：结果仅供验证代码链路，不能写进报告",
+        "Real data not found (%s); using SYNTHETIC data for pipeline checks only. Do not report these as model results.",
         path,
     )
     return _synthetic_records(rc, split=str(split), manifest_path=path)
@@ -164,7 +152,7 @@ def resolve_split_records(
 def _synthetic_records(
     rc: ResolvedConfig, *, split: str, manifest_path: Path, regenerate: bool = False
 ) -> list[FrameRecord]:
-    """生成（或复用）合成数据集的记录，并保证三种 split 是同一批文件。"""
+
     from handwash.data.synthetic import write_synthetic_dataset
     from handwash.io.manifest import read_manifest
 
@@ -180,7 +168,7 @@ def _synthetic_records(
     records = read_manifest(manifest)
     subset = [rec for rec in records if rec.split == split]
     if not subset:
-        raise DataError(f"合成数据集缺少 split={split}")
+        raise DataError(f"Synthetic dataset is missing split={split}")
     return subset
 
 
@@ -194,11 +182,7 @@ def build_manifest_loader(
     image_root: str | Path | None = None,
     label_space_name: str | None = None,
 ) -> DataLoader:
-    """构造 DataLoader。
 
-    ``for_clip_mode=True`` 时使用按视频分组的 batch 采样器：
-    一个 batch = 一段视频的连续帧，因此时序模型能看到真实的时间上下文。
-    """
     from handwash.data.dataset import build_dataset, collate_samples
 
     dataset = build_dataset(
@@ -218,10 +202,10 @@ def build_manifest_loader(
         ).set_window(rc.model.temporal.window, rc.model.temporal.stride)
         if len(sampler) == 0:
             raise DataError(
-                "按时序窗口切分后没有任何完整窗口",
+                "No complete temporal windows are available",
                 hint=(
-                    f"model.temporal.window={rc.model.temporal.window} 大于最短视频的帧数；"
-                    "请降低 window，或提高抽帧后每段视频的帧数。"
+                    f"model.temporal.window={rc.model.temporal.window} exceeds the frame count of the shortest clip; "
+                    "reduce the window or provide more frames per clip."
                 ),
             )
         return DataLoader(
@@ -240,13 +224,13 @@ def build_manifest_loader(
         num_workers=rc.runtime.num_workers,
         pin_memory=rc.runtime.pin_memory and torch.cuda.is_available(),
         worker_init_fn=worker_init_fn,
-        collate_fn=collate_samples,  # 与 clip_collate 保持同一套形状契约
+        collate_fn=collate_samples,
         drop_last=False,
     )
 
 
 def group_records_by_clip(records: Sequence[FrameRecord]) -> dict[str, list[FrameRecord]]:
-    """按 clip_id 分组，组内按 frame_index 升序（时间顺序是硬要求）。"""
+
     buckets: dict[str, list[FrameRecord]] = defaultdict(list)
     for rec in records:
         buckets[rec.clip_id].append(rec)
@@ -256,15 +240,6 @@ def group_records_by_clip(records: Sequence[FrameRecord]) -> dict[str, list[Fram
 
 
 class ClipBatchSampler(torch.utils.data.Sampler[list[int]]):
-    """把一个 batch 组织成"若干段完整视频片段"的采样器。
-
-    为什么需要它：时序模型（GRU/TCN）需要连续帧。如果按帧随机采样，
-    batch 里混着不同视频的随机帧，时序头学到的是噪声。
-
-    实现：按配置的窗口和步长切分每段视频，最后保留较短窗口以覆盖片段末尾；一个 batch
-    内同一视频最多出现一次，避免把同一视频的多个窗口拼成一段虚假的长序列。
-    """
-
     def __init__(
         self,
         records: Sequence[FrameRecord],
@@ -279,7 +254,7 @@ class ClipBatchSampler(torch.utils.data.Sampler[list[int]]):
             (rec.clip_id, rec.frame_index): i for i, rec in enumerate(records)
         }
         by_clip = group_records_by_clip(records)
-        window = 16  # 会被 set_window 覆盖
+        window = 16
         self._by_clip = by_clip
         self._index_of = index_of
         self.clips_per_batch = max(1, int(clips_per_batch))
@@ -294,7 +269,7 @@ class ClipBatchSampler(torch.utils.data.Sampler[list[int]]):
         self._window = max(1, int(window))
         self._stride = self._window if stride is None else int(stride)
         if self._stride < 1 or self._stride > self._window:
-            raise DataError("时序窗口步长必须在 1..window 范围内")
+            raise DataError("Temporal window stride must be in 1..window")
         self._rebuild()
         return self
 
@@ -337,13 +312,9 @@ class ClipBatchSampler(torch.utils.data.Sampler[list[int]]):
 
 
 def clip_collate(batch: Sequence[dict[str, Any]]) -> dict[str, Any]:
-    """把"每组恰好一个窗口"的样本拼成 ``(B, T, 3, H, W)``。
 
-    约定：``ClipBatchSampler`` 保证每个窗口长度一致，因此可以直接 stack。
-    长度不一致会明确报错，而不是靠 padding 掩盖问题。
-    """
     if not batch:
-        raise DataError("clip_collate 收到空 batch")
+        raise DataError("clip_collate received an empty batch")
     clips: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for item in batch:
         clips[str(item["clip_id"])].append(item)
@@ -363,8 +334,8 @@ def clip_collate(batch: Sequence[dict[str, Any]]) -> dict[str, Any]:
 
     if len(lengths) != 1:
         raise DataError(
-            f"同一 batch 内窗口长度不一致：{sorted(lengths)}",
-            hint="请检查 ClipBatchSampler 是否按窗口长度分组。",
+            f"Inconsistent window lengths within a batch: {sorted(lengths)}",
+            hint="Check that ClipBatchSampler groups samples by window length.",
         )
 
     return {
@@ -376,5 +347,5 @@ def clip_collate(batch: Sequence[dict[str, Any]]) -> dict[str, Any]:
 
 
 def label_names(rc: ResolvedConfig) -> list[str]:
-    """当前标签空间的类别名（指标表与混淆矩阵的坐标轴）。"""
+
     return [step.value for step in get_label_space(rc.label_space).labels]

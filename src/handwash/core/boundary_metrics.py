@@ -107,8 +107,9 @@ def reference_boundaries(labels: ArrayLike, times: ArrayLike) -> list[ReferenceB
     values, stamps = _aligned(labels, times)
     valid = np.flatnonzero(values >= 0)
     return [
-        ReferenceBoundary(float(stamps[previous]), float(stamps[current]),
-                          int(values[previous]), int(values[current]))
+        ReferenceBoundary(
+            float(stamps[previous]), float(stamps[current]), int(values[previous]), int(values[current])
+        )
         for previous, current in zip(valid[:-1], valid[1:], strict=True)
         if values[previous] != values[current]
     ]
@@ -119,8 +120,12 @@ def predicted_boundaries(labels: ArrayLike, times: ArrayLike) -> list[PredictedB
     values, stamps = _aligned(labels, times)
     changes = np.flatnonzero(values[1:] != values[:-1]) + 1
     return [
-        PredictedBoundary(float((stamps[index - 1] + stamps[index]) / 2),
-                          int(values[index - 1]), int(values[index]), int(index))
+        PredictedBoundary(
+            float((stamps[index - 1] + stamps[index]) / 2),
+            int(values[index - 1]),
+            int(values[index]),
+            int(index),
+        )
         for index in changes
     ]
 

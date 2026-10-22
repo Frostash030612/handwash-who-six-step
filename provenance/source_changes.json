@@ -1,0 +1,374 @@
+{
+  "base_commit": "87f02a69bc26075730a798119a554f2ca40e6201",
+  "scope": "English runtime source distribution; computational AST unchanged after ignoring docstrings and string literals, except direct launch/bootstrap packaging. No model run performed.",
+  "modified": [
+    {
+      "path": "pyproject.toml",
+      "original_sha256": "db3b7ec3d57db0efe8ebd6f6468a813fc6566a53ea2c72259911b00110bfa2f9",
+      "english_sha256": "f43fa4db4c668f3cb1b3ef42f42fa00d8df21d851e78004212f8ef5d6be0e547"
+    },
+    {
+      "path": "README.md",
+      "original_sha256": "c37e9ffa982ceda43d36ce45f0f23aae39b98f9e3315c34359ca1a064de515ba",
+      "english_sha256": "52bdbceb6aca6de714f19024111f171801c28fac9f219ad976c5e8ff5e0e7795"
+    },
+    {
+      "path": "docs/FINAL_RELEASE.md",
+      "original_sha256": "9b6443b72b3a2b17497c5558ca976bdca547fff4754f58039b8ebe94f737bd85",
+      "english_sha256": "ad2b24d7419868430e228307eae87ad039dc8788f64033d80c5917f04b80174b"
+    },
+    {
+      "path": "docs/final_release/requirements-camera.txt",
+      "original_sha256": "18c3b83fcfad0104169f99c8e52c89b556932c2b32fd0b0926b7d9d9d7dc0977",
+      "english_sha256": "f95ab144311b699134e1cb4f355255ead3a68b79de2644e5f6b304996ea0ced3"
+    },
+    {
+      "path": "scripts/compare_self_scene_common_centers.py",
+      "original_sha256": "be3a9c85d84080511afcc7ec76e74c2d950902d0f4a234dd7115df37100062fb",
+      "english_sha256": "447b69438e371354afc2fda211d14ac6b4951bc984cdd9c69cbc0a1c78276bfc"
+    },
+    {
+      "path": "scripts/_bootstrap.py",
+      "original_sha256": "e22c7224dda315ceb1283d52e83c209aba4818aa2f4ad5b4f1d585dff0f2aa8d",
+      "english_sha256": "9b254d4f06e5deb1a60b09d221862b10e3d2f59952d2d40f67d24ba299790f64"
+    },
+    {
+      "path": "scripts/run_self_scene_camera.py",
+      "original_sha256": "7a636181f31cf7ab29a9c8067231c90833a9a886bbd7227e5209607bd44962c0",
+      "english_sha256": "de1270fc83ef9c6f0b6d0358b43827a45a46e017671f0d6bb3746adc310732e0"
+    },
+    {
+      "path": "scripts/train_videomae_self_scene.py",
+      "original_sha256": "ad9c28b644d4c800aa29cfdf33c9bac5a19f342e24c7f2216c3332b20d72dcd3",
+      "english_sha256": "8e4d8ed4e816915740b78177b6617630d8a2d50932e69278f1bc81e588f86340"
+    },
+    {
+      "path": "src/handwash/logging.py",
+      "original_sha256": "c647451fff2421b5c043f53042e0b22f1bd50c06de6881d4f0c20fa7e1f189ad",
+      "english_sha256": "9bb123082fd973c44509f59f776a157ffac2746154143c6b3714658e931e8357"
+    },
+    {
+      "path": "src/handwash/paths.py",
+      "original_sha256": "bd96cc9936a3c97c465e72648aba22898813487a76e075eb6c8030c74066bd02",
+      "english_sha256": "848c314303a1a563408e298a72b0367f85db70ad431f99ab58a5e62582a55776"
+    },
+    {
+      "path": "src/handwash/__init__.py",
+      "original_sha256": "95d2b1e3cad80697c402416bf0e58f98051c66553ab43a9af40faa6125b946dd",
+      "english_sha256": "28e9fdd81b8b2ed0f569f0ab53e0f49789673992b3d75dea5eac009eeec52f8d"
+    },
+    {
+      "path": "src/handwash/self_scene_assessment.py",
+      "original_sha256": "9a34677e48bb28a80163f66a1445b5626f512576a1a6d74ba0fe283f29f21b01",
+      "english_sha256": "93724656cd5194ab5c4c5e77463d2004280cb21ce82ab0ae9824db3ab78d0c91"
+    },
+    {
+      "path": "src/handwash/errors.py",
+      "original_sha256": "dccd337ddfb76468f11e2b5e9c62cd10108db571df2637196140d41607ae4bf7",
+      "english_sha256": "86454cd80757bfe2d8fdfd0f58050f44aa785ed24dc9300ca1a87bde0f77771a"
+    },
+    {
+      "path": "src/handwash/self_scene_camera.py",
+      "original_sha256": "6b641bf669a4888710e2190a77984b21e18f37ccad8ea946748e9d2b6912e925",
+      "english_sha256": "b12173e152b10102038c853944f4e9a2a57df2702c1fecc3bde136cce6d3a0a7"
+    },
+    {
+      "path": "src/handwash/core/seeding.py",
+      "original_sha256": "c4189d0f1eaf5fe6180d95e9cf95c92ced14d027558927f803dcb95eb79eeb0d",
+      "english_sha256": "e1d4e8d72fddacca243171056925475671b5097ce88aa0f6460c45aaea3bbf16"
+    },
+    {
+      "path": "src/handwash/core/labels.py",
+      "original_sha256": "0135c3536644318152ef3ced3a8d59bb7ee4ae6a45772e92774d2f55f774f4c9",
+      "english_sha256": "5ff0a4dc15c99688f7b916709680752891f809319da20a148884d0f89af0592a"
+    },
+    {
+      "path": "src/handwash/core/config.py",
+      "original_sha256": "8f650a5004e003870f1a608334417845804f14cdc246428cebaa4f59254c65e7",
+      "english_sha256": "d7f5846aba3fc15faece711ad22d0add7bb01ca9a9c6136c9f77a8e771281dc4"
+    },
+    {
+      "path": "src/handwash/core/action_chain.py",
+      "original_sha256": "f516cdd0487f639f287dbac90ebc8ade36b326f12f9479e3d1eb6444a043133d",
+      "english_sha256": "a9cd87ae41853d8512d849cfe35882c9e6a9479acec40571eaa3404a7f2b72ec"
+    },
+    {
+      "path": "src/handwash/core/__init__.py",
+      "original_sha256": "991acb10c59033973c34a30237cbb244256b6d6b27695d4785c5b9ff46089771",
+      "english_sha256": "29b05be628697294ce2004b1b83622ee4a01ecbb77cc5688ef703fc3b6ff8141"
+    },
+    {
+      "path": "src/handwash/core/boundary_decoding.py",
+      "original_sha256": "0270def1669ec90903e60a30b18791304d8f4fb62512d9ff47bf57efaa46a626",
+      "english_sha256": "d30d9778af57262596c65713d0a8f2d7e7ae834ee194b8ac041ab58007e68672"
+    },
+    {
+      "path": "src/handwash/core/boundary_metrics.py",
+      "original_sha256": "c6c0e0b23f312b22e51d40fe9c686ff6b79061e291923a265665a3a2ec5c8c9d",
+      "english_sha256": "2904891c637be29366882f56d709c47e3ba8a2ec5ba82421793685d562decd2d"
+    },
+    {
+      "path": "src/handwash/core/schema.py",
+      "original_sha256": "3814a6c569487cc9d4e96a4d817a84fe91d51b9f69d545b3f0b522a9a392b83e",
+      "english_sha256": "acf1f67e31f4e53b2507b735a5f09a64ca88b2d0c45a9a39e647120038679702"
+    },
+    {
+      "path": "src/handwash/io/manifest.py",
+      "original_sha256": "5eceb64b5309f20509974316d2a9b0751f01e4d741497ba4e851f4ae6f5dd67a",
+      "english_sha256": "fb7370ca5643ea5eea77407666484d8b63d66fe66270b49a076660cd6e8f70f2"
+    },
+    {
+      "path": "src/handwash/io/__init__.py",
+      "original_sha256": "7c8c82301eb9d456e1d99e8cca314eac68bbe66bb4b57227a85953a0f923967b",
+      "english_sha256": "7f31e37190e82e72fcb69698edba1376eb818f490f78565e3ce891740aadbc11"
+    },
+    {
+      "path": "src/handwash/io/utils.py",
+      "original_sha256": "b74ed032b403600c1ea37e4d950847d47077a4a13583f07c82777260597d28b5",
+      "english_sha256": "2bfc73f94096b161d635fdf4242b03dce3b1904ab201be84bf2ce26f4dedbad0"
+    },
+    {
+      "path": "src/handwash/io/video.py",
+      "original_sha256": "53d446cfa30d6f1ca73b7fd3e5e112be43519e597cf80b3cca86b924158b5add",
+      "english_sha256": "b60aab69261bab3963ea810834175bfdf780a8c2bd59ffac297b8a187c04032b"
+    },
+    {
+      "path": "src/handwash/pipelines/__init__.py",
+      "original_sha256": "94b765dde0844a99b33db1a27dafebd0009624b357173930af0be885a53a1ad9",
+      "english_sha256": "4777d31217458ca14d323aad5c10a3f4e738adf9000d508e51cd6fcbb3aec5ac"
+    },
+    {
+      "path": "src/handwash/pipelines/exp_demo.py",
+      "original_sha256": "4ae8b2bb6337119372362129f62071c9332dde314ddffc208a14817ee22a7efe",
+      "english_sha256": "8daec9d5db6a8ed5bbacc1139e103d3aba51e5d605bdfefeb42939e87437ec2f"
+    },
+    {
+      "path": "src/handwash/pipelines/common.py",
+      "original_sha256": "ee61886064e3c2ff3f0507549750015e9df5514b2c805e497024bffad47dde91",
+      "english_sha256": "ab0c06b6ceee6420accc93155ee4f17e51064d20eccc4584eb9f5a393cee1ec6"
+    },
+    {
+      "path": "src/handwash/pipelines/boundary_gru.py",
+      "original_sha256": "38fd62f0eb3c0c5564b15f5bf9dc5f6eca029dbf4a533ddae6086024c8482616",
+      "english_sha256": "945d9f4816a28fabfb3fe9839f9965fa2723df012154668d3ac6b43e69e2745d"
+    },
+    {
+      "path": "src/handwash/static/self_scene_camera.js",
+      "original_sha256": "a58d82efb209152f4605300915ae818fd86cc0b040315bc38dd188555d994f4f",
+      "english_sha256": "e7f48dab1c81b1f6c5f835da901996f7f622d18925b5c6ea0e5e0248e03dffb5"
+    },
+    {
+      "path": "src/handwash/data/synthetic.py",
+      "original_sha256": "2fc2c5542cc44108efe9df286f487c3c3037430137ffa7bf21339cdafe46098d",
+      "english_sha256": "e1ec8a37b0be9b051a44bf82ada799dd51127d0f5995ea46770629634ea57736"
+    },
+    {
+      "path": "src/handwash/data/transforms.py",
+      "original_sha256": "70e09562749b802d12d9ab32f82c3eee80df04f57a8d4c137643fd4926d6e886",
+      "english_sha256": "eb6f1b28a052f26b9d2e7dfcc8a06ccacc3a26f231bf756760eb123ee3f57d8b"
+    },
+    {
+      "path": "src/handwash/data/__init__.py",
+      "original_sha256": "da6a9d9ae02a8fe70aab3f9e191ed42a24f17d7ba78e250cafcfaa5103505b8c",
+      "english_sha256": "fa780a5902f05b76d5ae28dff2385f9ae59e6dc8a5b798db2af863ae435c51d5"
+    },
+    {
+      "path": "src/handwash/data/dataset.py",
+      "original_sha256": "4db1b8613d89564bef9dda795b0c8cc5b2d8b3be5e8f3a1b2a4cfbab59ac4449",
+      "english_sha256": "0e31402a675c4e1be404ee049e1e8f818ded81f41b9e9461c891bff5652fa683"
+    }
+  ],
+  "omitted": [
+    "ARCHIVE_NOTE.md",
+    "environment.yml",
+    "CHANGELOG.md",
+    ".pre-commit-config.yaml",
+    "Makefile",
+    "CODEOWNERS",
+    ".editorconfig",
+    "CONTRIBUTING.md",
+    "README.zh-CN.md",
+    "tests/conftest.py",
+    "tests/__init__.py",
+    "tests/README.md",
+    "tests/unit/test_boundary_decoding.py",
+    "tests/unit/test_pskuss_quality_filter.py",
+    "tests/unit/test_logging.py",
+    "tests/unit/test_transition_supervision.py",
+    "tests/unit/test_build_full_hospital_dataset.py",
+    "tests/unit/test_boundary_metrics.py",
+    "tests/unit/test_video_smoothing.py",
+    "tests/unit/test_errors.py",
+    "tests/unit/test_segment_decoding.py",
+    "tests/unit/test_boundary_gru.py",
+    "tests/unit/__init__.py",
+    "tests/unit/test_download_data_resume.py",
+    "tests/unit/test_yolo_spatial_attention.py",
+    "tests/unit/test_adaptive_boundary_gru_chain.py",
+    "tests/unit/test_sequence_review.py",
+    "tests/unit/test_paths.py",
+    "tests/unit/test_segment_consistency_loss.py",
+    "tests/unit/test_oof_partition.py",
+    "tests/unit/test_demo_audit.py",
+    "tests/unit/test_short_segment_verifier.py",
+    "tests/unit/test_sequence_protocol.py",
+    "tests/unit/core/test_registry.py",
+    "tests/unit/core/test_protocol.py",
+    "tests/unit/core/test_metrics.py",
+    "tests/unit/core/__init__.py",
+    "tests/unit/core/test_schema.py",
+    "tests/unit/core/test_labels.py",
+    "tests/unit/core/test_config.py",
+    "tests/integration/test_pskuss_adapter.py",
+    "tests/integration/test_manifest_integrity.py",
+    "tests/integration/__init__.py",
+    "tests/integration/test_live.py",
+    "models/README.md",
+    "docs/VIDEOMAE.zh-CN.md",
+    "docs/SELF_RECORDING.md",
+    "docs/ARCHITECTURE.md",
+    "docs/Project_Proposal_Template.docx",
+    "docs/FULL_DATASET.zh-CN.md",
+    "docs/EXPERIMENTS.md",
+    "docs/PRS-Practice-Module-brief.pdf",
+    "docs/VIDEO_MODEL_OPTIMIZATION_PLAN.zh-CN.md",
+    "docs/DATA.md",
+    "docs/RULES_CARD.md",
+    "docs/SELF_SCENE_CAMERA.zh-CN.md",
+    "docs/FINAL_RELEASE.zh-CN.md",
+    "docs/SELF_SCENE_FOUR_MODEL_COMPARISON.zh-CN.md",
+    "docs/FULL_PSKUS_CLOUD.zh-CN.md",
+    "docs/CONFIG.md",
+    "docs/DATA_COLLABORATION.md",
+    "docs/IMPLEMENTATION_PLAN.zh-CN.md",
+    "docs/FAIR_VIDEO_COMPARISON.zh-CN.md",
+    "docs/PROJECT_PROPOSAL.md",
+    "docs/PROJECT_BRIEF.zh-CN.txt",
+    "docs/SEQUENCE_EVALUATION_PROTOCOL.zh-CN.md",
+    "docs/PROTOCOL.md",
+    "docs/PROJECT_PLAN_4_WEEK.md",
+    "docs/zh/ARCHITECTURE.md",
+    "docs/zh/MODEL_FRAMEWORK.md",
+    "docs/zh/DATA.md",
+    "docs/zh/RULES_CARD.md",
+    "docs/zh/CONFIG.md",
+    "docs/zh/DATA_COLLABORATION.md",
+    "docs/zh/CONTRIBUTING.md",
+    "docs/zh/PROJECT_PROPOSAL.md",
+    "docs/zh/PROTOCOL.md",
+    "docs/zh/PROJECT_PLAN_4_WEEK.md",
+    "deliverables/README.md",
+    "configs/local.example.yaml",
+    "configs/config.yaml",
+    "configs/experiments/full_hospital_yolo_frame.yaml",
+    "configs/experiments/exp02_yolo26n_gru.yaml",
+    "configs/experiments/exp03_ablation_temporal.yaml",
+    "configs/experiments/live_yolo_frame.yaml",
+    "configs/experiments/exp04_cross_domain.yaml",
+    "configs/experiments/exp01_baseline_frame.yaml",
+    "configs/experiments/smoke.yaml",
+    "configs/data/selfrecorded.yaml",
+    "configs/data/metc.yaml",
+    "configs/data/jurmala.yaml",
+    "configs/data/kaggle.yaml",
+    "configs/data/pskuss.yaml",
+    "scripts/train_short_segment_verifier.py",
+    "scripts/audit_sequence_protocol.py",
+    "scripts/run_pskuss_ds1234_videomae.py",
+    "scripts/evaluate_dense_boundary_validation.py",
+    "scripts/evaluate_model.py",
+    "scripts/compare_boundary_videomae_fusion_validation.py",
+    "scripts/check_docs.py",
+    "scripts/build_oof_boundary_predictions.py",
+    "scripts/train_pskuss_full_yolo.py",
+    "scripts/build_pskuss_full_yolo_dataset.py",
+    "scripts/train_temporal_conv_refiner.py",
+    "scripts/train_videomae_pskus.py",
+    "scripts/run_pskuss_ds1234_yolo.py",
+    "scripts/evaluate_videomae_full_videos.py",
+    "scripts/train_model.py",
+    "scripts/setup_windows.ps1",
+    "scripts/prepare_data.py",
+    "scripts/train_current_yolo_gru.py",
+    "scripts/run_pskuss_ds134_pilot.py",
+    "scripts/train_exp_temporal_head.py",
+    "scripts/bootstrap_dataset.py",
+    "scripts/evaluate_boundary_candidate_validation.py",
+    "scripts/compare_full_video_models.py",
+    "scripts/check_config.py",
+    "scripts/compare_boundary_decoder_segment_validation.py",
+    "scripts/compare_boundary_validation_ablations.py",
+    "scripts/make_proposal.py",
+    "scripts/_common.py",
+    "scripts/__init__.py",
+    "scripts/run_camera.py",
+    "scripts/finetune_yolo_validation_only.py",
+    "scripts/run_assess.py",
+    "scripts/evaluate_adaptive_boundary_gru.py",
+    "scripts/train_yolo_spatial_attention.py",
+    "scripts/sync_doc_locales.py",
+    "scripts/build_full_hospital_dataset.py",
+    "scripts/download_data.py",
+    "scripts/check_structure.py",
+    "scripts/run_inference.py",
+    "scripts/package_final_release.py",
+    "scripts/run_pskuss_full_cloud.py",
+    "scripts/audit_demo.py",
+    "scripts/full_video_eval_common.py",
+    "scripts/retry_full_download.py",
+    "scripts/train_yolo26l_validation_only.py",
+    "scripts/pack_processed_data.py",
+    "scripts/compare_boundary_local_blend_validation.py",
+    "scripts/train_boundary_yolo_gru.py",
+    "scripts/compare_boundary_viterbi_validation.py",
+    "scripts/analyze_pskuss_validation_errors.py",
+    "scripts/doctor.py",
+    "scripts/run_compare.py",
+    "scripts/evaluate_yolo_full_videos.py",
+    "scripts/check_data_ignores.py",
+    "scripts/evaluate_yolo_candidate_validation.py",
+    "scripts/launchers/\u4e00\u952e\u51fa\u7ed3\u679c.command",
+    "scripts/launchers/one_click_dataset.py",
+    "scripts/launchers/\u4e00\u952e\u51fa\u7ed3\u679c.bat",
+    "scripts/launchers/README.md",
+    "data/README.md",
+    "outputs/README.md",
+    "src/handwash/compare_app.py",
+    "src/handwash/proposal_content_zh.py",
+    "src/handwash/cli.py",
+    "src/handwash/proposal_content.py",
+    "src/handwash/data_sources.py",
+    "src/handwash/camera_app.py",
+    "src/handwash/cli_doctor.py",
+    "src/handwash/core/metrics.py",
+    "src/handwash/core/sequence_review.py",
+    "src/handwash/core/registry.py",
+    "src/handwash/core/protocol.py",
+    "src/handwash/core/segment_metrics.py",
+    "src/handwash/core/segment_decoding.py",
+    "src/handwash/io/split.py",
+    "src/handwash/pipelines/demo_audit.py",
+    "src/handwash/pipelines/yolo_spatial_attention.py",
+    "src/handwash/pipelines/action_chain.py",
+    "src/handwash/pipelines/assess.py",
+    "src/handwash/pipelines/video_smoothing.py",
+    "src/handwash/pipelines/train.py",
+    "src/handwash/pipelines/live.py",
+    "src/handwash/pipelines/multiscale_boundary_gru.py",
+    "src/handwash/pipelines/infer.py",
+    "src/handwash/pipelines/evaluate.py",
+    "src/handwash/pipelines/compare_local.py",
+    "src/handwash/pipelines/prepare.py",
+    "src/handwash/models/torchvision_baselines.py",
+    "src/handwash/models/checkpoint.py",
+    "src/handwash/models/__init__.py",
+    "src/handwash/models/factory.py",
+    "src/handwash/models/mobilenet.py",
+    "src/handwash/models/yolo26_cls.py",
+    "src/handwash/models/voting.py",
+    "src/handwash/models/base.py",
+    "src/handwash/static/compare.html",
+    "src/handwash/static/camera.html"
+  ],
+  "added": []
+}
