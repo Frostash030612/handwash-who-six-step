@@ -41,6 +41,20 @@ heads were finally refit on 22 development clips, whereas YOLO and VideoMAE used
 The current branch focuses on the camera system and the final self-recorded results.
 Historical experiments remain in Git history and the `self-scene-final-20261022` tag.
 
+## Final report and presentation
+
+- [Project report](docs/final_report/Camera_Based_Handwashing_Assessment.pdf) and
+  [Overleaf source](docs/final_report/Camera_Based_Handwashing_Assessment_Overleaf_Source.zip).
+- [Final presentation](docs/final_presentation/Handwashing_Final_Presentation.pptx):
+  11 slides with timed speaker notes.
+- [Presentation script (PDF)](docs/final_presentation/Handwashing_Presentation_Script.pdf)
+  and [editable script](docs/final_presentation/Handwashing_Presentation_Script.md).
+
+The presentation targets 13 minutes: eight minutes of narration and five minutes of
+pre-recorded system demonstration. Play the video after slide 6, then resume at
+slide 8. The demonstration video is not embedded in the deck or included in this
+repository. See the [presentation guide](docs/final_presentation/README.md) for timing.
+
 ## Local camera setup
 
 The self-recorded raw videos, sampled images, frame annotations and model weights are
@@ -72,5 +86,5 @@ To recalculate the saved results, supply the prediction CSVs from the local pack
 ```
 
 This source release excludes raw self-recorded videos, weights, credentials and camera
-session histories. The coursework report, final slides, presentation recording and
+session histories. The report and final slides are available above; the presentation recording and
 individual submissions are separate deliverables.
