@@ -1,6 +1,8 @@
 # Camera-Based Handwashing Assessment Report
 
-- `Camera_Based_Handwashing_Assessment.pdf`: final English project report.
-- `Camera_Based_Handwashing_Assessment_Overleaf_Source.zip`: LaTeX source and figures, ready to upload to Overleaf.
+The final report presents the system design, dataset preparation, training protocol, evaluation, deployment workflow, and case analysis for the six-step handwashing assessment project.
 
-Upload the source ZIP to Overleaf to edit or recompile the report.
+- `Camera_Based_Handwashing_Assessment.pdf`: 45-page English report with 24 figures and 9 tables.
+- `Camera_Based_Handwashing_Assessment_Overleaf_Source.zip`: complete LaTeX source, tables, and figure assets for editing or recompilation in Overleaf.
+
+To edit the report, upload the source ZIP to Overleaf and select XeLaTeX as the compiler.
