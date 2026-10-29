@@ -23,6 +23,7 @@ deliverables/
 *.safetensors
 *.mov
 *.mp4
+!docs/final_presentation/*.mp4
 *.zip
 *.zip.sha256
 reproduced_metrics/

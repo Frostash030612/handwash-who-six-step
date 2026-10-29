@@ -45,15 +45,16 @@ Historical experiments remain in Git history and the `self-scene-final-20261022`
 
 - [Project report](docs/final_report/Camera_Based_Handwashing_Assessment.pdf) and
   [Overleaf source](docs/final_report/Camera_Based_Handwashing_Assessment_Overleaf_Source.zip).
-- [Final presentation](docs/final_presentation/Handwashing_Final_Presentation.pptx):
-  11 slides with timed speaker notes.
-- [Presentation script (PDF)](docs/final_presentation/Handwashing_Presentation_Script.pdf)
-  and [editable script](docs/final_presentation/Handwashing_Presentation_Script.md).
+- [Animated final presentation](docs/final_presentation/Handwashing_Final_Presentation_Animated.pptx):
+  11 slides with fade transitions and staged reveals.
+- [Silent eight-minute slide video](docs/final_presentation/Handwashing_Presentation_Silent_8min.mp4)
+  and [three-speaker narration script](docs/final_presentation/Handwashing_Presentation_Three_Speaker_Script.md).
 
 The presentation targets 13 minutes: eight minutes of narration and five minutes of
-pre-recorded system demonstration. Play the video after slide 6, then resume at
-slide 8. The demonstration video is not embedded in the deck or included in this
-repository. See the [presentation guide](docs/final_presentation/README.md) for timing.
+pre-recorded system demonstration. Insert the separately recorded demonstration
+after slide 6 at 04:20 of the silent slide video, then resume at slide 8. The
+demonstration itself is not included in this repository. See the
+[presentation guide](docs/final_presentation/README.md) for the edit-ready parts and timing.
 
 ## Local camera setup
 
@@ -86,5 +87,5 @@ To recalculate the saved results, supply the prediction CSVs from the local pack
 ```
 
 This source release excludes raw self-recorded videos, weights, credentials and camera
-session histories. The report and final slides are available above; the presentation recording and
-individual submissions are separate deliverables.
+session histories. The report, slides and silent slide video are available above;
+the narrated demonstration and individual submissions are separate deliverables.
