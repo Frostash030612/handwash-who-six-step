@@ -4,7 +4,7 @@
 
 **Target:** 13:00 total — 8:00 slide narration plus 5:00 recorded demonstration. Play the demonstration at 04:20 and resume narration at 09:20.
 
-本稿只做一件事：把现有 11 页讲稿按**最初的分工**拆到四个人头上。英文口播与数字一个字没改，只加了每段的讲者、时间边界和交接句。
+本稿只做一件事：把现有 11 页讲稿按**最初的分工**拆到四个人头上。英文口播与数字一个字没改，只加了每段的讲者与时间边界。
 
 ## 分工总表
 
@@ -140,8 +140,6 @@ Source: evaluation/metrics.csv and final project report, Table 4.
 *Presenter cue: Point to the four bars, then distinguish prediction correctness from procedure correctness. 这一页是"逐帧分数不等于流程正确"的核心证据。*
 
 Source: evaluation/action_chains.csv and final project report, Tables 4 and 5.
-
-交接：Wenzhe, over to you.
 
 # PART A（续）· Xu Wenzhe（徐文哲）— 部署取舍与结论
 
