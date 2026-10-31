@@ -16,8 +16,8 @@ This folder collects the final shareable group deliverables:
 | `Final_Video_Presentation.mp4` | 13:52 narrated presentation, including the recorded system demonstration |
 
 The runnable application source, evaluation exports and supporting documentation are
-in the repository root. The single Canvas submission ZIP also includes the annotated
-self-recorded dataset and trained model files. Raw recordings and weights are not
-published in this public repository.
+in the repository root. The [complete Canvas ZIP](../submission_assets/README.md) is
+published as three Git LFS parts. It includes the annotated self-recorded dataset and
+trained model files.
 
 Individual reports and peer reviews are separate student submissions.

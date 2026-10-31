@@ -1,0 +1,22 @@
+{
+  "filename": "Group_43_Final_Submission_20261031.zip",
+  "bytes": 4636372024,
+  "sha256": "ce46243d9164a137a1800abda803554121f5963e578deef03cfacb7de20875c2",
+  "parts": [
+    {
+      "file": "Group_43_Final_Submission_20261031.zip.part01",
+      "bytes": 1600000000,
+      "sha256": "b13a1bab9c7e0c0606802052113e4c247d2d61c36876b820c90e35ce4b644a29"
+    },
+    {
+      "file": "Group_43_Final_Submission_20261031.zip.part02",
+      "bytes": 1600000000,
+      "sha256": "7d022c11b396282221077fdb3f466300f6eddfcc37b73ff550f5ac08fbb14f48"
+    },
+    {
+      "file": "Group_43_Final_Submission_20261031.zip.part03",
+      "bytes": 1436372024,
+      "sha256": "1d0f497a0512cb6bd14ebef7f225137e472fadbf0417484eadf29c79b8cea4fc"
+    }
+  ]
+}

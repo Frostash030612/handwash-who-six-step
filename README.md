@@ -50,11 +50,19 @@ remains available separately. The team's Canvas submission ZIP also contains the
 annotated dataset and runnable system with model weights; individual reports and peer
 reviews are submitted separately.
 
+## Complete submission archive
+
+The [submission assets](submission_assets/README.md) contain the complete group ZIP as
+three Git LFS parts. They include the self-recorded dataset, sampled frames, reviewed
+annotations, four model checkpoints, runnable application, report, slides and narrated
+video. Run the restore script after cloning with Git LFS to recover the single ZIP for
+Canvas submission.
+
 ## Local camera setup
 
 The self-recorded raw videos, sampled images, frame annotations and model weights are
-included in the **local technical ZIP**, not this GitHub source repository. Place its
-`runtime/models/` directory at a local path. Install Python 3.12 and dependencies:
+included in the Git LFS submission archive. Extract its `System/runtime/models/`
+directory to a local path. Install Python 3.12 and dependencies:
 
 ```sh
 python3.12 -m venv .venv
@@ -80,6 +88,5 @@ To recalculate the saved results, supply the prediction CSVs from the local pack
   --output reproduced_metrics
 ```
 
-This public repository excludes raw self-recorded videos, weights, credentials and camera
-session histories. The local Canvas submission ZIP includes the first two of those
-assets together with the report, slides, video and application source.
+The public Git LFS archive includes the self-recorded dataset and weights. Credentials
+and camera session histories are excluded. Individual reports remain separate.
