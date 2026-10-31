@@ -46,8 +46,7 @@ Historical experiments remain in Git history and the `self-scene-final-20261022`
 The [submission folder](submission/README.md) contains the 45-page final report, both
 presentation slide decks, and the fully narrated 13-minute-53-second video with the
 system demonstration. The editable [Overleaf source](docs/final_report/Camera_Based_Handwashing_Assessment_Overleaf_Source.zip)
-and [presentation script](docs/final_presentation/Handwashing_Presentation_Three_Speaker_Script.md)
-remain available separately. The team's Canvas submission ZIP also contains the
+remains available separately. The team's Canvas submission ZIP also contains the
 annotated dataset and runnable system with model weights; individual reports and peer
 reviews are submitted separately.
 
